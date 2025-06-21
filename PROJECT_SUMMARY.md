@@ -2,7 +2,7 @@
 
 ## Overview
 
-Calva Backseat Driver is a VS Code extension that transforms AI coding assistants into Interactive Programmers by giving them access to a live Clojure/ClojureScript REPL. It exposes Calva's powerful REPL-driven development capabilities to AI assistants through both VS Code's Language Model API and the Model Context Protocol (MCP).
+Calva Backseat Driver (v0.0.14) is a VS Code extension that transforms AI coding assistants into Interactive Programmers by giving them access to a live Clojure/ClojureScript REPL. It exposes Calva's powerful REPL-driven development capabilities to AI assistants through both VS Code's Language Model API and the Model Context Protocol (MCP).
 
 **Core Value Proposition**: Turn "plausible-looking code that might work" into "tested code that actually works" by enabling AI to evaluate and iterate on solutions in real-time.
 
@@ -64,6 +64,8 @@ User ↔ AI Agent ↔ [VS Code LM API | MCP Server] ↔ Calva ↔ REPL ↔ Runni
 
 ### Integrations
 - `src/calva_backseat_driver/integrations/calva/api.cljs` - Calva API integration
+- `src/calva_backseat_driver/integrations/calva/editor.cljs` - Editor integration utilities
+- `src/calva_backseat_driver/integrations/calva/features.cljs` - Feature detection and capabilities
 - `src/calva_backseat_driver/integrations/vscode/tools.cljs` - VS Code Language Model tools
 - `src/calva_backseat_driver/stdio/wrapper.cljs` - MCP stdio wrapper for external clients
 
@@ -91,6 +93,7 @@ User ↔ AI Agent ↔ [VS Code LM API | MCP Server] ↔ Calva ↔ REPL ↔ Runni
 - **Shadow-CLJS 2.28.23** - Build tooling and hot reload
 - **Promesa 11.0.678** - Promise handling and async coordination
 - **Core.match 1.1.0** - Pattern matching for action/effect dispatch
+- **Baldr 1.0.9** - Updates test output to do positive reporting
 
 ### VS Code Integration
 - **VS Code API ^1.96.2** - Extension host environment
@@ -127,8 +130,13 @@ The tools are exposed as VS Code Language ModelAPI (for CoPilot) and MCP (for ex
    - Fix bracket imbalances in Clojure code using Parinfer
    - Parameters: `text`
 
-6. **replace_top_level_form** (VS Code only)
+6. **replace_top_level_form**
    - Form-aware editing of Clojure code with semantic awareness
+   - Parameters: `filePath`, `line`, `targetLineText` (optional), `newForm`
+   - Features: Text targeting, automatic bracket balancing, rich comment support
+
+7. **insert_top_level_form**
+   - Form-aware insertion of new Clojure forms
    - Parameters: `filePath`, `line`, `targetLineText` (optional), `newForm`
    - Features: Text targeting, automatic bracket balancing, rich comment support
 
