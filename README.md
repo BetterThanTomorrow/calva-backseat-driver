@@ -30,7 +30,7 @@ Please note that for the editing tools there is no UI for reviewing the edits. I
 
 ## Why Calva Backseat Driver?
 
-"I wish Copilot could actually run my Clojure code instead of just guessing what it might do."
+"I wish Copilot could actually run my Clojure code instead of just guessing what the code may do."
 
 The Calva Backseat Driver transforms AI coding assistants from static code generators into interactive programming partners by giving them access to your REPL. (Please be mindful about the implications of that before you start using it.)
 
