@@ -17,6 +17,7 @@ This extension exposes the AI tools both to CoPilot directly, using the VS Code 
 ## Features
 
 * Tool: **Evaluate Code** Access to the Clojure REPL to evaluate code at will
+* Tool: **Human Intelligence** The agent can ask the human for guidance, using an VS Code input box
 * Tool: **Replace top level form** Structural editing, including formatting, bracket balancing and linting
 * Tool: **Insert top level form** Structural editing, including formatting, bracket balancing and linting
 * Tool: **Bracket Balancer** Helps the model get the bracket balance right (powered by [Parinfer](https://github.com/parinfer/parinfer.js))

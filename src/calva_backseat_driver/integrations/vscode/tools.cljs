@@ -149,7 +149,7 @@
                                                           :cbd/prompt prompt})]
                    (vscode/LanguageModelToolResult.
                     #js [(vscode/LanguageModelTextPart.
-                          (js/JSON.stringify result))])))})
+                          result)])))})
 
 (defn register-language-model-tools [dispatch!]
   (cond-> []

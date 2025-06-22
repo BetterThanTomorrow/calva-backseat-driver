@@ -32,7 +32,7 @@
                                      (.hide input-box))))
          (.onDidHide input-box (fn []
                                  (.dispose input-box)
-                                 (resolve-fn (:human-intelligence/result @!state))))
+                                 (resolve-fn (str (:human-intelligence/result @!state)))))
          (.show input-box))))))
 
 (comment
