@@ -1,5 +1,7 @@
 (ns calva-backseat-driver.mcp.fxs
   (:require
+   ["fs" :as fs]
+   ["path" :as path]
    ["vscode" :as vscode]
    [calva-backseat-driver.ex.ax :as ax]
    [calva-backseat-driver.mcp.requests :as requests]
@@ -29,21 +31,17 @@
           (p/then (fn [success?]
                     (dispatch! context (ax/enrich-with-args on-success success?))))))
 
-    [:mcp/fx.show-server-started-message server-info]
-    (let [{:server/keys [port ^js port-file-uri port-note]} server-info]
-      (p/let [button (vscode/window.showInformationMessage (str port-note " MCP socket server started on port: " port ". Now your MCP client can run the `calva` stdio server command. (See Backseat Driver README and the docs of your AI Agent for how to do this.)") "Copy port" "Copy command")]
+    [:mcp/fx.show-server-started-message server-info wrapper-config-path]
+    (let [{:server/keys [port ^js port-file-uri port-note]} server-info
+          script-path (path/join wrapper-config-path "calva-mcp-server.js")]
+      (p/let [button (vscode/window.showInformationMessage (str port-note " MCP socket server started on port: " port ". Now your MCP client can run the `calva` stdio server command. (See Backseat Driver README and the docs of your AI Agent for how to do this.)") "Copy command + port" "Copy command + port-file")]
         (case button
-          "Copy port"
+          "Copy command + port"
           (vscode/env.clipboard.writeText
-           (str port))
+           (str "node " script-path " " port))
 
-          "Copy command"
-          (let [extension-uri (-> (vscode/extensions.getExtension
-                                   "betterthantomorrow.calva-backseat-driver")
-                                  .-extensionUri)
-                script-uri (vscode/Uri.joinPath extension-uri "dist" "calva-mcp-server.js")
-                script-path (.-fsPath script-uri)
-                port-file-path (.-fsPath port-file-uri)]
+          "Copy command + port-file"
+          (let [port-file-path (.-fsPath port-file-uri)]
             (vscode/env.clipboard.writeText
              (str "node " script-path " " port-file-path)))
 
@@ -54,6 +52,21 @@
 
     [:mcp/fx.handle-request options request]
     (requests/handle-request-fn (assoc options :ex/dispatch! (partial dispatch! context)) request)
+
+    [:mcp/fx.copy-wrapper-script-to-config-dir wrapper-config-path]
+    (let [extension-uri (-> (vscode/extensions.getExtension
+                             "betterthantomorrow.calva-backseat-driver")
+                            .-extensionUri)
+          script-uri (vscode/Uri.joinPath extension-uri "dist" "calva-mcp-server.js")
+          script-path (.-fsPath script-uri)]
+      (fs/mkdirSync wrapper-config-path
+                    #js {:recursive true}
+                    (fn [err]
+                      (when err (throw err))
+                      (js/console.log "Directories created successfully")))
+      ((if js/goog.DEBUG
+         fs/symlinkSync
+         fs/copyFileSync) script-path (path/join wrapper-config-path "calva-mcp-server.js")))
 
     :else
     (js/console.warn "Unknown MCP effect:" (pr-str effect))))

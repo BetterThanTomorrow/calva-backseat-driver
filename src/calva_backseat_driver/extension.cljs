@@ -1,5 +1,7 @@
 (ns calva-backseat-driver.extension
   (:require
+   ["os" :as os]
+   ["path" :as path]
    ["vscode" :as vscode]
    [calva-backseat-driver.ex.ex :as ex]
    [calva-backseat-driver.app.db :as db]))
@@ -11,7 +13,8 @@
   {:app/log-file-uri
    (vscode/Uri.joinPath
     (.-logUri context) "mcp-server.log")
-   :app/min-log-level :debug})
+   :app/min-log-level :debug
+   :mcp/wrapper-config-path (path/join (os/homedir) ".config" "calva" "backseat-driver")})
 
 (defn ^:export activate [^js context]
   (js/console.time "activation")

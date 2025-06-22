@@ -19,7 +19,7 @@
                    :app/server-starting? false)
      :ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/starting? false]
               [:app/ax.set-when-context :calva-backseat-driver/started? true]]
-     :ex/fxs [[:mcp/fx.show-server-started-message server-info]
+     :ex/fxs [[:mcp/fx.show-server-started-message server-info (:mcp/wrapper-config-path state)]
               [:app/fx.return (clj->js server-info)]]}
 
     [:mcp/ax.stop-server]

@@ -9,7 +9,8 @@
     (let [new-state (merge state initial-state)]
       {:ex/db new-state
        :ex/dxs [[:app/ax.init :vscode/config.autoStartMCPServer]] ;; Give the init-logging a chance to save the promise
-       :ex/fxs [[:app/fx.init-logging (assoc new-state :ex/uri-action [:db/ax.assoc-in [:app/log-dir-initialized+]])]]})
+       :ex/fxs [[:app/fx.init-logging (assoc new-state :ex/uri-action [:db/ax.assoc-in [:app/log-dir-initialized+]])]
+                [:mcp/fx.copy-wrapper-script-to-config-dir (:mcp/wrapper-config-path new-state)]]})
 
     [:app/ax.init autostart-mcp-server?]
     {:ex/dxs [[:app/ax.register-command "calva-backseat-driver.startMcpServer"

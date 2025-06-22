@@ -127,7 +127,7 @@ The MCP server is running as a plain socket server in the VS Code Extension Host
 1. Open your project
 1. Start the Calva MCP socket server
    * This will create a port file: `${workspaceFolder}/.calva/mcp-server/port`
-   * When the server is started, a confirmation dialog will be shown. This dialog has a button which lets you copy the port number, or the command for starting the stdio wrapper, to the clipboard.
+   * When the server is started, a confirmation dialog will be shown. This dialog has a button which lets you copy the command for starting the stdio wrapper to the clipboard.
 
      ![MCP Server Started message with Copy Command button](assets/howto/mcp-copy-stdio-command.png)
 1. Add the MCP server config (will vary depending on MCP Client)
@@ -152,7 +152,7 @@ In you project's `.cursor/mcp.json` add a `"backseat-driver"` entry like so:
     "backseat-driver": {
       "command": "node",
       "args": [
-        "<absolute path to calva-mcp-server.js in the extension folder>",
+        "<absolute path to calva-mcp-server.js in user-homme-config directory>",
         "<absolute path to port file (which points to your project's .calva/mcp-server/port)"
       ]
     }
@@ -193,7 +193,7 @@ Claude Desktop doesn't run in VS Code, and doesn't have any other project/worksp
     "backseat-driver": {
       "command": "node",
       "args": [
-        "<absolute path to calva-mcp-server.js in the extension folder>",
+        "<absolute path to calva-mcp-server.js in user-homme-config directory>",
         "1664"
       ]
     }
