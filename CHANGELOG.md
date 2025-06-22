@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.14] - 2025-06-22
+
 - [Add human intelligence tool, for the agent to ask the human for guidance](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/17)
 - [Place MCP stdio wrapper script in user home Calva config directory](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/15)
 
