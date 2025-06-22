@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- [Add human intelligence tool, for the agent to ask the human for guidance](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/17)
+
 ## [v0.0.13] - 2025-05-28
 
 - [Add replace-top-level-form structural editing tool](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/12)
