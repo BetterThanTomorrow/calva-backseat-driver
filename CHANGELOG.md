@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.15] - 2025-07-01
+
 - [Limit the lines of REPL output to be passed to the AI by the REPL output tool](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/20)
 
 ## [v0.0.14] - 2025-06-22
