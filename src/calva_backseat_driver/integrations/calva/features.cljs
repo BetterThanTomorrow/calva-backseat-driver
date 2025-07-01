@@ -73,7 +73,7 @@
                    :calva/keys [since-line]}]
   (clj->js
    (dispatch! [[:app/ax.log :debug "[Server] Getting getting output since line:" since-line]
-               [:calva/ax.get-output since-line]])))
+               [:calva/ax.get-output since-line [:db/get :output/limit]]])))
 
 (defn exists-on-output? [] (boolean (get-in calva/calva-api [:repl :onOutputLogged])))
 

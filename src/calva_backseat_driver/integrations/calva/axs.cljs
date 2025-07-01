@@ -19,10 +19,11 @@
                      :calva/output-buffer capped-buffer
                      :calva/output-message-count message-count)})
 
-    [:calva/ax.get-output since-line]
-    {:ex/fxs [[:app/fx.return (filter (fn [message]
-                                        (> (:line message 0) since-line))
-                                      (:calva/output-buffer state))]]}
+    [:calva/ax.get-output since-line limit]
+    {:ex/fxs [[:app/fx.return (->> (:calva/output-buffer state)
+                                   (filter (fn [message]
+                                             (> (:line message 0) since-line)))
+                                   (take-last limit))]]}
 
     :else
     {:ex/fxs [[:node/fx.log-error "Unknown action:" (pr-str action)]]}))

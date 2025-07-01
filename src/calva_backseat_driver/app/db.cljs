@@ -2,7 +2,8 @@
 
 (def init-db {:vscode/extension-context nil
               :extension/disposables []
-              :extension/when-contexts {:calva-mcp-extension/activated? false}})
+              :extension/when-contexts {:calva-mcp-extension/activated? false}
+              :output/limit 150})
 
 (defonce !app-db (atom init-db))
 

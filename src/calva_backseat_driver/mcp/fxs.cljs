@@ -64,9 +64,11 @@
                     (fn [err]
                       (when err (throw err))
                       (js/console.log "Directories created successfully")))
-      ((if js/goog.DEBUG
-         fs/symlinkSync
-         fs/copyFileSync) script-path (path/join wrapper-config-path "calva-mcp-server.js")))
+      (if js/goog.DEBUG
+        (try
+          (fs/symlinkSync script-path (path/join wrapper-config-path "calva-mcp-server.js"))
+          (catch :default _e))
+        (fs/copyFileSync script-path (path/join wrapper-config-path "calva-mcp-server.js"))))
 
     :else
     (js/console.warn "Unknown MCP effect:" (pr-str effect))))
