@@ -2,7 +2,7 @@
   "name": "calva-backseat-driver",
   "displayName": "Calva Backseat Driver",
   "description": "Make CoPilot an Interactive Programmer, tools for VS Code CoPilot. Can also be run as an MCP server",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "publisher": "betterthantomorrow",
   "author": {
     "name": "Better Than Tomorrow",
