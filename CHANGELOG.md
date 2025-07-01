@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- [Limit the lines of REPL output to be passed to the AI by the REPL output tool](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/20)
+
 ## [v0.0.14] - 2025-06-22
 
 - [Add human intelligence tool, for the agent to ask the human for guidance](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/17)
