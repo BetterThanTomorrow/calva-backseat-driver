@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- [Human Intelligence input box closes when focus is lost (should persist)](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/22)
+
 ## [v0.0.15] - 2025-07-01
 
 - [Limit the lines of REPL output to be passed to the AI by the REPL output tool](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/20)
