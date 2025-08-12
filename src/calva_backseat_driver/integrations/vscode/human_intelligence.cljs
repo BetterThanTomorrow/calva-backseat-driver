@@ -16,6 +16,7 @@
          (set! (.-title input-box) "AI Agent needs input")
          (set! (.-prompt input-box) prompt)
          (set! (.-placeholder input-box) (str "Start typing to cancel auto-dismiss (" timeout-s "s timeout)..."))
+         (set! (.-ignoreFocusOut input-box) true)
          (swap! !state assoc :human-intelligence/timeout-id
                 (js/setTimeout #(do
                                   (dispatch! [[:app/ax.log :debug "[Server] Human Intelligence timed out:"]])
