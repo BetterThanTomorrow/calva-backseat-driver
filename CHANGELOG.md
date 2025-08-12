@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.16] - 2025-08-12
+
 - [Human Intelligence input box closes when focus is lost (should persist)](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/22)
 
 ## [v0.0.15] - 2025-07-01
