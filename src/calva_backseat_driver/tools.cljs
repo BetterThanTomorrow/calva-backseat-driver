@@ -1,4 +1,4 @@
-(ns calva-backseat-driver.integrations.vscode.tools
+(ns calva-backseat-driver.tools
   (:require
    ["vscode" :as vscode]
    [calva-backseat-driver.bracket-balance :as balance]
@@ -90,8 +90,8 @@
 
        :invoke (fn invoke [^js options _token]
                  (let [text (-> options .-input .-text)
-                       result (balance/infer-parens {:ex/dispatch! dispatch!
-                                                     :calva/text text})]
+                       result (balance/infer-parens-response {:ex/dispatch! dispatch!
+                                                              :calva/text text})]
                    (vscode/LanguageModelToolResult.
                     #js [(vscode/LanguageModelTextPart.
                           (js/JSON.stringify result))])))})

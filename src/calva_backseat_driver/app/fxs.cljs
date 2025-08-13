@@ -2,7 +2,7 @@
   (:require
    ["vscode" :as vscode]
    [calva-backseat-driver.ex.ax :as ax]
-   [calva-backseat-driver.integrations.vscode.tools :as tools]
+   [calva-backseat-driver.tools :as tools]
    [calva-backseat-driver.mcp.logging :as logging]
    [clojure.core.match :refer [match]]))
 
