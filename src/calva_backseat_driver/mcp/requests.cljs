@@ -269,8 +269,8 @@
 
         (= tool "balance_brackets")
         (let [{:keys [text]} arguments
-              result (bracket-balance/infer-parens (merge options
-                                                          {:calva/text text}))]
+              result (bracket-balance/infer-parens-response (merge options
+                                                                   {:calva/text text}))]
           {:jsonrpc "2.0"
            :id id
            :result {:content [{:type "text"

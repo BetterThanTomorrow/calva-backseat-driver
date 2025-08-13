@@ -2,13 +2,17 @@
   (:require ["parinfer" :as parinfer]))
 
 (defn infer-parens
+  [code]
+  (some-> (parinfer/indentMode code #js {:partialResult true})
+          (js->clj :keywordize-keys true)))
+
+(defn infer-parens-response
   "Infer parens from the indentation"
   [{:ex/keys [dispatch!]
     :calva/keys [text]}]
   (dispatch! [[:app/ax.log :debug "[Server] Infering brackets for:" text]])
   (try
-    (let [result (some-> (parinfer/indentMode  text #js {:partialResult true})
-                         (js->clj :keywordize-keys true))]
+    (let [result (infer-parens text)]
       (clj->js
        (if (:success result)
          (let [new-text (:text result)]
@@ -21,5 +25,5 @@
       #js {:error (.-message e)})))
 
 (comment
-  (infer-parens {:ex/dispatch! println
-                 :calva/text "(def foo [a b"}))
+  (infer-parens-response {:ex/dispatch! println
+                          :calva/text "(def foo [a b"}))
