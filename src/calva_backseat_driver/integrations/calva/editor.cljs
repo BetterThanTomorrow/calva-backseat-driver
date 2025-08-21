@@ -146,9 +146,11 @@
                       form-data (get-ranges-form-data-by-line file-path final-line-number ranges-fn-key)
                       diagnostics-before-edit (get-diagnostics-for-file file-path)]
                 (if (:success balance-result)
-                  (p/let [text (if (= :insertionPoint ranges-fn-key)
-                                 (str (string/trim (:text balance-result)) "\n\n")
-                                 (:text balance-result))
+                  (p/let [balanced-form (:text balance-result)
+                          balancing-occurred? (not= new-form balanced-form)
+                          text (if (= :insertionPoint ranges-fn-key)
+                                 (str (string/trim balanced-form) "\n\n")
+                                 balanced-form)
                           edit-result (edit-replace-range file-path
                                                           (first (:ranges-object form-data))
                                                           text)
@@ -158,10 +160,15 @@
                       (do
                         ; save the document
                         (.save vscode-document)
-                        {:success true
-                         :actual-line-used final-line-number
-                         :diagnostics-before-edit diagnostics-before-edit
-                         :diagnostics-after-edit diagnostics-after-edit})
+                        (cond-> {:success true
+                                 :actual-line-used final-line-number
+                                 :diagnostics-before-edit diagnostics-before-edit
+                                 :diagnostics-after-edit diagnostics-after-edit}
+
+                          balancing-occurred?
+                          (merge
+                           {:balancing-note "The code provided for editing had unbalanced brackets. The code was automatically balanced before editing. Use the code in the `balanced-code` to correct your code on record."
+                            :balanced-code balanced-form})))
                       {:success false
                        :diagnostics-before-edit diagnostics-before-edit}))
                   balance-result))

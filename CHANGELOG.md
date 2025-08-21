@@ -4,6 +4,9 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- [Remove default copilot instructions settings](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/24)
+- [Improve instructions to agents for the structural editing tools](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/27)
+
 ## [v0.0.17] - 2025-08-13
 
 - [Balance brackets before evaluating code](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/25)
