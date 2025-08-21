@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.18] - 2025-08-21
+
 - [Remove default copilot instructions settings](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/24)
 - [Improve instructions to agents for the structural editing tools](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/27)
 
