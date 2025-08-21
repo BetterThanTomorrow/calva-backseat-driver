@@ -58,10 +58,13 @@ Follow this process for making safe and working updates:
 1. **Always edit whole top level forms** (typically `def` and `defn` and such) using the structural editing tools (`replace_top_level_form` or `insert_top_level_form`)
 2. Always check with the problem tool what the current linting state is
 3. Plan your edits, breaking it up in one edit per complete top level form you are editing or inserting
-4. With your list of edits, work backwards from the edit furthest down/nearest the end the file to the edit nearest the start of the file
-5. For each top level form in your edit plan (starting at the bottom of the file):
-   1. Edit the file using the appropriate structural editing tool
-   2. Check with the problem tool that no new problems are reported
+4. **Work from bottom to top of the file** - Because editing tools use line numbers, and edits can shift line numbers of content below them, always apply your edits starting from the lowest line number (bottom of file) and work upward. This keeps your planned line numbers accurate.
+
+   Example: If you plan to edit lines 10, 20, and 30, edit them in this order: line 30 → line 20 → line 10.
+
+   1. For each top level form in your edit plan (starting at the bottom of the file):
+      1. Edit the file using the appropriate structural editing tool
+      2. Check with the problem tool that no new problems are reported
 
 # When the bracket balance is off
 
