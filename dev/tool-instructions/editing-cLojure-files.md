@@ -1,4 +1,4 @@
-# Editing CLojure files
+# Editing Clojure files
 
 Even as an interactive programmer, now and then you do edit files. The most important things:
 
