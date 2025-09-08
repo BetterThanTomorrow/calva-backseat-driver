@@ -117,7 +117,7 @@
   "Find the actual line number by searching for target text within a window around the initial line.
    Returns the line number (1-indexed) where the target text is found, or nil if not found."
   [^js vscode-document initial-line-number target-text]
-  (inc (util/find-target-line-by-text (.getText vscode-document) target-text initial-line-number search-window)))
+  (inc (util/find-target-line-by-text (.getText vscode-document) target-text (dec initial-line-number) search-window)))
 
 (defn apply-form-edit-by-line-with-text-targeting
   "Apply a form edit by line number with text-based targeting for better accuracy.
