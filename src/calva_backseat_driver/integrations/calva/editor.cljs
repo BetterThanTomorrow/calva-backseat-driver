@@ -3,6 +3,7 @@
    ["vscode" :as vscode]
    [calva-backseat-driver.integrations.calva.api :as calva]
    [calva-backseat-driver.integrations.parinfer :as parinfer]
+   [calva-backseat-driver.integrations.calva.editor-util :as util]
    [clojure.string :as string]
    [promesa.core :as p]))
 
@@ -110,24 +111,13 @@
     :else
     {:valid? true}))
 
+(def ^:private search-window 2)
+
 (defn- find-target-line-by-text
   "Find the actual line number by searching for target text within a window around the initial line.
    Returns the line number (1-indexed) where the target text is found, or nil if not found."
   [^js vscode-document initial-line-number target-text]
-  (let [line-count (.-lineCount vscode-document)
-        search-window 2  ; search 2 lines above and below
-        start-line (max 0 (- initial-line-number search-window 1))  ; convert to 0-indexed and clamp
-        end-line (min (dec line-count) (+ initial-line-number search-window 1))]  ; convert to 0-indexed and clamp
-    (loop [line-idx start-line]
-      (if (<= line-idx end-line)
-        (let [line-text (-> vscode-document
-                            (.lineAt line-idx)
-                            .-text
-                            (.trim))]
-          (if (= line-text (.trim target-text))
-            (inc line-idx)  ; return 1-indexed line number
-            (recur (inc line-idx))))
-        nil))))
+  (inc (util/find-target-line-by-text (.getText vscode-document) target-text initial-line-number search-window)))
 
 (defn apply-form-edit-by-line-with-text-targeting
   "Apply a form edit by line number with text-based targeting for better accuracy.
