@@ -280,7 +280,7 @@
             },
             "targetLineText": {
               "type": "string",
-              "description": "The exact text content (trimmed) of the line you are targeting"
+              "description": "The exact text content of the line you are targeting"
             },
             "newForm": {
               "type": "string",
@@ -322,7 +322,7 @@
             },
             "targetLineText": {
               "type": "string",
-              "description": "The exact text content (trimmed) of the line you are targeting."
+              "description": "The exact text content of the line you are targeting."
             },
             "newForm": {
               "type": "string",
