@@ -168,7 +168,7 @@
                               diagnostics-after-edit (get-diagnostics-for-file file-path)]
                         (if edit-result
                           (do
-                            (.save (:vscode-document form-data))
+                            (.save vscode-document)
                             (cond-> {:success true
                                      :actual-line-used final-line-number
                                      :diagnostics-before-edit diagnostics-before-edit
