@@ -1,5 +1,7 @@
 # Editing Clojure files
 
+We refer to all files of reasonably Clojure-ish type as **Clojure files**, be it Clojure, ClojureScript, Babashka, nbb, Joyride, Jank, you-name-it.
+
 Even as an interactive programmer, now and then you do edit files. The most important things:
 
 1. **Before any editing: First always read the whole file you are about to edit.** Instead of chunked reading, **read it in one go**.
@@ -7,49 +9,24 @@ Even as an interactive programmer, now and then you do edit files. The most impo
 3. Check with the problem tool after each edit
 4. Always be alert to when the bracket balance is off, and see [When the bracket balance is off](#when-the-bracket-balance-is-off) if it is.
 
-The specific process look different depending on if you are creating files, adding functions, or editing existing functions.
+Also:
+* The structural editing tools attempt to automatically balance brackets before applying edits.
+* The tools return post-edit diagnostics/linting ifno. Make use of it!
 
-## Creating Clojure files
+The specific process look different depending on if you are creating files, appending forms, inserting forms, or editing existing forms.
 
-Use the `create_file` tool to create files with empty content `""`.
+## About top level forms
 
-### Clojure Namespace and Filename Convention:
+The structural editing tools appends/inserts/replaces top level forms/s-expressions, such as the `ns` form, `def`, `defn`, `def...` forms, and many Rich Comment Forms. Top level form is Calva nomenclature for referring to forms at the root/top level of the Clojure code structure.
 
-**Important**: In Clojure,  namespace names use kebab-case while filenames use snake_case. For example:
-- Namespace: `my.project.multi-word-namespace`
-- Filename: `my/project/multi_word_namespace.clj(s|c)`
-
-Always convert dashes in namespace names to underscores in the corresponding filename.
-
-### Create empty files, then add content
-
-For you to create files and add content safely/predictably, follow this process:
-
-1. **Always create empty files first** - Use `create_file` with empty content `""`
-2. Read the content of the file created (default content may have been added)
-3. **Use structural editing tools** to edit the file
+* **Rich Comment Forms/RCF**: Calva treats forms immediately enclosed within `(comment <like this>)` as top level forms, making them valid targets for the top_level_form editing tools. (The `(comment ... )` form itself is also a top level form, as far as Calva is concerned.)
 
 ## Important about the Structural Editing Tools
 
-Use the structural editing tools for Clojure forms/s-expressions.
+Use the structural editing tools for Clojure top level forms/s-expressions.
 
-* Use `insert_top_level_form` to add new forms to a file
-* Use `replace_top_level_form` to modify existing forms
-* Make use of the diagnostics info returned
-* **Rich Comment Forms/RCF**: Calva treats forms immediately enclosed within `(comment <like this>)` as top level forms, making them valid targets for the top_level_form editing tools.
-
-The structural editing tools attempt to automatically balance brackets before applying edits.
-
-### `replace_top_level_form`
-* Target top level forms by their starting, 1-based, line number
-* **Important**: This tool is **only** for replacing top level Clojure one form/s-expression with another form/s-expression
-  * For editing line comments (`; ...` which are not structural), use your built in edit tools
-
-### `insert_top_level_form`
-* Always target the top level of the code
-* Use 1-based, line numbers
-* **Important**: This tool is **only** for inserting Clojure forms/s-expressions, one at a time
-  * For inserting line comments (`; ...` which are not structural), use your built in edit tool
+* Use the **Append Top Level Form** tool to append forms to the end of a Clojure file
+* Use the **Create Clojure File** tool to create a Clojure file. Create the file with all the contents you know should go there at the time of creation.
 
 ## Structural editing process
 
