@@ -20,3 +20,14 @@
             line-idx
             (recur (inc line-idx))))
         nil))))
+
+(defn target-text-is-first-line?
+  "Check if target text matches the first line of a form.
+   Returns true if the trimmed target text equals the trimmed first line of the form."
+  [target-text form-text]
+  (let [trimmed-target (string/trim target-text)
+        first-line (-> form-text
+                       string/split-lines
+                       first
+                       string/trim)]
+    (= trimmed-target first-line)))
