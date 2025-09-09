@@ -145,12 +145,11 @@
               (p/let [final-line-number actual-line-number
                       text-validation (validate-top-level-form-targeting file-path final-line-number target-line)]
                 (if (not (:valid? text-validation))
-                  ;; Return validation error
                   {:success false
                    :error (str "Target text validation failed: " (:reason text-validation))
                    :validation-error (:reason text-validation)}
 
-                  ;; Proceed with form editing
+                  ;; Validation done. Proceed with form editing
                   (p/let [balance-result (some-> (parinfer/infer-brackets new-form)
                                                  (js->clj :keywordize-keys true))
                           form-data (get-ranges-form-data-by-line file-path final-line-number ranges-fn-key)
