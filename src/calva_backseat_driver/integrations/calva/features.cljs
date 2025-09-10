@@ -115,8 +115,6 @@
   (let [path-parts (string/split file-path #"/")]
     (string/join "/" (butlast path-parts))))
 
-
-
 (defn structural-create-file+
   "Create a new Clojure file with exact content using vscode/workspace.fs API"
   [{:ex/keys [dispatch!]
@@ -164,21 +162,37 @@
     (when balancing-occurred?
       (dispatch! [[:app/ax.log :debug "[Editor] Form was unbalanced, balanced before appending"]]))
     (p/let [uri (vscode/Uri.file file-path)
-            ;; Read current file content
-            file-bytes (vscode/workspace.fs.readFile uri)
-            current-content (.decode (js/TextDecoder.) file-bytes)
-            ;; Create the appended content with proper spacing
-            normalized-current (string/trim current-content)
-            appended-content (str normalized-current "\n\n" (string/trim balanced-form) "\n")
-            ;; Write back to file
-            content-bytes (.encode (js/TextEncoder.) appended-content)]
-      (p/-> (vscode/workspace.fs.writeFile uri content-bytes)
-            (p/then (fn [_]
-                      (cond-> {:success true
-                               :appended-at-end true}
-                        balancing-occurred?
-                        (merge {:balancing-note "The code provided had unbalanced brackets. The code was automatically balanced before appending."
-                                :balanced-code balanced-form}))))
+            ^js vscode-document (vscode/workspace.openTextDocument uri)
+            ;; Get the end position of the document
+            last-line-number (.-lineCount vscode-document)
+            end-position (vscode/Position. last-line-number 0)
+            ;; Check if we need to add spacing based on the last line
+            last-line-text (if (pos? last-line-number)
+                             (.-text (.lineAt vscode-document (dec last-line-number)))
+                             "")
+            needs-spacing? (and (pos? last-line-number)
+                                (not (string/blank? last-line-text)))
+            ;; Create the text to append with proper spacing
+            spacing (if needs-spacing? "\n\n" "\n")
+            append-text (str spacing (string/trim balanced-form) "\n")
+            ;; Create edit operation
+            edit (vscode/TextEdit.insert end-position append-text)
+            workspace-edit (vscode/WorkspaceEdit.)]
+      ;; Apply the edit
+      (.set workspace-edit uri #js [edit])
+      (p/-> (vscode/workspace.applyEdit workspace-edit)
+            (p/then (fn [success]
+                      (if success
+                        (do
+                          ;; Save the document synchronously like the existing editor code
+                          (.save vscode-document)
+                          (cond-> {:success true
+                                   :appended-at-end true}
+                            balancing-occurred?
+                            (merge {:balancing-note "The code provided had unbalanced brackets. The code was automatically balanced before appending."
+                                    :balanced-code balanced-form})))
+                        {:success false
+                         :error "Failed to apply workspace edit"})))
             (p/catch (fn [error]
                        (dispatch! [[:app/ax.log :error "[Editor] Failed to append code to file" file-path error]])
                        {:success false
