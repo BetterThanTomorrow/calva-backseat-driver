@@ -35,6 +35,24 @@ Follow this process for making safe and working updates:
 
     Remember that in Clojure, functions need to be defined before they are called, so during the edits this way, linter complaints about symbols not found are to be expected. When the edit plan is carried out, you should have no new such warnings.
 
+## Code Indentation Before REPL Evaluation
+
+**Always ensure that Clojure code is properly indented.** Proper indentation is essential for the structural editing tools to work correctly.
+
+### Essential Rule:
+- **Indent code properly** - Align nested forms with consistent indentation before evaluation
+
+### Pattern:
+```clojure
+;; ❌ Poor indentation - will cause issues
+(defn my-function [x]
+(+ x 2))
+
+;; ✅ Proper indentation - ready for use with the structural editing tools
+(defn my-function [x]
+  (+ x 2))
+```
+
 ## When the bracket balance is off
 
 When you have a situation where e.g. the problem tool or Clojure compiler complains about missing brackets or anything suggesting the bracket balance is off (probably because you have used non-structural editing tools):
