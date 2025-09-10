@@ -4,6 +4,7 @@
    [calva-backseat-driver.bracket-balance :as balance]
    [calva-backseat-driver.integrations.calva.api :as calva]
    [calva-backseat-driver.integrations.calva.editor :as editor]
+   [clojure.string :as string]
    [promesa.core :as p]))
 
 (def ^:private no-ns-eval-note
@@ -106,6 +107,82 @@
   (dispatch! [[:app/ax.log :debug "[Editor] Inserting form at line" line "in" file-path]])
   (editor/apply-form-edit-by-line-with-text-targeting
    file-path line target-line-text new-form :insertionPoint))
+
+(defn- normalize-file-content [content]
+  (-> content str string/trim (str "\n")))
+
+(defn- get-directory-from-path [file-path]
+  (let [path-parts (string/split file-path #"/")]
+    (string/join "/" (butlast path-parts))))
+
+
+
+(defn structural-create-file+
+  "Create a new Clojure file with exact content using vscode/workspace.fs API"
+  [{:ex/keys [dispatch!]
+    :calva/keys [file-path content]}]
+  (dispatch! [[:app/ax.log :debug "[Editor] Creating file" file-path]])
+  (let [inferred (balance/infer-parens content)
+        balanced-content (if (:success inferred)
+                           (:text inferred)
+                           content)
+        balancing-occurred? (not= content balanced-content)]
+    (when balancing-occurred?
+      (dispatch! [[:app/ax.log :debug "[Editor] Content was unbalanced, balanced before creation"]]))
+    (p/let [uri (vscode/Uri.file file-path)
+            normalized-content (normalize-file-content balanced-content)
+            content-bytes (.encode (js/TextEncoder.) normalized-content)
+            directory-path (get-directory-from-path file-path)
+            directory-uri (vscode/Uri.file directory-path)]
+      (p/-> (vscode/workspace.fs.createDirectory directory-uri)
+            (p/catch (fn [_] nil)) ;; Ignore if directory already exists
+            (p/then (fn [_]
+                      (vscode/workspace.fs.writeFile uri content-bytes)))
+            (p/then (fn [_]
+                      (cond-> {:success true
+                               :file-path file-path
+                               :message "File created successfully"}
+                        balancing-occurred?
+                        (merge {:balancing-note "The code provided had unbalanced brackets. The code was automatically balanced before creating file."
+                                :balanced-code balanced-content}))))
+            (p/catch (fn [error]
+                       (dispatch! [[:app/ax.log :error "[Editor] Failed to create file" file-path error]])
+                       {:success false
+                        :error (.-message error)
+                        :file-path file-path}))))))
+
+(defn append-code+
+  "Append a top-level form to the end of a file at guaranteed top level"
+  [{:ex/keys [dispatch!]
+    :calva/keys [file-path code]}]
+  (dispatch! [[:app/ax.log :debug "[Editor] Appending code to end of" file-path]])
+  (let [inferred (balance/infer-parens code)
+        balanced-form (if (:success inferred)
+                       (:text inferred)
+                       code)
+        balancing-occurred? (not= code balanced-form)]
+    (when balancing-occurred?
+      (dispatch! [[:app/ax.log :debug "[Editor] Form was unbalanced, balanced before appending"]]))
+    (p/let [uri (vscode/Uri.file file-path)
+            ;; Read current file content
+            file-bytes (vscode/workspace.fs.readFile uri)
+            current-content (.decode (js/TextDecoder.) file-bytes)
+            ;; Create the appended content with proper spacing
+            normalized-current (string/trim current-content)
+            appended-content (str normalized-current "\n\n" (string/trim balanced-form) "\n")
+            ;; Write back to file
+            content-bytes (.encode (js/TextEncoder.) appended-content)]
+      (p/-> (vscode/workspace.fs.writeFile uri content-bytes)
+            (p/then (fn [_]
+                      (cond-> {:success true
+                               :appended-at-end true}
+                        balancing-occurred?
+                        (merge {:balancing-note "The code provided had unbalanced brackets. The code was automatically balanced before appending."
+                                :balanced-code balanced-form}))))
+            (p/catch (fn [error]
+                       (dispatch! [[:app/ax.log :error "[Editor] Failed to append code to file" file-path error]])
+                       {:success false
+                        :error (.-message error)}))))))
 
 
 (comment

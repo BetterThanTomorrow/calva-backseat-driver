@@ -362,6 +362,68 @@
             "prompt"
           ]
         }
+      },
+      {
+        "name": "structural_create_file",
+        "tags": [
+          "clojure",
+          "file-creation",
+          "structural-editing"
+        ],
+        "toolReferenceName": "structural-create-file",
+        "displayName": "Structural Create File",
+        "modelDescription": "Create a new Clojure file with proper content handling and bracket balancing. This tool ensures the file content is properly formatted for Clojure structural editing tools.",
+        "userDescription": "Create a new Clojure file with structural editing support",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(file-add)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "The absolute path where the file should be created"
+            },
+            "content": {
+              "type": "string",
+              "description": "The content to write to the file"
+            }
+          },
+          "required": [
+            "filePath",
+            "content"
+          ]
+        }
+      },
+      {
+        "name": "append_code",
+        "tags": [
+          "clojure",
+          "code-editing",
+          "structural-editing"
+        ],
+        "toolReferenceName": "append-code",
+        "displayName": "Append Code",
+        "modelDescription": "Append code forms to the end of a Clojure file at the top level with proper bracket balancing. Ensures the appended code is properly formatted and doesn't break the file structure.",
+        "userDescription": "Append code to the end of a Clojure file",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(add)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "The absolute path to the file to append to"
+            },
+            "newForms": {
+              "type": "string",
+              "description": "The code forms to append to the file"
+            }
+          },
+          "required": [
+            "filePath",
+            "newForms"
+          ]
+        }
       }
     ]
   },
