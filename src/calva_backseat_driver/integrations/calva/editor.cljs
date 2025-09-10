@@ -226,3 +226,86 @@
     (def the-result the-result))
 
   :rcf)
+
+(defn- normalize-file-content [content]
+  (-> content str string/trim (str "\n")))
+
+(defn- get-directory-from-path [file-path]
+  (let [path-parts (string/split file-path #"/")]
+    (string/join "/" (butlast path-parts))))
+
+(defn structural-create-file+
+  "Create a new Clojure file with exact content using vscode/workspace.fs API"
+  [file-path content]
+  (let [inferred (parinfer/infer-brackets content)
+        infer-result (when inferred (js->clj inferred :keywordize-keys true))
+        balanced-content (if (:success infer-result)
+                           (:text infer-result)
+                           content)
+        balancing-occurred? (not= content balanced-content)]
+    (p/let [uri (vscode/Uri.file file-path)
+            normalized-content (normalize-file-content balanced-content)
+            content-bytes (.encode (js/TextEncoder.) normalized-content)
+            directory-path (get-directory-from-path file-path)
+            directory-uri (vscode/Uri.file directory-path)]
+      (p/-> (vscode/workspace.fs.createDirectory directory-uri)
+            (p/catch (fn [_] nil)) ;; Ignore if directory already exists
+            (p/then (fn [_]
+                      (vscode/workspace.fs.writeFile uri content-bytes)))
+            (p/then (fn [_]
+                      (p/let [_ (p/delay 1000) ;; Wait for diagnostics to update
+                              diagnostics-after-edit (get-diagnostics-for-file file-path)]
+                        (cond-> {:success true
+                                 :file-path file-path
+                                 :message "File created successfully"
+                                 :diagnostics-after-edit diagnostics-after-edit}
+                          balancing-occurred?
+                          (merge {:balancing-note "The code provided had unbalanced brackets. The code was automatically balanced before creating file."
+                                  :balanced-code balanced-content})))))
+            (p/catch (fn [error]
+                       {:success false
+                        :error (.-message error)
+                        :file-path file-path}))))))
+
+(defn append-code+
+  "Append a top-level form to the end of a file at guaranteed top level"
+  [file-path code]
+  (let [inferred (parinfer/infer-brackets code)
+        infer-result (when inferred (js->clj inferred :keywordize-keys true))
+        balanced-form (if (:success infer-result)
+                        (:text infer-result)
+                        code)
+        balancing-occurred? (not= code balanced-form)]
+    (-> (p/let [uri (vscode/Uri.file file-path)
+                ^js vscode-document (vscode/workspace.openTextDocument uri)
+                diagnostics-before-edit (get-diagnostics-for-file file-path)
+                last-line-number (.-lineCount vscode-document)
+                end-position (vscode/Position. last-line-number 0)
+                last-line-text (if (pos? last-line-number)
+                                 (.-text (.lineAt vscode-document (dec last-line-number)))
+                                 "")
+                needs-spacing? (and (pos? last-line-number)
+                                    (not (string/blank? last-line-text)))
+                spacing (if needs-spacing? "\n\n" "\n")
+                append-text (str spacing (string/trim balanced-form) "\n")
+                edit (vscode/TextEdit.insert end-position append-text)
+                workspace-edit (vscode/WorkspaceEdit.)
+                _ (.set workspace-edit uri #js [edit])
+                edit-result (vscode/workspace.applyEdit workspace-edit)
+                _ (p/delay 1000) ;; Wait for diagnostics to update
+                diagnostics-after-edit (get-diagnostics-for-file file-path)]
+          (.save vscode-document)
+          (if edit-result
+            (cond-> {:success true
+                     :appended-at-end true
+                     :diagnostics-before-edit diagnostics-before-edit
+                     :diagnostics-after-edit diagnostics-after-edit}
+              balancing-occurred?
+              (merge {:balancing-note "The code provided had unbalanced brackets. The code was automatically balanced before appending."
+                      :balanced-code balanced-form}))
+            {:success false
+             :diagnostics-before-edit diagnostics-before-edit
+             :error "Failed to apply workspace edit"}))
+        (p/catch (fn [error]
+                   {:success false
+                    :error (.-message error)})))))
