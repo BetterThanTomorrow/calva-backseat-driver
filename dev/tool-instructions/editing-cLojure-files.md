@@ -9,9 +9,9 @@ Even as an interactive programmer, now and then you do edit files. The most impo
 
 Also:
 * The structural editing tools attempt to automatically balance brackets before applying edits.
-* The tools return post-edit diagnostics/linting ifno. Make use of it!
+* The tools return post-edit diagnostics/linting info. Make use of it!
 
-The specific process look different depending on if you are creating files, appending forms, inserting forms, or editing existing forms.
+The specific processes look different depending on if you are creating files, appending forms, inserting forms, or editing existing forms.
 
 ## About top level forms
 
@@ -33,7 +33,7 @@ Follow this process for making safe and working updates:
      1. For each top level form in your edit plan (starting at the bottom of the file):
         * Edit the file using the appropriate structural editing tool
 
-    Remember that in Clojure, functions need to be defined before they are called, so during the edits this way, linter complaints about symbols not found are to be expected. When the edit plan is carrieed out, you should have no new such warnings.
+    Remember that in Clojure, functions need to be defined before they are called, so during the edits this way, linter complaints about symbols not found are to be expected. When the edit plan is carried out, you should have no new such warnings.
 
 ## When the bracket balance is off
 
