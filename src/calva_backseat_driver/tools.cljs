@@ -3,7 +3,6 @@
    ["vscode" :as vscode]
    [calva-backseat-driver.bracket-balance :as balance]
    [calva-backseat-driver.integrations.calva.features :as calva]
-   [calva-backseat-driver.integrations.vscode.human-intelligence :as hi]
    [promesa.core :as p]))
 
 (defn EvaluateClojureCodeTool [dispatch!]
@@ -136,21 +135,6 @@
 (defn InsertTopLevelFormTool [dispatch!]
   (ReplaceOrInsertTopLevelFormTool dispatch! :insertionPoint "Insert" "Inserted"))
 
-(defn HumanIntelligenceTool [dispatch!]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [prompt (-> options .-input .-prompt)]
-                              #js {:confirmationMessages #js {:title "Ask human"
-                                                              :message prompt}
-                                   :invocationMessage "Asked human"}))
-
-       :invoke (fn invoke [^js options _token]
-                 (p/let [prompt (-> options .-input .-prompt)
-                         result (hi/request-human-input! {:ex/dispatch! dispatch!
-                                                          :cbd/prompt prompt})]
-                   (vscode/LanguageModelToolResult.
-                    #js [(vscode/LanguageModelTextPart.
-                          result)])))})
-
 (defn StructuralCreateFileTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
                             (let [file-path (-> options .-input .-filePath)
@@ -223,11 +207,6 @@
     (conj (vscode/lm.registerTool
            "insert_top_level_form"
            (#'InsertTopLevelFormTool dispatch!)))
-
-    :always
-    (conj (vscode/lm.registerTool
-           "request_human_input"
-           (#'HumanIntelligenceTool dispatch!)))
 
     :always
     (conj (vscode/lm.registerTool

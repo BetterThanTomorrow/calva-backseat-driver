@@ -338,32 +338,6 @@
         }
       },
       {
-        "name": "request_human_input",
-        "tags": [
-          "information",
-          "knowledge",
-          "lookup"
-        ],
-        "toolReferenceName": "human-intelligence",
-        "displayName": "Human Intelligence",
-        "modelDescription": "**Human Intelligence** lets you ask the human developer for input or guidance. Give your question context in the chat, then use this tool to request input from the human.\n\n## When to use\n* Need to think about a thing together with someone?\n* Would you benefit from clarification?\n* Is there some domain knowledge you need?\n* Have you encountered unexpected results?\n* Has the human requested to be kept in the loop?\n\n## Tool flow\nAI Agent Working → Agent Needs Input → Agents Explains Context in Chat → Calls Tool → VS Code Input Box → Human Responds → AI Continues, better informed.",
-        "userDescription": "The AI asks the human developer for input or guidance",
-        "canBeReferencedInPrompt": true,
-        "icon": "$(person)",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "prompt": {
-              "type": "string",
-              "description": "The question to ask the human. First provide context in the chat, this prompt is for framing the question."
-            }
-          },
-          "required": [
-            "prompt"
-          ]
-        }
-      },
-      {
         "name": "clojure_create_file",
         "tags": [
           "clojure",

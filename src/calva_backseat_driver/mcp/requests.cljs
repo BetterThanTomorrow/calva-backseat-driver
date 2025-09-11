@@ -3,7 +3,6 @@
    ["vscode" :as vscode]
    [calva-backseat-driver.bracket-balance :as bracket-balance]
    [calva-backseat-driver.integrations.calva.features :as calva]
-   [calva-backseat-driver.integrations.vscode.human-intelligence :as hi]
    [clojure.string :as string]
    [promesa.core :as p]))
 
@@ -171,17 +170,6 @@
                    :audience ["user" "assistant"]
                    :priority 7}}))
 
-(def human-intelligence-tool-listing
-  (let [tool-name "request_human_input"]
-    {:name tool-name
-     :description (tool-description tool-name)
-     :inputSchema {:type "object"
-                   :properties {"prompt" {:type "string"
-                                          :description (param-description tool-name "prompt")}}
-                   :required ["prompt"]
-                   :audience ["user" "assistant"]
-                   :priority 10}}))
-
 (defn handle-request-fn [{:ex/keys [dispatch!] :as options
                           :mcp/keys [repl-enabled?]}
                          {:keys [id method params] :as request}]
@@ -228,10 +216,7 @@
                                       (conj structural-create-file-tool-listing)
 
                                       true
-                                      (conj append-code-tool-listing)
-
-                                      true
-                                      (conj human-intelligence-tool-listing))}}]
+                                      (conj append-code-tool-listing))}}]
       response)
 
     (= method "resources/templates/list")
@@ -351,15 +336,6 @@
            :id id
            :result {:content [{:type "text"
                                :text (js/JSON.stringify (clj->js result))}]}})
-
-        (= tool "request_human_input")
-        (p/let [{:keys [prompt]} arguments
-                result (hi/request-human-input! (merge options
-                                                       {:cbd/prompt prompt}))]
-          {:jsonrpc "2.0"
-           :id id
-           :result {:content [{:type "text"
-                               :text result}]}})
 
         :else
         {:jsonrpc "2.0"
