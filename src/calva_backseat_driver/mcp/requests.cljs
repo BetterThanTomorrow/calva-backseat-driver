@@ -145,6 +145,32 @@
                    :audience ["user" "assistant"]
                    :priority 10}}))
 
+(def structural-create-file-tool-listing
+  (let [tool-name "structural_create_file"]
+    {:name tool-name
+     :description (tool-description tool-name)
+     :inputSchema {:type "object"
+                   :properties {"filePath" {:type "string"
+                                            :description (param-description tool-name "filePath")}
+                                "content" {:type "string"
+                                           :description (param-description tool-name "content")}}
+                   :required ["filePath" "content"]
+                   :audience ["user" "assistant"]
+                   :priority 7}}))
+
+(def append-code-tool-listing
+  (let [tool-name "append_code"]
+    {:name tool-name
+     :description (tool-description tool-name)
+     :inputSchema {:type "object"
+                   :properties {"filePath" {:type "string"
+                                            :description (param-description tool-name "filePath")}
+                                "code" {:type "string"
+                                        :description (param-description tool-name "code")}}
+                   :required ["filePath" "code"]
+                   :audience ["user" "assistant"]
+                   :priority 7}}))
+
 (def human-intelligence-tool-listing
   (let [tool-name "request_human_input"]
     {:name tool-name
@@ -197,6 +223,12 @@
 
                                       true
                                       (conj insert-top-level-form-tool-listing)
+
+                                      true
+                                      (conj structural-create-file-tool-listing)
+
+                                      true
+                                      (conj append-code-tool-listing)
 
                                       true
                                       (conj human-intelligence-tool-listing))}}]
@@ -295,6 +327,26 @@
                                                              :calva/line line
                                                              :calva/target-line-text targetLineText
                                                              :calva/new-form newForm}))]
+          {:jsonrpc "2.0"
+           :id id
+           :result {:content [{:type "text"
+                               :text (js/JSON.stringify (clj->js result))}]}})
+
+        (= tool "structural_create_file")
+        (p/let [{:keys [filePath content]} arguments
+                result (calva/structural-create-file+ (merge options
+                                                             {:calva/file-path filePath
+                                                              :calva/content content}))]
+          {:jsonrpc "2.0"
+           :id id
+           :result {:content [{:type "text"
+                               :text (js/JSON.stringify (clj->js result))}]}})
+
+        (= tool "append_code")
+        (p/let [{:keys [filePath code]} arguments
+                result (calva/append-code+ (merge options
+                                                  {:calva/file-path filePath
+                                                   :calva/code code}))]
           {:jsonrpc "2.0"
            :id id
            :result {:content [{:type "text"

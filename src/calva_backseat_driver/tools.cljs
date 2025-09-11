@@ -179,7 +179,7 @@
 
        :invoke (fn invoke [^js options _token]
                  (p/let [file-path (-> options .-input .-filePath)
-                         code (-> options .-input .-newForms)
+                         code (-> options .-input .-code)
                          result (calva/append-code+ {:ex/dispatch! dispatch!
                                                      :calva/file-path file-path
                                                      :calva/code code})]

@@ -414,14 +414,14 @@
               "type": "string",
               "description": "The absolute path to the file to append to"
             },
-            "newForms": {
+            "code": {
               "type": "string",
               "description": "The code forms to append to the file"
             }
           },
           "required": [
             "filePath",
-            "newForms"
+            "code"
           ]
         }
       }
