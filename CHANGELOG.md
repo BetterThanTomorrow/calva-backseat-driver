@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.20] - 2025-09-11
+
 - [Update tool ids to qualify them as Clojure](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/34)
 - [Remove Human Intelligence tool](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/35)
 
