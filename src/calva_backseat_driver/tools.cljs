@@ -151,6 +151,42 @@
                     #js [(vscode/LanguageModelTextPart.
                           result)])))})
 
+(defn StructuralCreateFileTool [dispatch!]
+  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
+                            (let [file-path (-> options .-input .-filePath)
+                                  message (str "Create file: " file-path)]
+                              #js {:invocationMessage "Creating Clojure file"
+                                   :confirmationMessages #js {:title "Create Clojure File"
+                                                              :message message}}))
+
+       :invoke (fn invoke [^js options _token]
+                 (p/let [file-path (-> options .-input .-filePath)
+                         content (-> options .-input .-content)
+                         result (calva/structural-create-file+ {:ex/dispatch! dispatch!
+                                                                :calva/file-path file-path
+                                                                :calva/content content})]
+                   (vscode/LanguageModelToolResult.
+                    #js [(vscode/LanguageModelTextPart.
+                          (js/JSON.stringify (clj->js result)))])))})
+
+(defn AppendCodeTool [dispatch!]
+  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
+                            (let [file-path (-> options .-input .-filePath)
+                                  message (str "Append form to: " file-path)]
+                              #js {:invocationMessage "Appending code"
+                                   :confirmationMessages #js {:title "Append code"
+                                                              :message message}}))
+
+       :invoke (fn invoke [^js options _token]
+                 (p/let [file-path (-> options .-input .-filePath)
+                         code (-> options .-input .-code)
+                         result (calva/append-code+ {:ex/dispatch! dispatch!
+                                                     :calva/file-path file-path
+                                                     :calva/code code})]
+                   (vscode/LanguageModelToolResult.
+                    #js [(vscode/LanguageModelTextPart.
+                          (js/JSON.stringify (clj->js result)))])))})
+
 (defn register-language-model-tools [dispatch!]
   (cond-> []
     :always
@@ -175,7 +211,7 @@
 
     :always
     (conj (vscode/lm.registerTool
-           "balance_brackets"
+           "clojure_balance_brackets"
            (#'InferBracketsTool dispatch!)))
 
     :always
@@ -191,4 +227,14 @@
     :always
     (conj (vscode/lm.registerTool
            "request_human_input"
-           (#'HumanIntelligenceTool dispatch!)))))
+           (#'HumanIntelligenceTool dispatch!)))
+
+    :always
+    (conj (vscode/lm.registerTool
+           "clojure_create_file"
+           (#'StructuralCreateFileTool dispatch!)))
+
+    :always
+    (conj (vscode/lm.registerTool
+           "clojure_append_code"
+           (#'AppendCodeTool dispatch!)))))

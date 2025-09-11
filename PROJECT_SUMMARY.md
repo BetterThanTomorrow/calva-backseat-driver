@@ -126,7 +126,7 @@ The tools are exposed as VS Code Language ModelAPI (for CoPilot) and MCP (for ex
    - Access REPL output for monitoring and debugging
    - Parameters: `sinceLine`
 
-5. **balance_brackets**
+5. **clojure_balance_brackets**
    - Fix bracket imbalances in Clojure code using Parinfer
    - Parameters: `text`
 

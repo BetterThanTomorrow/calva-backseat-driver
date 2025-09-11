@@ -226,7 +226,7 @@
         }
       },
       {
-        "name": "balance_brackets",
+        "name": "clojure_balance_brackets",
         "tags": [
           "clojure",
           "parinfer",
@@ -263,7 +263,7 @@
         ],
         "toolReferenceName": "replace-top-level-form",
         "displayName": "Edit: Replace Top Level Form",
-        "modelDescription": "# Editing Clojure files\n\nEven as an interactive programmer, now and then you do edit files. The most important things:\n\n1. **Before any editing: First always read the whole file you are about to edit.** Instead of chunked reading, **read it in one go**.\n2. Always check with the problem tool what the current linting state is\n3. Check with the problem tool after each edit\n4. Always be alert to when the bracket balance is off, and see [When the bracket balance is off](#when-the-bracket-balance-is-off) if it is.\n\nThe specific process look different depending on if you are creating files, adding functions, or editing existing functions.\n\n## Creating Clojure files\n\nUse the `create_file` tool to create files with empty content `\"\"`.\n\n### Clojure Namespace and Filename Convention:\n\n**Important**: In Clojure,  namespace names use kebab-case while filenames use snake_case. For example:\n- Namespace: `my.project.multi-word-namespace`\n- Filename: `my/project/multi_word_namespace.clj(s|c)`\n\nAlways convert dashes in namespace names to underscores in the corresponding filename.\n\n### Create empty files, then add content\n\nFor you to create files and add content safely/predictably, follow this process:\n\n1. **Always create empty files first** - Use `create_file` with empty content `\"\"`\n2. Read the content of the file created (default content may have been added)\n3. **Use structural editing tools** to edit the file\n\n## Important about the Structural Editing Tools\n\nUse the structural editing tools for Clojure forms/s-expressions.\n\n* Use `insert_top_level_form` to add new forms to a file\n* Use `replace_top_level_form` to modify existing forms\n* Make use of the diagnostics info returned\n* **Rich Comment Forms/RCF**: Calva treats forms immediately enclosed within `(comment <like this>)` as top level forms, making them valid targets for the top_level_form editing tools.\n\nThe structural editing tools attempt to automatically balance brackets before applying edits.\n\n### `replace_top_level_form`\n* Target top level forms by their starting, 1-based, line number\n* **Important**: This tool is **only** for replacing top level Clojure one form/s-expression with another form/s-expression\n  * For editing line comments (`; ...` which are not structural), use your built in edit tools\n\n### `insert_top_level_form`\n* Always target the top level of the code\n* Use 1-based, line numbers\n* **Important**: This tool is **only** for inserting Clojure forms/s-expressions, one at a time\n  * For inserting line comments (`; ...` which are not structural), use your built in edit tool\n\n## Structural editing process\n\nFollow this process for making safe and working updates:\n\n1. **Always edit whole top level forms** (typically `def` and `defn` and such) using the structural editing tools (`replace_top_level_form` or `insert_top_level_form`)\n2. Always check with the problem tool what the current linting state is\n3. Plan your edits, breaking it up in one edit per complete top level form you are editing or inserting\n4. **Work from bottom to top of the file** - Because editing tools use line numbers, and edits can shift line numbers of content below them, always apply your edits starting from the lowest line number (bottom of file) and work upward. This keeps your planned line numbers accurate.\n\n   Example: If you plan to edit lines 10, 20, and 30, edit them in this order: line 30 → line 20 → line 10.\n\n   1. For each top level form in your edit plan (starting at the bottom of the file):\n      1. Edit the file using the appropriate structural editing tool\n      2. Check with the problem tool that no new problems are reported\n\n# When the bracket balance is off\n\nWhen you have a situation where e.g. the problem tool or Clojure compiler complains about missing brackets or anything suggesting the bracket balance is off:\n* Instead of going ahead trying to fix it, **use the tool for requesting human input to ask for guidance/help.**\n",
+        "modelDescription": "This is the **Replace Top Level Form** tool. Use it to modify an existing top level form. To delete a top level form, replace it with an empty string.\n\n**Important**: This tool is **only** for replacing Clojure forms/s-expressions, **one at a time**\n* For editing line comments (`; ...` which are not structural), use the built in edit tool\n\nProcess:\n\n1. Find the top level form you want to replace.\n2. Read the first line of the form and use the text for the `targetLineText` param\n3. Use the 1-based line number for the `line` param\n\n# Editing Clojure files\n\nWe refer to all files of reasonably Clojure-ish type as **Clojure files**, be it Clojure, ClojureScript, Babashka, nbb, Joyride, Jank, you-name-it.\n\nEven as an interactive programmer, now and then you do edit files.\n\n* The structural editing tools attempt to automatically balance brackets before applying edits.\n* The tools return post-edit diagnostics/linting info. Make use of it!\n\nThe specific processes look different depending on if you are creating files, appending forms, inserting forms, or editing existing forms.\n\n## Code Indentation Before REPL Evaluation\n\n**Always ensure that Clojure code is properly indented.** Proper indentation is essential for the structural editing tools to work correctly.\n\n### Essential Rule:\n- **Indent code properly** - Align nested forms with consistent indentation before evaluation\n\n### Pattern:\n```clojure\n;; ❌ Poor indentation - will cause issues\n(defn my-function [x]\n  {:foo 1\n  :bar 2}) ; `:bar` is not properly “inside” the enclosing map\n\n;; ✅ Proper indentation - ready for use with the structural editing tools\n(defn my-function [x]\n  {:foo 1\n   :bar 2}) ; `:bar` is properly “inside” the enclosing map\n```\n\n## When the bracket balance is off\n\nWhen you have a situation where e.g. the problem tool or Clojure compiler complains about missing brackets or anything suggesting the bracket balance is off (probably because you have used non-structural editing tools):\n* Instead of going ahead trying to fix it, **use the tool for requesting human input to ask for guidance/help.**\n\n## About top level forms\n\nThe structural editing tools appends/inserts/replaces top level forms/s-expressions, such as the `ns` form, `def`, `defn`, `def...` forms, and many Rich Comment Forms. Top level form is Calva nomenclature for referring to forms at the root/top level of the Clojure code structure.\n\n**Rich Comment Forms/RCF**: Calva treats forms immediately enclosed within `(comment <like this>)` as top level forms, making them valid targets for the top_level_form editing tools. (The `(comment ... )` form itself is also a top level form, as far as Calva and the tools are concerned.)\n\n## Structural editing process\n\nFollow this process for making safe and working updates:\n\n1. **Always edit whole top level forms** (typically `ns`, `def` and `defn` and such) using the structural editing tools (**Replace Top Level Form** or **Insert Top Level Form** )\n2. Always check with the problem tool what the current linting state is\n3. If you are doing multiple edits to a file: **Plan your edits**, breaking it up in one edit per complete top level form you are editing or inserting. Use the todo list.\n   - **Work from bottom to top of the file** - Because editing tools use line numbers, and edits can shift line numbers of content below them, always apply your edits starting from the lowest line number (bottom of file) and work upward. This keeps your planned line numbers accurate.\n\n     Example: If you plan to edit lines 10, 20, and 30, edit them in this order: line 30 → line 20 → line 10.\n\n     1. For each top level form in your edit plan (starting at the bottom of the file):\n        * Edit the file using the appropriate structural editing tool\n\n    Remember that in Clojure, functions need to be defined before they are called, so during the edits this way, linter complaints about symbols not found are to be expected. When the edit plan is carried out, you should have no new such warnings.\n\n",
         "userDescription": "Edit Clojure files by replacing top level forms",
         "canBeReferencedInPrompt": true,
         "icon": "$(edit)",
@@ -276,11 +276,11 @@
             },
             "line": {
               "type": "integer",
-              "description": "Line number, 1-based, where the target form/sexpression starts"
+              "description": "The target line number, 1-based, where the target top level form/sexpression starts."
             },
             "targetLineText": {
               "type": "string",
-              "description": "The exact text content (trimmed) of the line you are targeting"
+              "description": "The exact text content of the line you are targeting. This is the text from the first line of the target top level form."
             },
             "newForm": {
               "type": "string",
@@ -305,7 +305,7 @@
         ],
         "toolReferenceName": "insert-top-level-form",
         "displayName": "Edit: Insert Top Level Form",
-        "modelDescription": "# Editing Clojure files\n\nEven as an interactive programmer, now and then you do edit files. The most important things:\n\n1. **Before any editing: First always read the whole file you are about to edit.** Instead of chunked reading, **read it in one go**.\n2. Always check with the problem tool what the current linting state is\n3. Check with the problem tool after each edit\n4. Always be alert to when the bracket balance is off, and see [When the bracket balance is off](#when-the-bracket-balance-is-off) if it is.\n\nThe specific process look different depending on if you are creating files, adding functions, or editing existing functions.\n\n## Creating Clojure files\n\nUse the `create_file` tool to create files with empty content `\"\"`.\n\n### Clojure Namespace and Filename Convention:\n\n**Important**: In Clojure,  namespace names use kebab-case while filenames use snake_case. For example:\n- Namespace: `my.project.multi-word-namespace`\n- Filename: `my/project/multi_word_namespace.clj(s|c)`\n\nAlways convert dashes in namespace names to underscores in the corresponding filename.\n\n### Create empty files, then add content\n\nFor you to create files and add content safely/predictably, follow this process:\n\n1. **Always create empty files first** - Use `create_file` with empty content `\"\"`\n2. Read the content of the file created (default content may have been added)\n3. **Use structural editing tools** to edit the file\n\n## Important about the Structural Editing Tools\n\nUse the structural editing tools for Clojure forms/s-expressions.\n\n* Use `insert_top_level_form` to add new forms to a file\n* Use `replace_top_level_form` to modify existing forms\n* Make use of the diagnostics info returned\n* **Rich Comment Forms/RCF**: Calva treats forms immediately enclosed within `(comment <like this>)` as top level forms, making them valid targets for the top_level_form editing tools.\n\nThe structural editing tools attempt to automatically balance brackets before applying edits.\n\n### `replace_top_level_form`\n* Target top level forms by their starting, 1-based, line number\n* **Important**: This tool is **only** for replacing top level Clojure one form/s-expression with another form/s-expression\n  * For editing line comments (`; ...` which are not structural), use your built in edit tools\n\n### `insert_top_level_form`\n* Always target the top level of the code\n* Use 1-based, line numbers\n* **Important**: This tool is **only** for inserting Clojure forms/s-expressions, one at a time\n  * For inserting line comments (`; ...` which are not structural), use your built in edit tool\n\n## Structural editing process\n\nFollow this process for making safe and working updates:\n\n1. **Always edit whole top level forms** (typically `def` and `defn` and such) using the structural editing tools (`replace_top_level_form` or `insert_top_level_form`)\n2. Always check with the problem tool what the current linting state is\n3. Plan your edits, breaking it up in one edit per complete top level form you are editing or inserting\n4. **Work from bottom to top of the file** - Because editing tools use line numbers, and edits can shift line numbers of content below them, always apply your edits starting from the lowest line number (bottom of file) and work upward. This keeps your planned line numbers accurate.\n\n   Example: If you plan to edit lines 10, 20, and 30, edit them in this order: line 30 → line 20 → line 10.\n\n   1. For each top level form in your edit plan (starting at the bottom of the file):\n      1. Edit the file using the appropriate structural editing tool\n      2. Check with the problem tool that no new problems are reported\n\n# When the bracket balance is off\n\nWhen you have a situation where e.g. the problem tool or Clojure compiler complains about missing brackets or anything suggesting the bracket balance is off:\n* Instead of going ahead trying to fix it, **use the tool for requesting human input to ask for guidance/help.**\n",
+        "modelDescription": "This is the **Insert Top Level Form** tool. Use it to insert new forms to a file, the forms will be inserted before an existing, targeted, top level form.\n\n**Important**: This tool is **only** for inserting Clojure forms/s-expressions\n* For inserting line comments (`; ...` which are not structural), use your built in edit tool\n\nProcess:\n\n1. Find the top level form you want to insert code before.\n2. Read the first line of the form and use the text for the `targetLineText` param\n3. Use the 1-based line number for the `line` param\n\n# Editing Clojure files\n\nWe refer to all files of reasonably Clojure-ish type as **Clojure files**, be it Clojure, ClojureScript, Babashka, nbb, Joyride, Jank, you-name-it.\n\nEven as an interactive programmer, now and then you do edit files.\n\n* The structural editing tools attempt to automatically balance brackets before applying edits.\n* The tools return post-edit diagnostics/linting info. Make use of it!\n\nThe specific processes look different depending on if you are creating files, appending forms, inserting forms, or editing existing forms.\n\n## Code Indentation Before REPL Evaluation\n\n**Always ensure that Clojure code is properly indented.** Proper indentation is essential for the structural editing tools to work correctly.\n\n### Essential Rule:\n- **Indent code properly** - Align nested forms with consistent indentation before evaluation\n\n### Pattern:\n```clojure\n;; ❌ Poor indentation - will cause issues\n(defn my-function [x]\n  {:foo 1\n  :bar 2}) ; `:bar` is not properly “inside” the enclosing map\n\n;; ✅ Proper indentation - ready for use with the structural editing tools\n(defn my-function [x]\n  {:foo 1\n   :bar 2}) ; `:bar` is properly “inside” the enclosing map\n```\n\n## When the bracket balance is off\n\nWhen you have a situation where e.g. the problem tool or Clojure compiler complains about missing brackets or anything suggesting the bracket balance is off (probably because you have used non-structural editing tools):\n* Instead of going ahead trying to fix it, **use the tool for requesting human input to ask for guidance/help.**\n\n## About top level forms\n\nThe structural editing tools appends/inserts/replaces top level forms/s-expressions, such as the `ns` form, `def`, `defn`, `def...` forms, and many Rich Comment Forms. Top level form is Calva nomenclature for referring to forms at the root/top level of the Clojure code structure.\n\n**Rich Comment Forms/RCF**: Calva treats forms immediately enclosed within `(comment <like this>)` as top level forms, making them valid targets for the top_level_form editing tools. (The `(comment ... )` form itself is also a top level form, as far as Calva and the tools are concerned.)\n\n## Structural editing process\n\nFollow this process for making safe and working updates:\n\n1. **Always edit whole top level forms** (typically `ns`, `def` and `defn` and such) using the structural editing tools (**Replace Top Level Form** or **Insert Top Level Form** )\n2. Always check with the problem tool what the current linting state is\n3. If you are doing multiple edits to a file: **Plan your edits**, breaking it up in one edit per complete top level form you are editing or inserting. Use the todo list.\n   - **Work from bottom to top of the file** - Because editing tools use line numbers, and edits can shift line numbers of content below them, always apply your edits starting from the lowest line number (bottom of file) and work upward. This keeps your planned line numbers accurate.\n\n     Example: If you plan to edit lines 10, 20, and 30, edit them in this order: line 30 → line 20 → line 10.\n\n     1. For each top level form in your edit plan (starting at the bottom of the file):\n        * Edit the file using the appropriate structural editing tool\n\n    Remember that in Clojure, functions need to be defined before they are called, so during the edits this way, linter complaints about symbols not found are to be expected. When the edit plan is carried out, you should have no new such warnings.\n\n",
         "userDescription": "Edit Clojure files by replacing top level forms",
         "canBeReferencedInPrompt": true,
         "icon": "$(edit)",
@@ -318,11 +318,11 @@
             },
             "line": {
               "type": "integer",
-              "description": "Line number, 1-based, where to insert the form. The code will be inserted at the start of the line."
+              "description": "The target line number, 1-based, where the target top level form/sexpression starts. The code will be inserted at the start of the line."
             },
             "targetLineText": {
               "type": "string",
-              "description": "The exact text content (trimmed) of the line you are targeting."
+              "description": "The exact text content of the line you are targeting. This is the text from the first line of the target top level form."
             },
             "newForm": {
               "type": "string",
@@ -360,6 +360,68 @@
           },
           "required": [
             "prompt"
+          ]
+        }
+      },
+      {
+        "name": "clojure_create_file",
+        "tags": [
+          "clojure",
+          "file-creation",
+          "structural-editing"
+        ],
+        "toolReferenceName": "clojure-create-file",
+        "displayName": "Create Clojure File",
+        "modelDescription": "This is the **Create Clojure File** tool. Use it to create a Clojure file. Create the file with all the content you know should go there at the time of creation.\n\n## Clojure Namespace and Filename Convention:\n\n**Important**: In Clojure, namespace names use kebab-case while filenames use snake_case. For example:\n- Namespace: `my.project.multi-word-namespace`\n- Filename: `my/project/multi_word_namespace.clj(s|c)`\n\nAlways convert dashes in namespace names to underscores in the corresponding filename.\n\n## Use structural editing tools\n\nOnce the file is created and you need to append/insert/replace forms in it, use the appropriate structural editing tool for that.\n\n# Editing Clojure files\n\nWe refer to all files of reasonably Clojure-ish type as **Clojure files**, be it Clojure, ClojureScript, Babashka, nbb, Joyride, Jank, you-name-it.\n\nEven as an interactive programmer, now and then you do edit files.\n\n* The structural editing tools attempt to automatically balance brackets before applying edits.\n* The tools return post-edit diagnostics/linting info. Make use of it!\n\nThe specific processes look different depending on if you are creating files, appending forms, inserting forms, or editing existing forms.\n\n## Code Indentation Before REPL Evaluation\n\n**Always ensure that Clojure code is properly indented.** Proper indentation is essential for the structural editing tools to work correctly.\n\n### Essential Rule:\n- **Indent code properly** - Align nested forms with consistent indentation before evaluation\n\n### Pattern:\n```clojure\n;; ❌ Poor indentation - will cause issues\n(defn my-function [x]\n  {:foo 1\n  :bar 2}) ; `:bar` is not properly “inside” the enclosing map\n\n;; ✅ Proper indentation - ready for use with the structural editing tools\n(defn my-function [x]\n  {:foo 1\n   :bar 2}) ; `:bar` is properly “inside” the enclosing map\n```\n",
+        "userDescription": "Create a new Clojure file",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(file-add)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "The absolute path where the file should be created"
+            },
+            "content": {
+              "type": "string",
+              "description": "The content to write to the file"
+            }
+          },
+          "required": [
+            "filePath",
+            "content"
+          ]
+        }
+      },
+      {
+        "name": "clojure_append_code",
+        "tags": [
+          "clojure",
+          "code-editing",
+          "structural-editing"
+        ],
+        "toolReferenceName": "append-code",
+        "displayName": "Append Code",
+        "modelDescription": "This is the **Append Code** tool. Use it to append top level forms at the end of a Clojure file.\n\n# Editing Clojure files\n\nWe refer to all files of reasonably Clojure-ish type as **Clojure files**, be it Clojure, ClojureScript, Babashka, nbb, Joyride, Jank, you-name-it.\n\nEven as an interactive programmer, now and then you do edit files.\n\n* The structural editing tools attempt to automatically balance brackets before applying edits.\n* The tools return post-edit diagnostics/linting info. Make use of it!\n\nThe specific processes look different depending on if you are creating files, appending forms, inserting forms, or editing existing forms.\n\n## Code Indentation Before REPL Evaluation\n\n**Always ensure that Clojure code is properly indented.** Proper indentation is essential for the structural editing tools to work correctly.\n\n### Essential Rule:\n- **Indent code properly** - Align nested forms with consistent indentation before evaluation\n\n### Pattern:\n```clojure\n;; ❌ Poor indentation - will cause issues\n(defn my-function [x]\n  {:foo 1\n  :bar 2}) ; `:bar` is not properly “inside” the enclosing map\n\n;; ✅ Proper indentation - ready for use with the structural editing tools\n(defn my-function [x]\n  {:foo 1\n   :bar 2}) ; `:bar` is properly “inside” the enclosing map\n```\n",
+        "userDescription": "Append code to the end of a Clojure file",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(add)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "The absolute path to the file to append to"
+            },
+            "code": {
+              "type": "string",
+              "description": "The code forms to append to the file"
+            }
+          },
+          "required": [
+            "filePath",
+            "code"
           ]
         }
       }

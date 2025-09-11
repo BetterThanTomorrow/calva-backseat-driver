@@ -3,6 +3,7 @@
    ["vscode" :as vscode]
    [calva-backseat-driver.integrations.calva.api :as calva]
    [calva-backseat-driver.integrations.parinfer :as parinfer]
+   [calva-backseat-driver.integrations.calva.editor-util :as util]
    [clojure.string :as string]
    [promesa.core :as p]))
 
@@ -110,70 +111,81 @@
     :else
     {:valid? true}))
 
+(def ^:private search-window 2)
+
 (defn- find-target-line-by-text
   "Find the actual line number by searching for target text within a window around the initial line.
    Returns the line number (1-indexed) where the target text is found, or nil if not found."
   [^js vscode-document initial-line-number target-text]
-  (let [line-count (.-lineCount vscode-document)
-        search-window 2  ; search 2 lines above and below
-        start-line (max 0 (- initial-line-number search-window 1))  ; convert to 0-indexed and clamp
-        end-line (min (dec line-count) (+ initial-line-number search-window 1))]  ; convert to 0-indexed and clamp
-    (loop [line-idx start-line]
-      (if (<= line-idx end-line)
-        (let [line-text (-> vscode-document
-                            (.lineAt line-idx)
-                            .-text
-                            (.trim))]
-          (if (= line-text (.trim target-text))
-            (inc line-idx)  ; return 1-indexed line number
-            (recur (inc line-idx))))
-        nil))))
+  (when-let [found-line (util/find-target-line-by-text (.getText vscode-document) target-text (dec initial-line-number) search-window)]
+    (inc found-line)))
+
+(def remedy "Read the whole file again, in one go. Then perform the edit, targeting the correct line and the first line of the existing top level form starting at that line.")
+
+(defn- validate-top-level-form-targeting
+  "Validate that target text matches the start of the top-level form at the given position.
+   Returns validation result map."
+  [file-path line-number target-text]
+  (p/let [form-data (get-ranges-form-data-by-line file-path line-number :currentTopLevelForm)
+          top-level-form-text (second (:ranges-object form-data))]
+    (if (util/target-text-is-first-line? target-text top-level-form-text)
+      {:valid? true}
+      {:valid? false
+       :validation-error "The target text does not match the first line of a top level form in the vicinity of the target line."
+       :remedy remedy})))
 
 (defn apply-form-edit-by-line-with-text-targeting
   "Apply a form edit by line number with text-based targeting for better accuracy.
-   Searches for target-line text within a 2-line window around the specified line number."
+   Searches for target-line text within a 2-line window around the specified line number.
+   For insertions, the new form is inserted before the targeted form."
   [file-path line-number target-line new-form ranges-fn-key]
   (let [validation (validate-edit-inputs target-line new-form)]
     (if (:valid? validation)
       (-> (p/let [vscode-document (get-document-from-path file-path)
-                  actual-line-number (if target-line
-                                       (find-target-line-by-text vscode-document line-number target-line)
-                                       line-number)]
-            (if (or (not target-line) actual-line-number)
-              (p/let [balance-result (some-> (parinfer/infer-brackets new-form)
-                                             (js->clj :keywordize-keys true))
-                      final-line-number (or actual-line-number line-number)
-                      form-data (get-ranges-form-data-by-line file-path final-line-number ranges-fn-key)
-                      diagnostics-before-edit (get-diagnostics-for-file file-path)]
-                (if (:success balance-result)
-                  (p/let [balanced-form (:text balance-result)
-                          balancing-occurred? (not= new-form balanced-form)
-                          text (if (= :insertionPoint ranges-fn-key)
-                                 (str (string/trim balanced-form) "\n\n")
-                                 balanced-form)
-                          edit-result (edit-replace-range file-path
-                                                          (first (:ranges-object form-data))
-                                                          text)
-                          _ (p/delay 1000) ;; TODO: Consider subscribing on diagnistics changes instead
-                          diagnostics-after-edit (get-diagnostics-for-file file-path)]
-                    (if edit-result
-                      (do
-                        ; save the document
-                        (.save vscode-document)
-                        (cond-> {:success true
-                                 :actual-line-used final-line-number
-                                 :diagnostics-before-edit diagnostics-before-edit
-                                 :diagnostics-after-edit diagnostics-after-edit}
-
-                          balancing-occurred?
-                          (merge
-                           {:balancing-note "The code provided for editing had unbalanced brackets. The code was automatically balanced before editing. Use the code in the `balanced-code` to correct your code on record."
-                            :balanced-code balanced-form})))
-                      {:success false
-                       :diagnostics-before-edit diagnostics-before-edit}))
-                  balance-result))
+                  actual-line-number (find-target-line-by-text vscode-document line-number target-line)]
+            (if-not actual-line-number
               {:success false
-               :error (str "Target line text not found. Expected: '" target-line "' near line " line-number)}))
+               :error (str "Target line text not found. Expected: '" target-line "' near line " line-number)
+               :remedy remedy}
+              (p/let [final-line-number actual-line-number
+                      text-validation (validate-top-level-form-targeting file-path final-line-number target-line)]
+                (if (not (:valid? text-validation))
+                  {:success false
+                   :error (str "Target text validation failed near line: " line-number)
+                   :validation-error (:validation-error text-validation)
+                   :remedy (:remedy text-validation)}
+
+                  ;; Validation done. Proceed with form editing
+                  (p/let [balance-result (some-> (parinfer/infer-brackets new-form)
+                                                 (js->clj :keywordize-keys true))
+                          form-data (get-ranges-form-data-by-line file-path final-line-number ranges-fn-key)
+                          diagnostics-before-edit (get-diagnostics-for-file file-path)]
+                    (if (:success balance-result)
+                      (p/let [balanced-form (:text balance-result)
+                              balancing-occurred? (not= new-form balanced-form)
+                              text (if (= :insertionPoint ranges-fn-key)
+                                     (str (string/trim balanced-form) "\n\n")
+                                     balanced-form)
+                              edit-result (edit-replace-range file-path
+                                                              (first (:ranges-object form-data))
+                                                              text)
+                              _ (p/delay 1000) ;; TODO: Consider subscribing on diagnistics changes instead
+                              diagnostics-after-edit (get-diagnostics-for-file file-path)]
+                        (if edit-result
+                          (do
+                            (.save vscode-document)
+                            (cond-> {:success true
+                                     :actual-line-used final-line-number
+                                     :diagnostics-before-edit diagnostics-before-edit
+                                     :diagnostics-after-edit diagnostics-after-edit}
+
+                              balancing-occurred?
+                              (merge
+                               {:balancing-note "The code provided for editing had unbalanced brackets. The code was automatically balanced before editing. Use the code in the `balanced-code` to correct your code on record."
+                                :balanced-code balanced-form})))
+                          {:success false
+                           :diagnostics-before-edit diagnostics-before-edit}))
+                      balance-result))))))
           (p/catch (fn [e]
                      {:success false
                       :error (.-message e)})))
@@ -214,3 +226,86 @@
     (def the-result the-result))
 
   :rcf)
+
+(defn- normalize-file-content [content]
+  (-> content str string/trim (str "\n")))
+
+(defn- get-directory-from-path [file-path]
+  (let [path-parts (string/split file-path #"/")]
+    (string/join "/" (butlast path-parts))))
+
+(defn structural-create-file+
+  "Create a new Clojure file with exact content using vscode/workspace.fs API"
+  [file-path content]
+  (let [inferred (parinfer/infer-brackets content)
+        infer-result (when inferred (js->clj inferred :keywordize-keys true))
+        balanced-content (if (:success infer-result)
+                           (:text infer-result)
+                           content)
+        balancing-occurred? (not= content balanced-content)]
+    (p/let [uri (vscode/Uri.file file-path)
+            normalized-content (normalize-file-content balanced-content)
+            content-bytes (.encode (js/TextEncoder.) normalized-content)
+            directory-path (get-directory-from-path file-path)
+            directory-uri (vscode/Uri.file directory-path)]
+      (p/-> (vscode/workspace.fs.createDirectory directory-uri)
+            (p/catch (fn [_] nil)) ;; Ignore if directory already exists
+            (p/then (fn [_]
+                      (vscode/workspace.fs.writeFile uri content-bytes)))
+            (p/then (fn [_]
+                      (p/let [_ (p/delay 1000) ;; Wait for diagnostics to update
+                              diagnostics-after-edit (get-diagnostics-for-file file-path)]
+                        (cond-> {:success true
+                                 :file-path file-path
+                                 :message "File created successfully"
+                                 :diagnostics-after-edit diagnostics-after-edit}
+                          balancing-occurred?
+                          (merge {:balancing-note "The code provided had unbalanced brackets. The code was automatically balanced before creating file."
+                                  :balanced-code balanced-content})))))
+            (p/catch (fn [error]
+                       {:success false
+                        :error (.-message error)
+                        :file-path file-path}))))))
+
+(defn append-code+
+  "Append a top-level form to the end of a file at guaranteed top level"
+  [file-path code]
+  (let [inferred (parinfer/infer-brackets code)
+        infer-result (when inferred (js->clj inferred :keywordize-keys true))
+        balanced-form (if (:success infer-result)
+                        (:text infer-result)
+                        code)
+        balancing-occurred? (not= code balanced-form)]
+    (-> (p/let [uri (vscode/Uri.file file-path)
+                ^js vscode-document (vscode/workspace.openTextDocument uri)
+                diagnostics-before-edit (get-diagnostics-for-file file-path)
+                last-line-number (.-lineCount vscode-document)
+                end-position (vscode/Position. last-line-number 0)
+                last-line-text (if (pos? last-line-number)
+                                 (.-text (.lineAt vscode-document (dec last-line-number)))
+                                 "")
+                needs-spacing? (and (pos? last-line-number)
+                                    (not (string/blank? last-line-text)))
+                spacing (if needs-spacing? "\n\n" "\n")
+                append-text (str spacing (string/trim balanced-form) "\n")
+                edit (vscode/TextEdit.insert end-position append-text)
+                workspace-edit (vscode/WorkspaceEdit.)
+                _ (.set workspace-edit uri #js [edit])
+                edit-result (vscode/workspace.applyEdit workspace-edit)
+                _ (p/delay 1000) ;; Wait for diagnostics to update
+                diagnostics-after-edit (get-diagnostics-for-file file-path)]
+          (.save vscode-document)
+          (if edit-result
+            (cond-> {:success true
+                     :appended-at-end true
+                     :diagnostics-before-edit diagnostics-before-edit
+                     :diagnostics-after-edit diagnostics-after-edit}
+              balancing-occurred?
+              (merge {:balancing-note "The code provided had unbalanced brackets. The code was automatically balanced before appending."
+                      :balanced-code balanced-form}))
+            {:success false
+             :diagnostics-before-edit diagnostics-before-edit
+             :error "Failed to apply workspace edit"}))
+        (p/catch (fn [error]
+                   {:success false
+                    :error (.-message error)})))))

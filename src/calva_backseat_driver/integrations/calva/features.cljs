@@ -107,6 +107,26 @@
   (editor/apply-form-edit-by-line-with-text-targeting
    file-path line target-line-text new-form :insertionPoint))
 
+(defn structural-create-file+
+  "Create a new Clojure file with exact content using vscode/workspace.fs API"
+  [{:ex/keys [dispatch!]
+    :calva/keys [file-path content]}]
+  (dispatch! [[:app/ax.log :debug "[Editor] Creating file" file-path]])
+  (p/let [result (editor/structural-create-file+ file-path content)]
+    (when (not (:success result))
+      (dispatch! [[:app/ax.log :error "[Editor] Failed to create file" file-path (:error result)]]))
+    result))
+
+(defn append-code+
+  "Append a top-level form to the end of a file at guaranteed top level"
+  [{:ex/keys [dispatch!]
+    :calva/keys [file-path code]}]
+  (dispatch! [[:app/ax.log :debug "[Editor] Appending code to end of" file-path]])
+  (p/let [result (editor/append-code+ file-path code)]
+    (when (not (:success result))
+      (dispatch! [[:app/ax.log :error "[Editor] Failed to append code to file" file-path (:error result)]]))
+    result))
+
 
 (comment
   (.-line (vscode/Position. 0))

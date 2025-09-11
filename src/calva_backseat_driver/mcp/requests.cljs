@@ -135,7 +135,7 @@
                    :priority 7}}))
 
 (def bracket-balance-tool-listing
-  (let [tool-name "balance_brackets"]
+  (let [tool-name "clojure_balance_brackets"]
     {:name tool-name
      :description (tool-description tool-name)
      :inputSchema {:type "object"
@@ -144,6 +144,32 @@
                    :required ["text"]
                    :audience ["user" "assistant"]
                    :priority 10}}))
+
+(def structural-create-file-tool-listing
+  (let [tool-name "clojure_create_file"]
+    {:name tool-name
+     :description (tool-description tool-name)
+     :inputSchema {:type "object"
+                   :properties {"filePath" {:type "string"
+                                            :description (param-description tool-name "filePath")}
+                                "content" {:type "string"
+                                           :description (param-description tool-name "content")}}
+                   :required ["filePath" "content"]
+                   :audience ["user" "assistant"]
+                   :priority 7}}))
+
+(def append-code-tool-listing
+  (let [tool-name "clojure_append_code"]
+    {:name tool-name
+     :description (tool-description tool-name)
+     :inputSchema {:type "object"
+                   :properties {"filePath" {:type "string"
+                                            :description (param-description tool-name "filePath")}
+                                "code" {:type "string"
+                                        :description (param-description tool-name "code")}}
+                   :required ["filePath" "code"]
+                   :audience ["user" "assistant"]
+                   :priority 7}}))
 
 (def human-intelligence-tool-listing
   (let [tool-name "request_human_input"]
@@ -197,6 +223,12 @@
 
                                       true
                                       (conj insert-top-level-form-tool-listing)
+
+                                      true
+                                      (conj structural-create-file-tool-listing)
+
+                                      true
+                                      (conj append-code-tool-listing)
 
                                       true
                                       (conj human-intelligence-tool-listing))}}]
@@ -267,7 +299,7 @@
            :result {:content [{:type "text"
                                :text (js/JSON.stringify output)}]}})
 
-        (= tool "balance_brackets")
+        (= tool "clojure_balance_brackets")
         (let [{:keys [text]} arguments
               result (bracket-balance/infer-parens-response (merge options
                                                                    {:calva/text text}))]
@@ -295,6 +327,26 @@
                                                              :calva/line line
                                                              :calva/target-line-text targetLineText
                                                              :calva/new-form newForm}))]
+          {:jsonrpc "2.0"
+           :id id
+           :result {:content [{:type "text"
+                               :text (js/JSON.stringify (clj->js result))}]}})
+
+        (= tool "clojure_create_file")
+        (p/let [{:keys [filePath content]} arguments
+                result (calva/structural-create-file+ (merge options
+                                                             {:calva/file-path filePath
+                                                              :calva/content content}))]
+          {:jsonrpc "2.0"
+           :id id
+           :result {:content [{:type "text"
+                               :text (js/JSON.stringify (clj->js result))}]}})
+
+        (= tool "clojure_append_code")
+        (p/let [{:keys [filePath code]} arguments
+                result (calva/append-code+ (merge options
+                                                  {:calva/file-path filePath
+                                                   :calva/code code}))]
           {:jsonrpc "2.0"
            :id id
            :result {:content [{:type "text"
