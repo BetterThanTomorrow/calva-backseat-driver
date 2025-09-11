@@ -2,16 +2,37 @@
 
 We refer to all files of reasonably Clojure-ish type as **Clojure files**, be it Clojure, ClojureScript, Babashka, nbb, Joyride, Jank, you-name-it.
 
-Even as an interactive programmer, now and then you do edit files. The most important things:
+Even as an interactive programmer, now and then you do edit files.
 
-1. **Before any editing: First always read the whole file you are about to edit.** Instead of chunked reading, **read it in one go**.
-2. Always check with the problem tool before and after each edit
-
-Also:
 * The structural editing tools attempt to automatically balance brackets before applying edits.
 * The tools return post-edit diagnostics/linting info. Make use of it!
 
 The specific processes look different depending on if you are creating files, appending forms, inserting forms, or editing existing forms.
+
+## Code Indentation Before REPL Evaluation
+
+**Always ensure that Clojure code is properly indented.** Proper indentation is essential for the structural editing tools to work correctly.
+
+### Essential Rule:
+- **Indent code properly** - Align nested forms with consistent indentation before evaluation
+
+### Pattern:
+```clojure
+;; ❌ Poor indentation - will cause issues
+(defn my-function [x]
+  {:foo 1
+  :bar 2}) ; `:bar` is not properly “inside” the enclosing map
+
+;; ✅ Proper indentation - ready for use with the structural editing tools
+(defn my-function [x]
+  {:foo 1
+   :bar 2}) ; `:bar` is properly “inside” the enclosing map
+```
+
+## When the bracket balance is off
+
+When you have a situation where e.g. the problem tool or Clojure compiler complains about missing brackets or anything suggesting the bracket balance is off (probably because you have used non-structural editing tools):
+* Instead of going ahead trying to fix it, **use the tool for requesting human input to ask for guidance/help.**
 
 ## About top level forms
 
@@ -35,25 +56,3 @@ Follow this process for making safe and working updates:
 
     Remember that in Clojure, functions need to be defined before they are called, so during the edits this way, linter complaints about symbols not found are to be expected. When the edit plan is carried out, you should have no new such warnings.
 
-## Code Indentation Before REPL Evaluation
-
-**Always ensure that Clojure code is properly indented.** Proper indentation is essential for the structural editing tools to work correctly.
-
-### Essential Rule:
-- **Indent code properly** - Align nested forms with consistent indentation before evaluation
-
-### Pattern:
-```clojure
-;; ❌ Poor indentation - will cause issues
-(defn my-function [x]
-(+ x 2))
-
-;; ✅ Proper indentation - ready for use with the structural editing tools
-(defn my-function [x]
-  (+ x 2))
-```
-
-## When the bracket balance is off
-
-When you have a situation where e.g. the problem tool or Clojure compiler complains about missing brackets or anything suggesting the bracket balance is off (probably because you have used non-structural editing tools):
-* Instead of going ahead trying to fix it, **use the tool for requesting human input to ask for guidance/help.**

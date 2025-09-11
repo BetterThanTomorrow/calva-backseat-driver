@@ -1,5 +1,3 @@
-## Replacing a Top Level Form in Clojure files
-
 This is the **Replace Top Level Form** tool. Use it to modify an existing top level form. To delete a top level form, replace it with an empty string.
 
 **Important**: This tool is **only** for replacing Clojure forms/s-expressions, **one at a time**

@@ -1,5 +1,3 @@
-## Inserting Top Level Forms in Clojure Files
-
 This is the **Insert Top Level Form** tool. Use it to insert new forms to a file, the forms will be inserted before an existing, targeted, top level form.
 
 **Important**: This tool is **only** for inserting Clojure forms/s-expressions
