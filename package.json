@@ -226,7 +226,7 @@
         }
       },
       {
-        "name": "balance_brackets",
+        "name": "clojure_balance_brackets",
         "tags": [
           "clojure",
           "parinfer",
@@ -364,13 +364,13 @@
         }
       },
       {
-        "name": "structural_create_file",
+        "name": "clojure_create_file",
         "tags": [
           "clojure",
           "file-creation",
           "structural-editing"
         ],
-        "toolReferenceName": "structural-create-file",
+        "toolReferenceName": "clojure-create-file",
         "displayName": "Create Clojure File",
         "modelDescription": "This is the **Create Clojure File** tool. Use it to create a Clojure file. Create the file with all the content you know should go there at the time of creation.\n\n## Clojure Namespace and Filename Convention:\n\n**Important**: In Clojure, namespace names use kebab-case while filenames use snake_case. For example:\n- Namespace: `my.project.multi-word-namespace`\n- Filename: `my/project/multi_word_namespace.clj(s|c)`\n\nAlways convert dashes in namespace names to underscores in the corresponding filename.\n\n## Use structural editing tools\n\nOnce the file is created and you need to append/insert/replace forms in it, use the appropriate structural editing tool for that.\n\n# Editing Clojure files\n\nWe refer to all files of reasonably Clojure-ish type as **Clojure files**, be it Clojure, ClojureScript, Babashka, nbb, Joyride, Jank, you-name-it.\n\nEven as an interactive programmer, now and then you do edit files.\n\n* The structural editing tools attempt to automatically balance brackets before applying edits.\n* The tools return post-edit diagnostics/linting info. Make use of it!\n\nThe specific processes look different depending on if you are creating files, appending forms, inserting forms, or editing existing forms.\n\n## Code Indentation Before REPL Evaluation\n\n**Always ensure that Clojure code is properly indented.** Proper indentation is essential for the structural editing tools to work correctly.\n\n### Essential Rule:\n- **Indent code properly** - Align nested forms with consistent indentation before evaluation\n\n### Pattern:\n```clojure\n;; ❌ Poor indentation - will cause issues\n(defn my-function [x]\n  {:foo 1\n  :bar 2}) ; `:bar` is not properly “inside” the enclosing map\n\n;; ✅ Proper indentation - ready for use with the structural editing tools\n(defn my-function [x]\n  {:foo 1\n   :bar 2}) ; `:bar` is properly “inside” the enclosing map\n```\n",
         "userDescription": "Create a new Clojure file",
@@ -395,7 +395,7 @@
         }
       },
       {
-        "name": "append_code",
+        "name": "clojure_append_code",
         "tags": [
           "clojure",
           "code-editing",

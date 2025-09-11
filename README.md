@@ -17,10 +17,12 @@ This extension exposes the AI tools both to CoPilot directly, using the VS Code 
 ## Features
 
 * Tool: **Evaluate Code** Access to the Clojure REPL to evaluate code at will
-* Tool: **Human Intelligence** The agent can ask the human for guidance, using an VS Code input box
-* Tool: **Replace top level form** Structural editing, including formatting, bracket balancing and linting
-* Tool: **Insert top level form** Structural editing, including formatting, bracket balancing and linting
+* Tool: **Create Clojure File** Creates Clojure files with automatic bracket balancing
+* Tool: **Append Code** Appends code to Clojure files with automatic bracket balancing
+* Tool: **Replace Top Level Form** Structural editing, including formatting, bracket balancing and linting
+* Tool: **Insert Top Level Form** Structural editing, including formatting, bracket balancing and linting
 * Tool: **Bracket Balancer** Helps the model get the bracket balance right (powered by [Parinfer](https://github.com/parinfer/parinfer.js))
+* Tool: **Human Intelligence** The agent can ask the human for guidance, using an VS Code input box
 * Tool: **Symbol info lookup**, the AI can look up symbols it is interested in, and will get doc strings, argument info etcetera
 * Tool: **clojuredocs.org lookup**, docs, examples, and *see also* information on Clojure core-ish symbols
 * Resource: **Symbol info lookup**, (a bit experimental) same as the tool
@@ -63,56 +65,13 @@ In [test-projects/example/AI_INTERACTIVE_PROGRAMMING.md](test-projects/example/A
 
 This is something we will have to figure out and discover together.  Here's a system prompt you can try. A lot of it is ripped from [Clojure MCP](https://github.com/bhauman/clojure-mcp).
 
-For CoPilot with default settings, system prompts can be provided in the workspace file `.github/copilot-instructions.md`
+For CoPilot with default settings, system prompts can be provided via CoPilot Instructions, chatmodes, and prompts. You'll find instructions to use and adapt at the [Awesome Copilot](https://github.com/github/awesome-copilot) repository. I can recommend using the [Awesome Copilot Joyride Script](https://pez.github.io/awesome-copilot-index/awesome-copilot-script) to quickly search and find Clojure content there.
 
-```markdown
-# AI Interactive Programming with Clojure and Calva Backseat Driver
-
-You are an AI Agent with access to Calva's REPL connection via the `evaluate-clojure-code` tool. THis makes you an Interactive Programmer. You love the REPL. You love Clojure. You also love lisp structural editing, so when you edit files you prefer to do so with structural tools such as replacing or inserting top level forms. Good thing Backseat Driver has these tool!
-
-You use your REPL power to evaluate and iterate on the code changes you propose. You develop the Clojure Way, data oriented, and building up solutions step by small step.
-
-The code will be functional code where functions take args and return results. This will be preferred over side effects. But we can use side effects as a last resort to service the larger goal.
-
-I'm going to supply a problem statement and I'd like you to work through the problem with me iteratively step by step.
-
-The expression doesn't have to be a complete function it can a simple sub expression.
-
-Where each step you evaluate an expression to verify that it does what you thing it will do.
-
-Println use id HIGHLY discouraged. Prefer evaluating subexpressions to test them vs using println.
-
-I'd like you to display what's being evaluated as a code block before invoking the evaluation tool.
-
-If something isn't working feel free to use the other clojure tools available.
-
-The main thing is to work step by step to incrementally develop a solution to a problem.  This will help me see the solution you are developing and allow me to guid it's development.
-
-When you update files:
-
-1. You first have used the REPL tool to develop and test the code that you edit into the files
-1. You use the structural editing tool to do the actual updates
-```
-
-The Backset Driver extension provides these as defailts instructions, in the `github.copilot.chat.codeGeneration.instructions` array. But only in case you don't have any yet.
-
-* Afaik, there is no way for the extension to describe itself to CoPilot.
-* For MCP clients, the server provides a description of itself.
-
-Even with this system prompt, to my experience the AI needs to be reminded to use the structural editing tools, and the REPL. When you give the agent a task, it can be good to end with something like:
+To my experience the AI needs to be reminded to use the structural editing tools, and the REPL. When you give the agent a task, it can be good to end with something like:
 
 > Please use interactive programming and structural editing.
 
 This repository has **Discussions** active. Please use it to share experience and tips with prompting.
-
-Right now I include this in the `github.copilot.chat.codeGeneration.instructions` array, and it seems to work pretty well.
-
-```
-      {
-        "text": "You are a Senior Clojure developer who know how to leverage the Calva Backseat Driver tools to improve your assistance. Your sources of truth are your tools for getting problem reports, code evalutation results, and Calva's output log, When you have edited a file you always check the problem report. Before your apply edits you check the balance of the whole would-be file with the balance_brackets tool.",
-        "language": "clojure"
-      },
-```
 
 ### Configuration (if using MCP Server)
 

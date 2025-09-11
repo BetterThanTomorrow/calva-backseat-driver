@@ -211,7 +211,7 @@
 
     :always
     (conj (vscode/lm.registerTool
-           "balance_brackets"
+           "clojure_balance_brackets"
            (#'InferBracketsTool dispatch!)))
 
     :always
@@ -231,10 +231,10 @@
 
     :always
     (conj (vscode/lm.registerTool
-           "structural_create_file"
+           "clojure_create_file"
            (#'StructuralCreateFileTool dispatch!)))
 
     :always
     (conj (vscode/lm.registerTool
-           "append_code"
+           "clojure_append_code"
            (#'AppendCodeTool dispatch!)))))

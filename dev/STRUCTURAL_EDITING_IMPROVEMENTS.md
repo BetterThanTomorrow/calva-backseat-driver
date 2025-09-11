@@ -28,7 +28,7 @@ Establish a common “human language name” for each tool. Use the Joyride GitH
 
 The current main instructions for the structural editing tools are [here](tool-instructions/editing-clojure-files.md), copy pasted into package.json where the instructions for the parameters are also hosted.
 
-#### 1.3 Create `structural_create_file` Tool
+#### 1.3 Create `clojure_create_file` Tool
 
 * Uses VS Code `vscode/workspace.fs` API to write exact content
 * Trims and adds trailing empty line at end of file
@@ -55,8 +55,8 @@ The current main instructions for the structural editing tools are [here](tool-i
 ### High Priority (Phase 1)
 - [ ] **Top level validation** - Stops nesting at the gate
 - [ ] **Enhanced tool instructions** - Prevents basic targeting errors
-- [ ] **`structural_create_file` tool** - Eliminates auto-namespace confusion
-- [ ] **`append_code` tool** - Solves immediate append struggles
+- [ ] **`clojure_create_file` tool** - Eliminates auto-namespace confusion
+- [ ] **`clojure_append_code` tool** - Solves immediate append struggles
 
 ### Out of scope, but cool ideas
 - [ ] **Rollback capability** - Safety net for complex edits
@@ -69,7 +69,7 @@ The current main instructions for the structural editing tools are [here](tool-i
 
 ## Open Questions
 
-1. How should `structural_create_file` handle directory creation (auto-create vs. explicit)?
+1. How should `clojure_create_file` handle directory creation (auto-create vs. explicit)?
    * Answer: It should create directories as needed
 
 ## Next Steps
@@ -80,9 +80,9 @@ The current main instructions for the structural editing tools are [here](tool-i
 2. Make a todo list for better instructions,
    1. Discuss with human developer about the requirements/implementation
    1. Implement better instructions, to `dev/tool-instructions/<tool>.md`
-3. Make a todo list for `structural_create_file` tool (addresses auto-namespace confusion)
+3. Make a todo list for `clojure_create_file` tool (addresses auto-namespace confusion)
    1. Discuss with human developer about the requirements/implementation
-   1. Implement `structural_create_file` tool
+   1. Implement `clojure_create_file` tool
 4. Make a todo list for `append_top_level_form` tool (addresses auto-namespace confusion)
    1. Discuss with human developer about the requirements/implementation
-   1. Implement `append_code` tool
+   1. Implement `clojure_append_code` tool

@@ -135,7 +135,7 @@
                    :priority 7}}))
 
 (def bracket-balance-tool-listing
-  (let [tool-name "balance_brackets"]
+  (let [tool-name "clojure_balance_brackets"]
     {:name tool-name
      :description (tool-description tool-name)
      :inputSchema {:type "object"
@@ -146,7 +146,7 @@
                    :priority 10}}))
 
 (def structural-create-file-tool-listing
-  (let [tool-name "structural_create_file"]
+  (let [tool-name "clojure_create_file"]
     {:name tool-name
      :description (tool-description tool-name)
      :inputSchema {:type "object"
@@ -159,7 +159,7 @@
                    :priority 7}}))
 
 (def append-code-tool-listing
-  (let [tool-name "append_code"]
+  (let [tool-name "clojure_append_code"]
     {:name tool-name
      :description (tool-description tool-name)
      :inputSchema {:type "object"
@@ -299,7 +299,7 @@
            :result {:content [{:type "text"
                                :text (js/JSON.stringify output)}]}})
 
-        (= tool "balance_brackets")
+        (= tool "clojure_balance_brackets")
         (let [{:keys [text]} arguments
               result (bracket-balance/infer-parens-response (merge options
                                                                    {:calva/text text}))]
@@ -332,7 +332,7 @@
            :result {:content [{:type "text"
                                :text (js/JSON.stringify (clj->js result))}]}})
 
-        (= tool "structural_create_file")
+        (= tool "clojure_create_file")
         (p/let [{:keys [filePath content]} arguments
                 result (calva/structural-create-file+ (merge options
                                                              {:calva/file-path filePath
@@ -342,7 +342,7 @@
            :result {:content [{:type "text"
                                :text (js/JSON.stringify (clj->js result))}]}})
 
-        (= tool "append_code")
+        (= tool "clojure_append_code")
         (p/let [{:keys [filePath code]} arguments
                 result (calva/append-code+ (merge options
                                                   {:calva/file-path filePath

@@ -21,11 +21,6 @@
             }
         }
     ],
-    "github.copilot.chat.codeGeneration.instructions": [
-        {
-            "file": ".github/AI_ASSISTANT.md"
-        }
-    ],
     "calva.customREPLCommandSnippets": [
         {
             "name": "Re-activate extension",
