@@ -131,7 +131,7 @@
     (if (util/target-text-is-first-line? target-text top-level-form-text)
       {:valid? true}
       {:valid? false
-       :validation-error "The target text does not match the first line of a top level form in the vincinty of the target line."
+       :validation-error "The target text does not match the first line of a top level form in the vicinity of the target line."
        :remedy remedy})))
 
 (defn apply-form-edit-by-line-with-text-targeting
