@@ -191,22 +191,22 @@
   (cond-> []
     :always
     (conj (vscode/lm.registerTool
-           "evaluate_clojure_code"
+           "clojure_evaluate_code"
            (#'EvaluateClojureCodeTool dispatch!)))
 
     (calva/exists-get-symbol-info?)
     (conj (vscode/lm.registerTool
-           "get_symbol_info"
+           "clojure_symbol_info"
            (#'GetSymbolInfoTool dispatch!)))
 
     (calva/exists-get-clojuredocs?)
     (conj (vscode/lm.registerTool
-           "get_clojuredocs_info"
+           "clojuredocs_info"
            (#'GetClojureDocsTool dispatch!)))
 
     (calva/exists-on-output?)
     (conj (vscode/lm.registerTool
-           "get_repl_output_log"
+           "clojure_repl_output_log"
            (#'GetOutputLogTool dispatch!)))
 
     :always

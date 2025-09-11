@@ -82,7 +82,7 @@
     "keybindings": [],
     "languageModelTools": [
       {
-        "name": "evaluate_clojure_code",
+        "name": "clojure_evaluate_code",
         "tags": [
           "clojure",
           "repl",
@@ -90,9 +90,9 @@
           "interactive-programming",
           "repl-driven-development"
         ],
-        "toolReferenceName": "evaluate",
+        "toolReferenceName": "clojure-eval",
         "displayName": "Evaluate Clojure Code",
-        "modelDescription": "Evaluate code using Calva's REPL connection. Enables AI Interactive Programming. Use this to make sure your edits work as you advertise, before applying them. The REPL holds the truth!\n\nEvaluating ClojureScript code?\n* remember to use the `\"cljs\"` `replSessionKey`\n* The user namespace is probably/often `cljs.user`\n* `js-keys` is a handy function to explore JS objects with",
+        "modelDescription": "**Evaluate Clojure Code** using Calva's REPL connection. Enables AI Interactive Programming. Use this to make sure your edits work as you advertise, before applying them. The REPL holds the truth!\n\n## Code Indentation Before REPL Evaluation\n\n**Always ensure Clojure code is properly indented before evaluating it in the REPL.** Proper indentation is essential for the bracket balancer and other tooling to work correctly.\n\n### Essential Rule:\n- **Indent code properly** - Align nested forms with consistent indentation before evaluation\n\n### Pattern:\n```clojure\n;; ❌ Poor indentation - will cause issues\n(defn my-function [x]\n  {:foo 1\n  :bar 2}) ; `:bar` is not properly “inside” the enclosing map\n\n;; ✅ Proper indentation - ready for evaluation\n(defn my-function [x]\n  {:foo 1\n   :bar 2}) ; `:bar` is properly “inside” the enclosing map\n```\n\n## Evaluating ClojureScript code?\n* remember to use the `\"cljs\"` `replSessionKey`\n* The user namespace is probably/often `cljs.user`\n* `js-keys` is a handy function to explore JS objects with\n",
         "userDescription": "Evaluate Clojure or ClojureScript code in the connected REPL.",
         "canBeReferencedInPrompt": true,
         "icon": "$(terminal-bash)",
@@ -105,7 +105,7 @@
             },
             "namespace": {
               "type": "string",
-              "description": "Fully qualified namespace in which to evaluate the code. E.g. if calling functions in a file you are reading, it is probably the namespace of that file that should be provided. If it is the first time you use a namespace, start with evaluating its ns-form in the `user` or `cljs.user` namespace (as appropriate)."
+              "description": "Fully qualified namespace in which to evaluate the code. E.g. if calling functions in a file you are reading, **it is probably the namespace of that file that should be provided**. If it is the first time you use a namespace, start with evaluating its ns-form in the `user` or `cljs.user` namespace (as appropriate)."
             },
             "replSessionKey": {
               "type": "string",
@@ -125,7 +125,7 @@
         }
       },
       {
-        "name": "get_symbol_info",
+        "name": "clojure_symbol_info",
         "tags": [
           "clojure",
           "documentation",
@@ -136,8 +136,8 @@
         ],
         "toolReferenceName": "clojure-symbol",
         "displayName": "Clojure Symbol Info",
-        "modelDescription": "Get detailed information about a Clojure symbol from the connected REPL.",
-        "userDescription": "Look up documentation for a Clojure symbol.",
+        "modelDescription": "**Clojure Symbol Info** gets you detailed information about a Clojure symbol from the connected REPL.",
+        "userDescription": "**Clojure Symbol Info** looks up documentation for a Clojure symbol.",
         "canBeReferencedInPrompt": true,
         "icon": "$(tag)",
         "inputSchema": {
@@ -169,7 +169,7 @@
         }
       },
       {
-        "name": "get_clojuredocs_info",
+        "name": "clojuredocs_info",
         "tags": [
           "clojure",
           "clojure-core",
@@ -180,7 +180,7 @@
         ],
         "toolReferenceName": "clojuredocs",
         "displayName": "clojuredocs.org Lookup",
-        "modelDescription": "Look up information, examples, see also:s, and more about a Clojure Core symbol from clojuredocs.org.",
+        "modelDescription": "**clojuredocs Lookup** looks up information, examples, see alsos, and more about a Clojure Core symbol from clojuredocs.org.",
         "userDescription": "Get examples and usage from clojuredocs.org",
         "canBeReferencedInPrompt": true,
         "icon": "$(globe)",
@@ -198,7 +198,7 @@
         }
       },
       {
-        "name": "get_repl_output_log",
+        "name": "clojure_repl_output_log",
         "tags": [
           "clojure",
           "repl",
@@ -208,7 +208,7 @@
         ],
         "toolReferenceName": "calva-output",
         "displayName": "Calva REPL Output Log",
-        "modelDescription": "Get REPL output messages from  Calva output window. Returns REPL output since `since-line`. Start with since-line=0 and use the last line number from previous output for subsequent calls. This is your window into the running application. Invoke it often as files are edited and/or you evaluate code.",
+        "modelDescription": "**Calva REPL Output** gets you REPL output messages from the Calva output window. Returns REPL output since `since-line`. Start with since-line=0 and use the last line number from previous output for subsequent calls. This is a window into the running application. Invoke it often as files are edited and/or you evaluate code.",
         "userDescription": "Read Calva's REPL output log",
         "canBeReferencedInPrompt": true,
         "icon": "$(list-ordered)",
@@ -236,7 +236,7 @@
         ],
         "toolReferenceName": "balance-brackets",
         "displayName": "Bracket Balancer",
-        "modelDescription": "This tool AUTHORITATIVELY balances brackets in Clojure code. Always follow these steps when using it:\n\n1. Pass the COMPLETE content of the file or would-be file without any modifications\n2. Use the EXACT output from this tool to replace the ENTIRE file content\n3. NEVER modify the tool's output or analyze its changes",
+        "modelDescription": "The **Bracket Balancer** AUTHORITATIVELY balances brackets in Clojure code. Always follow these steps when using it:\n\n1. Pass the COMPLETE content of the file or would-be file without any modifications\n2. Use the EXACT output from this tool to replace the ENTIRE file content\n3. NEVER modify the tool's output or analyze its changes",
         "userDescription": "Balance brackets in Clojure code",
         "canBeReferencedInPrompt": true,
         "icon": "$(bracket-error)",
@@ -346,7 +346,7 @@
         ],
         "toolReferenceName": "human-intelligence",
         "displayName": "Human Intelligence",
-        "modelDescription": "Ask the human developer for input or guidance. Give your question context in the chat, then use this tool to request input from the human.\n\n## When to use\n* Need to think about a thing together with someone?\n* Would you benefit from clarification?\n* Is there some domain knowledge you need?\n* Have you encountered unexpected results?\n* Has the human requested to be kept in the loop?\n\n## Tool flow\nAI Agent Working → Agent Needs Input → Agents Explains Context in Chat → Calls Tool → VS Code Input Box → Human Responds → AI Continues, better informed.",
+        "modelDescription": "**Human Intelligence** lets you ask the human developer for input or guidance. Give your question context in the chat, then use this tool to request input from the human.\n\n## When to use\n* Need to think about a thing together with someone?\n* Would you benefit from clarification?\n* Is there some domain knowledge you need?\n* Have you encountered unexpected results?\n* Has the human requested to be kept in the loop?\n\n## Tool flow\nAI Agent Working → Agent Needs Input → Agents Explains Context in Chat → Calls Tool → VS Code Input Box → Human Responds → AI Continues, better informed.",
         "userDescription": "The AI asks the human developer for input or guidance",
         "canBeReferencedInPrompt": true,
         "icon": "$(person)",

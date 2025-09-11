@@ -110,19 +110,19 @@ User ↔ AI Agent ↔ [VS Code LM API | MCP Server] ↔ Calva ↔ REPL ↔ Runni
 
 The tools are exposed as VS Code Language ModelAPI (for CoPilot) and MCP (for external AI clients).
 
-1. **evaluate_clojure_code** (if enabled)
+1. **clojure_evaluate_code** (if enabled)
    - Execute Clojure/ClojureScript code in connected REPL
    - Parameters: `code`, `namespace`, `replSessionKey`
 
-2. **get_symbol_info**
+2. **clojure_symbol_info**
    - Retrieve symbol documentation and metadata
    - Parameters: `clojureSymbol`, `namespace`, `replSessionKey`
 
-3. **get_clojuredocs_info**
+3. **clojuredocs_info**
    - Fetch examples and documentation from clojuredocs.org
    - Parameters: `clojureSymbol`
 
-4. **get_repl_output_log**
+4. **clojure_repl_output_log**
    - Access REPL output for monitoring and debugging
    - Parameters: `sinceLine`
 
