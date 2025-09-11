@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.19] - 2025-09-11
+
 - Fix: [The structural insert/replace top-level forms tools do not prevent editing non-top-level forms](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/32)
 - [Add tool for creating files](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/30)
 - [Add tool for appending top-level forms to a file](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/31)
