@@ -62,15 +62,16 @@ In [test-projects/example/AI_INTERACTIVE_PROGRAMMING.md](test-projects/example/A
 
 ### Code generation instructions
 
-This is something we will have to figure out and discover together.  Here's a system prompt you can try. A lot of it is ripped from [Clojure MCP](https://github.com/bhauman/clojure-mcp).
-
 For CoPilot with default settings, system prompts can be provided via CoPilot Instructions, chatmodes, and prompts. You'll find instructions to use and adapt at the [Awesome Copilot](https://github.com/github/awesome-copilot) repository. I can recommend using the [Awesome Copilot Joyride Script](https://pez.github.io/awesome-copilot-index/awesome-copilot-script) to quickly search and find Clojure content there.
 
-To my experience the AI needs to be reminded to use the structural editing tools, and the REPL. When you give the agent a task, it can be good to end with something like:
-
-> Please use interactive programming and structural editing.
-
 This repository has **Discussions** active. Please use it to share experience and tips with prompting.
+
+### Editor configuration
+
+The structural editing tools respect two Backseat Driver editor settings:
+
+- `calva-backseat-driver.editor.fuzzyLineTargetingPadding` (default `2`) — number of lines on each side of the requested line that the AI is allowed to scan when matching target text. Increase this if forms move around during larger refactorings; set to `0` for exact line targeting. _Trade-off_: higher values tolerate line shifts but raise the risk of matching a nearby, similar form when the agent's copy of the buffer is stale.
+- `calva-backseat-driver.editor.lineContextResponsePadding` (default `10`) — number of lines on each side of the requested line included in the troubleshooting snippet returned when targeting fails. Reduce this to keep responses shorter, or increase it for more surrounding context. _Trade-off_: larger values give the agent more cues for a retry, but can cost extra tokens (or time) compared with sending a focused snippet.
 
 ### Configuration (if using MCP Server)
 
