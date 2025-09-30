@@ -4,6 +4,9 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- [Make the structural editing tools return file context when the tool call is invalid ](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/37)
+  - Add user settings/configurability: `calva-backseat-driver.editor.fuzzyLineTargetingPadding` and `calva-backseat-driver.editor.lineContextResponsePadding`
+
 ## [v0.0.20] - 2025-09-11
 
 - [Update tool ids to qualify them as Clojure](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/34)
