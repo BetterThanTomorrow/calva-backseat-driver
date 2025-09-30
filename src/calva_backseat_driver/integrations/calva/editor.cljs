@@ -143,8 +143,12 @@
                                                                 :editor/target-text target-line
                                                                 :editor/search-padding search-padding})]
             (if-not actual-line-number
-              (let [file-context (util/get-context-lines doc-text line-number context-padding)
-                    remedy (util/get-remedy-for-targeting file-context target-line)]
+              (let [{:editor/keys [file-context
+                                   matched-line-in-context]} (util/get-context-lines doc-text
+                                                                                     line-number
+                                                                                     context-padding
+                                                                                     target-line)
+                    remedy (util/get-remedy-for-targeting matched-line-in-context)]
                 {:success false
                  :error (str "Target line text not found. Expected: '" target-line "' near line " line-number)
                  :remedy remedy
@@ -154,8 +158,12 @@
                                                                           :editor/line-number final-line-number
                                                                           :editor/target-text target-line})]
                 (if (not (:valid? text-validation))
-                  (let [file-context (util/get-context-lines doc-text line-number context-padding)
-                        remedy (util/get-remedy-for-targeting file-context target-line)]
+                  (let [{:editor/keys [file-context
+                                       matched-line-in-context]} (util/get-context-lines doc-text
+                                                                                         line-number
+                                                                                         context-padding
+                                                                                         target-line)
+                        remedy (util/get-remedy-for-targeting matched-line-in-context)]
                     {:success false
                      :error (str "Target text validation failed near line: " line-number)
                      :validation-error (:validation-error text-validation)

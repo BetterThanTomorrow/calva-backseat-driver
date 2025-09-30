@@ -110,33 +110,55 @@
   (let [sample-text "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15"]
 
     (testing "Extracts centered context"
-      (let [result (editor-util/get-context-lines sample-text 8 3)
-            lines (str/split-lines result)]
+      (let [{:editor/keys [file-context]} (editor-util/get-context-lines sample-text 8 3 nil)
+            lines (str/split-lines file-context)]
         (is (= 7 (count lines)) "Should have exactly 7 lines")
         (is (some #(str/starts-with? % "→") lines) "Should have marker")))
 
     (testing "Marker formatting is clean"
-      (let [result (editor-util/get-context-lines sample-text 5 2)
-            lines (str/split-lines result)
+      (let [{:editor/keys [file-context]} (editor-util/get-context-lines sample-text 5 2 nil)
+            lines (str/split-lines file-context)
             target-line (some #(when (str/starts-with? % "→") %) lines)
             non-target (first (filter #(not (str/starts-with? % "→")) lines))]
         (is (str/starts-with? target-line "→") "Target starts with arrow")
         (is (str/starts-with? non-target " ") "Non-target starts with space")))
 
     (testing "Pipes align consistently"
-      (let [result (editor-util/get-context-lines sample-text 10 2)
-            lines (str/split-lines result)
+      (let [{:editor/keys [file-context]} (editor-util/get-context-lines sample-text 10 2 nil)
+            lines (str/split-lines file-context)
             pipe-positions (map #(str/index-of % "|") lines)]
         (is (apply = pipe-positions) "All pipes should align")))
 
     (testing "Handles file boundaries"
-      (let [result (editor-util/get-context-lines sample-text 2 2)
-            lines (str/split-lines result)]
+      (let [{:editor/keys [file-context]} (editor-util/get-context-lines sample-text 2 2 nil)
+            lines (str/split-lines file-context)]
         (is (= 4 (count lines)) "Should have 4 lines (can't go below line 1)")
         (is (str/includes? (first lines) " 1 |") "Should start at line 1")))
 
     (testing "Preserves whitespace"
       (let [indented-text "  indented line\nno indent\n    more indent"
-            result (editor-util/get-context-lines indented-text 2 1)]
-        (is (str/includes? result "|   indented line") "Should preserve leading spaces")
-        (is (str/includes? result "|     more indent") "Should preserve indentation")))))
+            {:editor/keys [file-context]} (editor-util/get-context-lines indented-text 2 1 nil)]
+        (is (str/includes? file-context "|   indented line") "Should preserve leading spaces")
+        (is (str/includes? file-context "|     more indent") "Should preserve indentation")))))
+
+(deftest matched-line-in-context-reporting
+  (let [sample-text "line 1\nline 2\nline 3\nline 4\nline 5\nline 6"]
+    (testing "matches requested line when within window"
+      (let [{:editor/keys [matched-line-in-context]}
+            (editor-util/get-context-lines sample-text 4 2 "line 4")]
+        (is (= 4 matched-line-in-context)
+            "Should return requested line number")))
+
+    (testing "trims whitespace when matching"
+      (let [{:editor/keys [matched-line-in-context]}
+            (editor-util/get-context-lines sample-text 1 3 "  line 1  ")]
+        (is (= 1 matched-line-in-context)
+            "Should match first line even with extra whitespace")))
+
+    (testing "returns nil when target is outside document"
+      (let [{:editor/keys [matched-line-in-context file-context]}
+            (editor-util/get-context-lines sample-text 20 2 "line 20")]
+        (is (nil? matched-line-in-context)
+            "Should return nil when target line is out of bounds")
+        (is (str/blank? file-context)
+            "Should produce empty context when target line is missing")))))

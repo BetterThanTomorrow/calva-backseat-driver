@@ -64,53 +64,46 @@
    text - the full document text
    line-number - the 1-indexed line to focus on
    padding - number of lines to show above and below the target line
-   Returns formatted string with line numbers and marker for target line."
-  [text line-number padding]
+   target-text - optional text to match against context lines
+   Returns map with formatted context string and matched line number."
+  [text line-number padding target-text]
   (let [lines (string/split text #"\r?\n" -1)
         total-lines (count lines)
         target-idx (dec line-number)
-        ;; Calculate range using padding (±N lines)
+         ;; Calculate range using padding (±N lines)
         start-idx (max 0 (- target-idx padding))
         end-idx (min (dec total-lines) (+ target-idx padding))
         max-line-num (inc end-idx)
         line-padding (calculate-line-padding max-line-num true)
+        trimmed-target (when (and target-text (not (string/blank? target-text)))
+                         (string/trim target-text))
         formatted-lines (for [i (range start-idx (inc end-idx))]
-                          (let [line-text (nth lines i)
+                          (let [doc-line (nth lines i)
+                                trimmed-line (string/trim doc-line)
                                 line-num (inc i)
                                 is-target? (= line-num line-number)
+                                matches-target? (and trimmed-target
+                                                     (= trimmed-line trimmed-target))
                                 marker (format-line-marker is-target?)
                                 marker-len (count marker)
                                 padded-num (format-line-number line-num line-padding marker-len)]
-                            (str marker padded-num " | " line-text)))]
-    (string/join "\n" formatted-lines)))
-
-(defn target-in-context?
-  "Check if the target text appears anywhere in the provided file context.
-   Returns the line number if found, nil otherwise.
-   Trims both target and line content for comparison."
-  [file-context target-text]
-  (let [trimmed-target (string/trim target-text)
-        lines (string/split-lines file-context)]
-    (some (fn [line]
-            ;; Extract content after the pipe separator
-            (when-let [content-match (re-find #"\|\s*(.+)$" line)]
-              (let [line-content (string/trim (second content-match))]
-                (when (= line-content trimmed-target)
-                  ;; Extract line number
-                  (when-let [num-match (re-find #"^\s*[→\s]\s*(\d+)\s*\|" line)]
-                    (js/parseInt (second num-match)))))))
-          lines)))
+                            {:line-text (str marker padded-num " | " doc-line)
+                             :line-number line-num
+                             :matches-target? matches-target?}))
+        matched-line-in-context (when-let [line (-> (filter :matches-target? formatted-lines)
+                                                    first)]
+                                  (:line-number line))]
+    {:editor/file-context (string/join "\n" (map :line-text formatted-lines))
+     :editor/matched-line-in-context matched-line-in-context}))
 
 (defn get-remedy-for-targeting
   "Generate appropriate remedy message based on context.
-   file-context - the formatted context string with line numbers
-   target-text - the text that was being searched for
+   matched-line-in-context - line number matching the target text within provided context.
    Returns remedy string."
-  [file-context target-text]
-  (if-let [found-line (target-in-context? file-context target-text)]
-    (str "Line " found-line " in the context below matches your target text. "
-         "Consider if this is your intended target line. "
-         "Verify the line contains the first line of the top-level form you want to edit.")
+  [matched-line-in-context]
+  (if matched-line-in-context
+    (str "Line " matched-line-in-context " in the context below matches your target text. "
+         "Consider if this is your intended target line. ")
     (str "The target text was not found in the context shown below. "
          "Read the file to understand the actual structure, then target the correct line "
          "with the first line of the existing top level form starting at that line.")))
