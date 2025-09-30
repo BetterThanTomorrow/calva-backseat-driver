@@ -136,7 +136,7 @@
   [file-path line-number target-line new-form ranges-fn-key search-padding context-padding]
   (let [validation (validate-edit-inputs target-line new-form)]
     (if (:valid? validation)
-      (-> (p/let [vscode-document (get-document-from-path file-path)
+      (-> (p/let [^js vscode-document (get-document-from-path file-path)
                   doc-text (.getText vscode-document)
                   actual-line-number (find-target-line-by-text vscode-document line-number target-line search-padding)]
             (if-not actual-line-number
