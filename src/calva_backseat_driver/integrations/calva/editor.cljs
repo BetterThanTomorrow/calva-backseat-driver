@@ -17,7 +17,10 @@
                             first)]
     (if visible-editor
       visible-editor
-      (.showTextDocument vscode/window vscode-document))))
+      (.showTextDocument vscode/window
+                         vscode-document
+                         #js {:preserveFocus true
+                              :preview false}))))
 
 (defn- get-editor-from-file-path [file-path]
   (p/let [vscode-document (get-document-from-path file-path)]
