@@ -1,5 +1,6 @@
 (ns calva-backseat-driver.integrations.calva.editor-util-test
   (:require [cljs.test :refer [deftest testing is]]
+            [clojure.string :as str]
             [calva-backseat-driver.integrations.calva.editor-util :as editor-util]))
 
 (deftest find-target-line-by-text
@@ -76,3 +77,88 @@
 
     (is (= 2 (editor-util/find-target-line-by-text whitespace-doc "indented line" 2 2))
         "handles indented content")))
+
+(deftest format-line-marker-test
+  (is (= "→" (editor-util/format-line-marker true))
+      "Target line gets marker")
+  (is (= "" (editor-util/format-line-marker false))
+      "Non-target gets empty string"))
+
+(deftest format-line-number-test
+  (is (= "  5" (editor-util/format-line-number 5 3 0))
+      "Single digit with padding 3, no marker space")
+  (is (= " 42" (editor-util/format-line-number 42 3 0))
+      "Double digit with padding 3, no marker space")
+  (is (= "123" (editor-util/format-line-number 123 3 0))
+      "Triple digit with padding 3, no marker space")
+  (is (= " 5" (editor-util/format-line-number 5 3 1))
+      "With marker space, padding 3")
+  (is (= " 10" (editor-util/format-line-number 10 4 1))
+      "Two digit with marker space, padding 4"))
+
+(deftest calculate-line-padding-test
+  (is (= 1 (editor-util/calculate-line-padding 9 false))
+      "Small file without marker space")
+  (is (= 2 (editor-util/calculate-line-padding 9 true))
+      "Small file with marker space")
+  (is (= 3 (editor-util/calculate-line-padding 99 true))
+      "Medium file with marker space")
+  (is (= 4 (editor-util/calculate-line-padding 999 true))
+      "Large file with marker space"))
+
+(deftest get-context-lines-test
+  (let [sample-text "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15"]
+
+    (testing "Extracts centered context"
+      (let [{:editor/keys [file-context]} (editor-util/get-context-lines sample-text 8 3 nil)
+            lines (str/split-lines file-context)]
+        (is (= 7 (count lines)) "Should have exactly 7 lines")
+        (is (some #(str/starts-with? % "→") lines) "Should have marker")))
+
+    (testing "Marker formatting is clean"
+      (let [{:editor/keys [file-context]} (editor-util/get-context-lines sample-text 5 2 nil)
+            lines (str/split-lines file-context)
+            target-line (some #(when (str/starts-with? % "→") %) lines)
+            non-target (first (filter #(not (str/starts-with? % "→")) lines))]
+        (is (str/starts-with? target-line "→") "Target starts with arrow")
+        (is (str/starts-with? non-target " ") "Non-target starts with space")))
+
+    (testing "Pipes align consistently"
+      (let [{:editor/keys [file-context]} (editor-util/get-context-lines sample-text 10 2 nil)
+            lines (str/split-lines file-context)
+            pipe-positions (map #(str/index-of % "|") lines)]
+        (is (apply = pipe-positions) "All pipes should align")))
+
+    (testing "Handles file boundaries"
+      (let [{:editor/keys [file-context]} (editor-util/get-context-lines sample-text 2 2 nil)
+            lines (str/split-lines file-context)]
+        (is (= 4 (count lines)) "Should have 4 lines (can't go below line 1)")
+        (is (str/includes? (first lines) " 1 |") "Should start at line 1")))
+
+    (testing "Preserves whitespace"
+      (let [indented-text "  indented line\nno indent\n    more indent"
+            {:editor/keys [file-context]} (editor-util/get-context-lines indented-text 2 1 nil)]
+        (is (str/includes? file-context "|   indented line") "Should preserve leading spaces")
+        (is (str/includes? file-context "|     more indent") "Should preserve indentation")))))
+
+(deftest matched-line-in-context-reporting
+  (let [sample-text "line 1\nline 2\nline 3\nline 4\nline 5\nline 6"]
+    (testing "matches requested line when within window"
+      (let [{:editor/keys [matched-line-in-context]}
+            (editor-util/get-context-lines sample-text 4 2 "line 4")]
+        (is (= 4 matched-line-in-context)
+            "Should return requested line number")))
+
+    (testing "trims whitespace when matching"
+      (let [{:editor/keys [matched-line-in-context]}
+            (editor-util/get-context-lines sample-text 1 3 "  line 1  ")]
+        (is (= 1 matched-line-in-context)
+            "Should match first line even with extra whitespace")))
+
+    (testing "returns nil when target is outside document"
+      (let [{:editor/keys [matched-line-in-context file-context]}
+            (editor-util/get-context-lines sample-text 20 2 "line 20")]
+        (is (nil? matched-line-in-context)
+            "Should return nil when target line is out of bounds")
+        (is (str/blank? file-context)
+            "Should produce empty context when target line is missing")))))

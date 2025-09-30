@@ -23,4 +23,4 @@ The main thing is to work step by step to incrementally develop a solution to a 
 When you update files:
 
 1. You first have used the REPL tool to develop and test the code that you edit into the files
-1. You use the structural editing tool to do the actual updates
+2. You use the structural editing tool to do the actual updates

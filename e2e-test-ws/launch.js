@@ -5,7 +5,7 @@ const os = require('os');
 const fs = require('fs');
 const {
   downloadAndUnzipVSCode,
-  resolveCliPathFromVSCodeExecutablePath,
+  resolveCliArgsFromVSCodeExecutablePath,
   runTests,
 } = require('@vscode/test-electron');
 
@@ -33,10 +33,11 @@ async function main(vsixPathOrLabel, testWorkspace) {
   try {
     const extensionTestsPath = path.resolve(__dirname, 'runTests');
     const vscodeExecutablePath = await downloadAndUnzipVSCode('insiders');
-    const cliPath = resolveCliPathFromVSCodeExecutablePath(vscodeExecutablePath);
+    const [cliPath, ...args] = resolveCliArgsFromVSCodeExecutablePath(vscodeExecutablePath);
 
     const launchArgs = [
       testWorkspace,
+      ...args,
       //'--verbose',
       '--disable-workspace-trust',
       // When debugging tests, it can be good to use the development version of Joyride
@@ -45,6 +46,9 @@ async function main(vsixPathOrLabel, testWorkspace) {
       // (And can't be used if you are testing the development version of Calva)
       '--install-extension',
       'betterthantomorrow.joyride',
+      '--force',
+      '--install-extension',
+      'betterthantomorrow.calva',
       '--force',
     ];
     if (vsixPathOrLabel !== 'extension-development') {
@@ -65,7 +69,6 @@ async function main(vsixPathOrLabel, testWorkspace) {
       // When debugging tests, it can be good to use the development version Joyride
       // extensionDevelopmentPath: '/Users/pez/Projects/joyride',
       vscodeExecutablePath,
-      reuseMachineInstall: true,
       extensionTestsPath,
       launchArgs: [testWorkspace],
     };

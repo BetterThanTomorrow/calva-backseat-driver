@@ -10,7 +10,7 @@ Clojure Tools for CoPilot
 [![Issues](https://img.shields.io/github/issues/BetterThanTomorrow/calva-backseat-driver)](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues)
 [![License](https://img.shields.io/github/license/BetterThanTomorrow/calva-backseat-driver)](https://github.com/BetterThanTomorrow/calva-backseat-driver/blob/master/LICENSE.txt)
 
-An VS Code Language model extension for [Calva](https://calva.io), the Clojure/ClojureScript extension for VS Code, enabling AI assistants to harness the power of the REPL.
+A VS Code language model extension for [Calva](https://calva.io), the Clojure/ClojureScript extension for VS Code, enabling AI assistants to harness the power of the REPL.
 
 This extension exposes the AI tools both to CoPilot directly, using the VS Code Language Model API, and via an optional MCP server for any AI assistants/agents.
 
@@ -27,7 +27,15 @@ This extension exposes the AI tools both to CoPilot directly, using the VS Code 
 * Resource: **Symbol info lookup**, (a bit experimental) same as the tool
 * Resource: **clojuredocs.org lookup**, (a bit experimental) same as the tool
 
-Please note that for the editing tools there is no UI for reviewing the edits. I suggest using the source control tools for reviewing AI editing activity.
+Please note that for the editing tools there is no UI for reviewing the edits. I suggest using the source
+control tools for reviewing AI editing activity.
+
+### Editor configuration
+
+The structural editing tools for inserting and replacing top level forms respect two Backseat Driver editor settings:
+
+- `calva-backseat-driver.editor.fuzzyLineTargetingPadding` (default `2`) — number of lines on each side of the requested line that the AI is allowed to scan when matching target text. Increase this if forms move around during larger refactorings; set to `0` for exact line targeting. _Trade-off_: higher values tolerate line shifts but raise the risk of matching a nearby, similar form when the agent's copy of the buffer is stale.
+- `calva-backseat-driver.editor.lineContextResponsePadding` (default `10`) — number of lines on each side of the requested line included in the troubleshooting snippet returned when targeting fails. Reduce this to keep responses shorter, or increase it for more surrounding context. _Trade-off_: larger values give the agent more cues for a retry, but can cost extra tokens (or time) compared with sending a focused snippet.
 
 ## Why Calva Backseat Driver?
 
@@ -49,8 +57,6 @@ Tired of AI tools that write plausible-looking Clojure that falls apart at runti
 
 As Clojure developers, we know the REPL isn't just a console - it's the center of our workflow. Now your AI assistant can join that workflow, understanding your data and functions as they actually exist, not just as they appear in static code.
 
-In [test-projects/example/AI_INTERACTIVE_PROGRAMMING.md](test-projects/example/AI_INTERACTIVE_PROGRAMMING.md) you'll find an attempt to prompt the AI to leverage the REPL for interactive programming. (With varying success, help with this is much appreciated!)
-
 ## Getting Started
 
 ### Prerequisites
@@ -62,13 +68,7 @@ In [test-projects/example/AI_INTERACTIVE_PROGRAMMING.md](test-projects/example/A
 
 ### Code generation instructions
 
-This is something we will have to figure out and discover together.  Here's a system prompt you can try. A lot of it is ripped from [Clojure MCP](https://github.com/bhauman/clojure-mcp).
-
 For CoPilot with default settings, system prompts can be provided via CoPilot Instructions, chatmodes, and prompts. You'll find instructions to use and adapt at the [Awesome Copilot](https://github.com/github/awesome-copilot) repository. I can recommend using the [Awesome Copilot Joyride Script](https://pez.github.io/awesome-copilot-index/awesome-copilot-script) to quickly search and find Clojure content there.
-
-To my experience the AI needs to be reminded to use the structural editing tools, and the REPL. When you give the agent a task, it can be good to end with something like:
-
-> Please use interactive programming and structural editing.
 
 This repository has **Discussions** active. Please use it to share experience and tips with prompting.
 
@@ -76,7 +76,7 @@ This repository has **Discussions** active. Please use it to share experience an
 
 > Since evaluating Clojure code could be a bit risky, the MCP server defaults to evaluation being disabled, so you can use the server for other things. Search for *Backseat Driver* in VS Code Settings to enable it.
 >
-> Note that there are several layers to the security model here. This server starts with evaluation powers disables, and compliant MCP servers will default to low trust mode and ask for your confirmation every time the LLM wants to use the tool. Full YOLO mode is enabled if you enable the tool in the Calva MCP settings, and configure your AI client to be allowed to use it without asking.
+> Note that there are several layers to the security model here. This server starts with evaluation powers disabled, and compliant MCP servers will default to low trust mode and ask for your confirmation every time the LLM wants to use the tool. Full YOLO mode is enabled if you enable the tool in the Calva MCP settings, and configure your AI client to be allowed to use it without asking.
 
 The MCP server is running as a plain socket server in the VS Code Extension Host, writing out a port file when it starts. Then the MCP client needs to start a `stdio` relay/proxy/wrapper. The wrapper script takes the port or a port file as an argument. Because of these and other reasons, there will be one Calva Backseat Driver per workspace, and the port file will be written to the `.calva` directory in the workspace root.
 * The default port for the socket server is `1664`. If that is not available, a random, high, available port number will be used.
@@ -103,14 +103,14 @@ I am sorry that this is a bit messy. It is obvious that MCP is a bit new, and th
 
 [Cursor](https://www.cursor.com/) supports project level config.
 
-In you project's `.cursor/mcp.json` add a `"backseat-driver"` entry like so:
+In your project's `.cursor/mcp.json` add a `"backseat-driver"` entry like so:
 ```json
 {
   "mcpServers": {
     "backseat-driver": {
       "command": "node",
       "args": [
-        "<absolute path to calva-mcp-server.js in user-homme-config directory>",
+  "<absolute path to calva-mcp-server.js in user-home-config directory>",
         "<absolute path to port file (which points to your project's .calva/mcp-server/port)"
       ]
     }
@@ -159,7 +159,7 @@ Claude Desktop doesn't run in VS Code, and doesn't have any other project/worksp
 }
 ```
 
-There doesn't seem to be a way to refresh/reload the server info, so if you started the Backseat Driver MCP server after Claude, you probably neeed to restart Claude to for the refresh to happen.
+There doesn't seem to be a way to refresh/reload the server info, so if you started the Backseat Driver MCP server after Claude, you probably need to restart Claude for the refresh to happen.
 
 #### Other MCP client?
 
@@ -172,9 +172,12 @@ Please add configuration for other AI clients! 🙏
 
 All tools can be referenced in the chat:
 
-* `#eval-clojure`
+* `#clojure-eval`
 * `#replace-top-level-form`
 * `#insert-top-level-form`
+* `#balance-brackets`
+* `#clojure-create-file`
+* `#append-code`
 * `#clojure-symbol`
 * `#clojuredocs`
 * `#calva-output`
@@ -255,7 +258,7 @@ Some projects/tools to look to complement Backseat Driver, or use instead of it:
 
 This is all super early, and bare bones and experimental.
 
-Please let us now what features you would like to see.
+Please let us know what features you would like to see.
 
 ## Contributing
 

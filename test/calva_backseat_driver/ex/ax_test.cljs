@@ -23,7 +23,25 @@
           "new state has user-name from state")
       (is (= [[:node/fx.log "ex-test" "Clojurian"]]
              (:ex/fxs result))
-          "fxs uses user name from state"))))
+          "fxs uses user name from state")))
+
+  (testing "Enriching action from VS Code configuration placeholders"
+    (let [config (doto (js-obj)
+                   (aset "get" (fn [key]
+                                 (case key
+                                   "editor.lineContextResponsePadding" 21
+                                   "editor.fuzzyLineTargetingPadding" 7
+                                   nil))))
+          state {:app/getConfiguration (fn [_] config)}
+          result (ax/handle-action state
+                                   {}
+                                   [:ex-test/ax.log-message :vscode/config.editor.lineContextResponsePadding])]
+      (is (= 21
+             (:ex-test/last-message (:ex/db result)))
+          "Configuration values are resolved even when scoped under editor.")
+      (is (= [[:node/fx.log "ex-test" 21]]
+             (:ex/fxs result))
+          "Effects receive the resolved configuration value."))))
 
 (deftest handle-actions
   (is (= {:ex/db {:ex-test/ax.message-logged false
