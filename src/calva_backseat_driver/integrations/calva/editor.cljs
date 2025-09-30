@@ -114,14 +114,14 @@
 (defn- find-target-line-by-text
   "Find the actual line number by searching for target text within a window around the initial line.
    Returns the line number (1-indexed) where the target text is found, or nil if not found."
-  [^js vscode-document initial-line-number target-text search-padding]
-  (when-let [found-line (util/find-target-line-by-text (.getText vscode-document) target-text (dec initial-line-number) search-padding)]
+  [{:editor/keys [^js vscode-document line-number target-text search-padding]}]
+  (when-let [found-line (util/find-target-line-by-text (.getText vscode-document) target-text (dec line-number) search-padding)]
     (inc found-line)))
 
 (defn- validate-top-level-form-targeting
   "Validate that target text matches the start of the top-level form at the given position.
    Returns validation result map."
-  [file-path line-number target-text]
+  [{:editor/keys [file-path line-number target-text]}]
   (p/let [form-data (get-ranges-form-data-by-line file-path line-number :currentTopLevelForm)
           top-level-form-text (second (:ranges-object form-data))]
     (if (util/target-text-is-first-line? target-text top-level-form-text)
@@ -133,12 +133,15 @@
   "Apply a form edit by line number with text-based targeting for better accuracy.
    Searches for target-line text within a configurable window around the specified line number.
    For insertions, the new form is inserted before the targeted form."
-  [file-path line-number target-line new-form ranges-fn-key search-padding context-padding]
+  [{:editor/keys [file-path line-number target-line new-form ranges-fn-key search-padding context-padding]}]
   (let [validation (validate-edit-inputs target-line new-form)]
     (if (:valid? validation)
       (-> (p/let [^js vscode-document (get-document-from-path file-path)
                   doc-text (.getText vscode-document)
-                  actual-line-number (find-target-line-by-text vscode-document line-number target-line search-padding)]
+                  actual-line-number (find-target-line-by-text {:editor/vscode-document vscode-document
+                                                                :editor/line-number line-number
+                                                                :editor/target-text target-line
+                                                                :editor/search-padding search-padding})]
             (if-not actual-line-number
               (let [file-context (util/get-context-lines doc-text line-number context-padding)
                     remedy (util/get-remedy-for-targeting file-context target-line)]
@@ -147,7 +150,9 @@
                  :remedy remedy
                  :file-context file-context})
               (p/let [final-line-number actual-line-number
-                      text-validation (validate-top-level-form-targeting file-path final-line-number target-line)]
+                      text-validation (validate-top-level-form-targeting {:editor/file-path file-path
+                                                                          :editor/line-number final-line-number
+                                                                          :editor/target-text target-line})]
                 (if (not (:valid? text-validation))
                   (let [file-context (util/get-context-lines doc-text line-number context-padding)
                         remedy (util/get-remedy-for-targeting file-context target-line)]
@@ -196,43 +201,44 @@
 
 (comment
 
-  (p/let [edit-result (apply-form-edit-by-line-with-text-targeting "/Users/pez/Projects/calva-mcp-server/test-projects/example/src/mini/playground.clj"
-                                                                   214
-                                                                   ";foo"
-                                                                   "(foo"
-                                                                   :currentTopLevelForm
-                                                                   2
-                                                                   10)]
+  (p/let [edit-result (apply-form-edit-by-line-with-text-targeting
+                       {:editor/file-path "/Users/pez/Projects/calva-mcp-server/test-projects/example/src/mini/playground.clj"
+                        :editor/line-number 214
+                        :editor/target-line ";foo"
+                        :editor/new-form "(foo"
+                        :editor/ranges-fn-key :currentTopLevelForm
+                        :editor/search-padding 2
+                        :editor/context-padding 10})]
     (def edit-result edit-result))
 
   ;; Test validation - these should fail with proper error messages
   (apply-form-edit-by-line-with-text-targeting
-   "/some/file.clj"
-   10
-   "; This is a comment line"  ; ← This should fail
-   "(defn new-fn [])"
-   :currentTopLevelForm
-   2
-   10)
+   {:editor/file-path "/some/file.clj"
+    :editor/line-number 10
+    :editor/target-line "; This is a comment line"  ; ← This should fail
+    :editor/new-form "(defn new-fn [])"
+    :editor/ranges-fn-key :currentTopLevelForm
+    :editor/search-padding 2
+    :editor/context-padding 10})
 
   (apply-form-edit-by-line-with-text-targeting
-   "/some/file.clj"
-   10
-   "(defn old-fn [])"
-   "; This is a comment replacement"
-   :currentTopLevelForm
-   2
-   10)  ; ← This should fail
+   {:editor/file-path "/some/file.clj"
+    :editor/line-number 10
+    :editor/target-line "(defn old-fn [])"
+    :editor/new-form "; This is a comment replacement"  ; ← This should fail
+    :editor/ranges-fn-key :currentTopLevelForm
+    :editor/search-padding 2
+    :editor/context-padding 10})
 
   ;; This should succeed
   (p/let [the-result (apply-form-edit-by-line-with-text-targeting
-                      "/some/file.clj"
-                      10
-                      "(defn old-fn [])"
-                      "(defn new-fn [])"
-                      :currentTopLevelForm
-                      2
-                      10)]
+                      {:editor/file-path "/some/file.clj"
+                       :editor/line-number 10
+                       :editor/target-line "(defn old-fn [])"
+                       :editor/new-form "(defn new-fn [])"
+                       :editor/ranges-fn-key :currentTopLevelForm
+                       :editor/search-padding 2
+                       :editor/context-padding 10})]
     (def the-result the-result))
 
   :rcf)
