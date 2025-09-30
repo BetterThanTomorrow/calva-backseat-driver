@@ -112,6 +112,7 @@
     {:valid? true}))
 
 (def ^:private search-window 2)
+(def ^:private context-size 21)
 
 (defn- find-target-line-by-text
   "Find the actual line number by searching for target text within a window around the initial line.
@@ -119,8 +120,6 @@
   [^js vscode-document initial-line-number target-text]
   (when-let [found-line (util/find-target-line-by-text (.getText vscode-document) target-text (dec initial-line-number) search-window)]
     (inc found-line)))
-
-(def remedy "Read the whole file again, in one go. Then perform the edit, targeting the correct line and the first line of the existing top level form starting at that line.")
 
 (defn- validate-top-level-form-targeting
   "Validate that target text matches the start of the top-level form at the given position.
@@ -131,8 +130,7 @@
     (if (util/target-text-is-first-line? target-text top-level-form-text)
       {:valid? true}
       {:valid? false
-       :validation-error "The target text does not match the first line of a top level form in the vicinity of the target line."
-       :remedy remedy})))
+       :validation-error "The target text does not match the first line of a top level form in the vicinity of the target line."})))
 
 (defn apply-form-edit-by-line-with-text-targeting
   "Apply a form edit by line number with text-based targeting for better accuracy.
@@ -142,18 +140,25 @@
   (let [validation (validate-edit-inputs target-line new-form)]
     (if (:valid? validation)
       (-> (p/let [vscode-document (get-document-from-path file-path)
+                  doc-text (.getText vscode-document)
                   actual-line-number (find-target-line-by-text vscode-document line-number target-line)]
             (if-not actual-line-number
-              {:success false
-               :error (str "Target line text not found. Expected: '" target-line "' near line " line-number)
-               :remedy remedy}
+              (let [file-context (util/get-context-lines doc-text line-number context-size)
+                    remedy (util/get-remedy-for-targeting file-context target-line)]
+                {:success false
+                 :error (str "Target line text not found. Expected: '" target-line "' near line " line-number)
+                 :remedy remedy
+                 :file-context file-context})
               (p/let [final-line-number actual-line-number
                       text-validation (validate-top-level-form-targeting file-path final-line-number target-line)]
                 (if (not (:valid? text-validation))
-                  {:success false
-                   :error (str "Target text validation failed near line: " line-number)
-                   :validation-error (:validation-error text-validation)
-                   :remedy (:remedy text-validation)}
+                  (let [file-context (util/get-context-lines doc-text line-number context-size)
+                        remedy (util/get-remedy-for-targeting file-context target-line)]
+                    {:success false
+                     :error (str "Target text validation failed near line: " line-number)
+                     :validation-error (:validation-error text-validation)
+                     :remedy remedy
+                     :file-context file-context})
 
                   ;; Validation done. Proceed with form editing
                   (p/let [balance-result (some-> (parinfer/infer-brackets new-form)
