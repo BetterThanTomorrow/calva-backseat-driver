@@ -182,9 +182,10 @@
                           (do
                             (.save vscode-document)
                             (cond-> {:success true
-                                     :actual-line-used final-line-number
                                      :diagnostics-before-edit diagnostics-before-edit
                                      :diagnostics-after-edit diagnostics-after-edit}
+                              (not= final-line-number line-number)
+                              (assoc :actual-line-used final-line-number)
 
                               balancing-occurred?
                               (merge
