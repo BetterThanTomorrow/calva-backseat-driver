@@ -57,6 +57,20 @@
           "default": 1664,
           "markdownDescription": "Port to start the socket server on. Use `0` to let the server choose a high available port.",
           "scope": "resource"
+        },
+        "calva-backseat-driver.editor.fuzzyLineTargetingPadding": {
+          "type": "number",
+          "default": 2,
+          "minimum": 0,
+          "markdownDescription": "Number of lines to search above and below when locating a target line by its text content to decide if the edit should be carried out or not. **Trade-offs**: Higher values tolerate line number shifts but may match incorrect lines if similar code exists nearby. Large errors by the agent may indicate it has stale file content, and you may not want it to edit the file if so.",
+          "scope": "resource"
+        },
+        "calva-backseat-driver.editor.lineContextResponsePadding": {
+          "type": "number",
+          "default": 10,
+          "minimum": 0,
+          "markdownDescription": "Number of lines above and below the target line to show the agent in error responses when an edit operation fails. **Trade-offs**: Larger values provide more context for the agent's retry but may consume more tokens. Or it may not, depending on how the agent uses the information (e.g. if the context contains what it needs, if may be able to avoif a full file reread).",
+          "scope": "resource"
         }
       }
     },

@@ -299,7 +299,9 @@
                                                              {:calva/file-path filePath
                                                               :calva/line line
                                                               :calva/target-line-text targetLineText
-                                                              :calva/new-form newForm}))]
+                                                              :calva/new-form newForm
+                                                              :editor/search-padding :vscode/config.editor.fuzzyLineTargetingPadding
+                                                              :editor/context-padding :vscode/config.editor.lineContextResponsePadding}))]
           {:jsonrpc "2.0"
            :id id
            :result {:content [{:type "text"
@@ -311,7 +313,9 @@
                                                             {:calva/file-path filePath
                                                              :calva/line line
                                                              :calva/target-line-text targetLineText
-                                                             :calva/new-form newForm}))]
+                                                             :calva/new-form newForm
+                                                             :editor/search-padding :vscode/config.editor.fuzzyLineTargetingPadding
+                                                             :editor/context-padding :vscode/config.editor.lineContextResponsePadding}))]
           {:jsonrpc "2.0"
            :id id
            :result {:content [{:type "text"

@@ -94,18 +94,20 @@
 (defn replace-top-level-form+
   "Replace a top-level form using text targeting and Calva's ranges API"
   [{:ex/keys [dispatch!]
-    :calva/keys [file-path line target-line-text new-form]}]
+    :calva/keys [file-path line target-line-text new-form]
+    :editor/keys [search-padding context-padding]}]
   (dispatch! [[:app/ax.log :debug "[Editor] Replacing form at line" line "in" file-path]])
   (editor/apply-form-edit-by-line-with-text-targeting
-   file-path line target-line-text new-form :currentTopLevelForm))
+   file-path line target-line-text new-form :currentTopLevelForm search-padding context-padding))
 
 (defn insert-top-level-form+
   "Insert a top-level form using text targeting and Calva's ranges API"
   [{:ex/keys [dispatch!]
-    :calva/keys [file-path line target-line-text new-form]}]
+    :calva/keys [file-path line target-line-text new-form]
+    :editor/keys [search-padding context-padding]}]
   (dispatch! [[:app/ax.log :debug "[Editor] Inserting form at line" line "in" file-path]])
   (editor/apply-form-edit-by-line-with-text-targeting
-   file-path line target-line-text new-form :insertionPoint))
+   file-path line target-line-text new-form :insertionPoint search-padding context-padding))
 
 (defn structural-create-file+
   "Create a new Clojure file with exact content using vscode/workspace.fs API"

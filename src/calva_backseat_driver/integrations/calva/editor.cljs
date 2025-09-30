@@ -111,14 +111,11 @@
     :else
     {:valid? true}))
 
-(def ^:private search-window 2)
-(def ^:private context-size 21)
-
 (defn- find-target-line-by-text
   "Find the actual line number by searching for target text within a window around the initial line.
    Returns the line number (1-indexed) where the target text is found, or nil if not found."
-  [^js vscode-document initial-line-number target-text]
-  (when-let [found-line (util/find-target-line-by-text (.getText vscode-document) target-text (dec initial-line-number) search-window)]
+  [^js vscode-document initial-line-number target-text search-padding]
+  (when-let [found-line (util/find-target-line-by-text (.getText vscode-document) target-text (dec initial-line-number) search-padding)]
     (inc found-line)))
 
 (defn- validate-top-level-form-targeting
@@ -134,16 +131,16 @@
 
 (defn apply-form-edit-by-line-with-text-targeting
   "Apply a form edit by line number with text-based targeting for better accuracy.
-   Searches for target-line text within a 2-line window around the specified line number.
+   Searches for target-line text within a configurable window around the specified line number.
    For insertions, the new form is inserted before the targeted form."
-  [file-path line-number target-line new-form ranges-fn-key]
+  [file-path line-number target-line new-form ranges-fn-key search-padding context-padding]
   (let [validation (validate-edit-inputs target-line new-form)]
     (if (:valid? validation)
       (-> (p/let [vscode-document (get-document-from-path file-path)
                   doc-text (.getText vscode-document)
-                  actual-line-number (find-target-line-by-text vscode-document line-number target-line)]
+                  actual-line-number (find-target-line-by-text vscode-document line-number target-line search-padding)]
             (if-not actual-line-number
-              (let [file-context (util/get-context-lines doc-text line-number context-size)
+              (let [file-context (util/get-context-lines doc-text line-number context-padding)
                     remedy (util/get-remedy-for-targeting file-context target-line)]
                 {:success false
                  :error (str "Target line text not found. Expected: '" target-line "' near line " line-number)
@@ -152,7 +149,7 @@
               (p/let [final-line-number actual-line-number
                       text-validation (validate-top-level-form-targeting file-path final-line-number target-line)]
                 (if (not (:valid? text-validation))
-                  (let [file-context (util/get-context-lines doc-text line-number context-size)
+                  (let [file-context (util/get-context-lines doc-text line-number context-padding)
                         remedy (util/get-remedy-for-targeting file-context target-line)]
                     {:success false
                      :error (str "Target text validation failed near line: " line-number)
@@ -203,7 +200,9 @@
                                                                    214
                                                                    ";foo"
                                                                    "(foo"
-                                                                   :currentTopLevelForm)]
+                                                                   :currentTopLevelForm
+                                                                   2
+                                                                   10)]
     (def edit-result edit-result))
 
   ;; Test validation - these should fail with proper error messages
@@ -212,14 +211,18 @@
    10
    "; This is a comment line"  ; ← This should fail
    "(defn new-fn [])"
-   :currentTopLevelForm)
+   :currentTopLevelForm
+   2
+   10)
 
   (apply-form-edit-by-line-with-text-targeting
    "/some/file.clj"
    10
    "(defn old-fn [])"
    "; This is a comment replacement"
-   :currentTopLevelForm)  ; ← This should fail
+   :currentTopLevelForm
+   2
+   10)  ; ← This should fail
 
   ;; This should succeed
   (p/let [the-result (apply-form-edit-by-line-with-text-targeting
@@ -227,7 +230,9 @@
                       10
                       "(defn old-fn [])"
                       "(defn new-fn [])"
-                      :currentTopLevelForm)]
+                      :currentTopLevelForm
+                      2
+                      10)]
     (def the-result the-result))
 
   :rcf)

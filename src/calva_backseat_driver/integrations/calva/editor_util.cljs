@@ -63,34 +63,24 @@
   "Extract lines around a target line with line numbers.
    text - the full document text
    line-number - the 1-indexed line to focus on
-   context-size - total number of lines to show (target will be centered when possible)
+   padding - number of lines to show above and below the target line
    Returns formatted string with line numbers and marker for target line."
-  [text line-number context-size]
+  [text line-number padding]
   (let [lines (string/split text #"\r?\n" -1)
         total-lines (count lines)
         target-idx (dec line-number)
-        half-context (quot context-size 2)
-        ;; Try to center target, but clamp to file boundaries
-        ideal-start (- target-idx half-context)
-        ideal-end (+ target-idx half-context)
-        ;; Adjust if we hit boundaries
-        start-idx (cond
-                    (< ideal-start 0)
-                    0
-                    (>= ideal-end total-lines)
-                    (max 0 (- total-lines context-size))
-                    :else
-                    ideal-start)
-        end-idx (min (dec total-lines) (+ start-idx context-size -1))
+        ;; Calculate range using padding (±N lines)
+        start-idx (max 0 (- target-idx padding))
+        end-idx (min (dec total-lines) (+ target-idx padding))
         max-line-num (inc end-idx)
-        padding (calculate-line-padding max-line-num true)
+        line-padding (calculate-line-padding max-line-num true)
         formatted-lines (for [i (range start-idx (inc end-idx))]
                           (let [line-text (nth lines i)
                                 line-num (inc i)
                                 is-target? (= line-num line-number)
                                 marker (format-line-marker is-target?)
                                 marker-len (count marker)
-                                padded-num (format-line-number line-num padding marker-len)]
+                                padded-num (format-line-number line-num line-padding marker-len)]
                             (str marker padded-num " | " line-text)))]
     (string/join "\n" formatted-lines)))
 
