@@ -1,5 +1,6 @@
 (ns calva-backseat-driver.integrations.calva.editor-util-test
   (:require [cljs.test :refer [deftest testing is]]
+            [clojure.string :as str]
             [calva-backseat-driver.integrations.calva.editor-util :as editor-util]))
 
 (deftest find-target-line-by-text
@@ -76,3 +77,66 @@
 
     (is (= 2 (editor-util/find-target-line-by-text whitespace-doc "indented line" 2 2))
         "handles indented content")))
+
+(deftest format-line-marker-test
+  (is (= "→" (editor-util/format-line-marker true))
+      "Target line gets marker")
+  (is (= "" (editor-util/format-line-marker false))
+      "Non-target gets empty string"))
+
+(deftest format-line-number-test
+  (is (= "  5" (editor-util/format-line-number 5 3 0))
+      "Single digit with padding 3, no marker space")
+  (is (= " 42" (editor-util/format-line-number 42 3 0))
+      "Double digit with padding 3, no marker space")
+  (is (= "123" (editor-util/format-line-number 123 3 0))
+      "Triple digit with padding 3, no marker space")
+  (is (= " 5" (editor-util/format-line-number 5 3 1))
+      "With marker space, padding 3")
+  (is (= " 10" (editor-util/format-line-number 10 4 1))
+      "Two digit with marker space, padding 4"))
+
+(deftest calculate-line-padding-test
+  (is (= 1 (editor-util/calculate-line-padding 9 false))
+      "Small file without marker space")
+  (is (= 2 (editor-util/calculate-line-padding 9 true))
+      "Small file with marker space")
+  (is (= 3 (editor-util/calculate-line-padding 99 true))
+      "Medium file with marker space")
+  (is (= 4 (editor-util/calculate-line-padding 999 true))
+      "Large file with marker space"))
+
+(deftest get-context-lines-test
+  (let [sample-text "line 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\nline 8\nline 9\nline 10\nline 11\nline 12\nline 13\nline 14\nline 15"]
+
+    (testing "Extracts centered context"
+      (let [result (editor-util/get-context-lines sample-text 8 7)
+            lines (str/split-lines result)]
+        (is (= 7 (count lines)) "Should have exactly 7 lines")
+        (is (some #(str/starts-with? % "→") lines) "Should have marker")))
+
+    (testing "Marker formatting is clean"
+      (let [result (editor-util/get-context-lines sample-text 5 5)
+            lines (str/split-lines result)
+            target-line (some #(when (str/starts-with? % "→") %) lines)
+            non-target (first (filter #(not (str/starts-with? % "→")) lines))]
+        (is (str/starts-with? target-line "→") "Target starts with arrow")
+        (is (str/starts-with? non-target " ") "Non-target starts with space")))
+
+    (testing "Pipes align consistently"
+      (let [result (editor-util/get-context-lines sample-text 10 5)
+            lines (str/split-lines result)
+            pipe-positions (map #(str/index-of % "|") lines)]
+        (is (apply = pipe-positions) "All pipes should align")))
+
+    (testing "Handles file boundaries"
+      (let [result (editor-util/get-context-lines sample-text 2 5)
+            lines (str/split-lines result)]
+        (is (= 5 (count lines)) "Should have 5 lines")
+        (is (str/includes? (first lines) " 1 |") "Should start at line 1")))
+
+    (testing "Preserves whitespace"
+      (let [indented-text "  indented line\nno indent\n    more indent"
+            result (editor-util/get-context-lines indented-text 2 3)]
+        (is (str/includes? result "|   indented line") "Should preserve leading spaces")
+        (is (str/includes? result "|     more indent") "Should preserve indentation")))))

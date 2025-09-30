@@ -32,13 +32,32 @@
                        string/trim)]
     (= trimmed-target first-line)))
 
+(defn format-line-marker
+  "Returns marker string for a line. Just '→' for target, empty string otherwise."
+  [is-target?]
+  (if is-target? "→" ""))
+
 (defn format-line-number
-  "Format a line number with padding to 3 digits.
-   Returns a string like '  5' or ' 42' or '123'"
-  [n]
-  (let [s (str n)
-        padding (apply str (repeat (- 3 (count s)) " "))]
-    (str padding s)))
+  "Format a line number with padding.
+   n - the line number
+   padding - total width for marker + padding + number
+   marker-len - length of marker (0 or 1)
+   Returns padded string like '  5' or ' 42' or '123'"
+  [n padding marker-len]
+  (let [num-str (str n)
+        needed-padding (- padding marker-len (count num-str))
+        pad-str (apply str (repeat needed-padding " "))]
+    (str pad-str num-str)))
+
+(defn calculate-line-padding
+  "Calculate padding width needed for line numbers.
+   max-line-number - the largest line number that will be displayed
+   has-marker? - whether any line will have a marker
+   Returns total width needed for [marker][padding][number]"
+  [max-line-number has-marker?]
+  (let [number-width (count (str max-line-number))
+        marker-width (if has-marker? 1 0)]
+    (+ marker-width number-width)))
 
 (defn get-context-lines
   "Extract lines around a target line with line numbers.
@@ -63,11 +82,16 @@
                     :else
                     ideal-start)
         end-idx (min (dec total-lines) (+ start-idx context-size -1))
+        max-line-num (inc end-idx)
+        padding (calculate-line-padding max-line-num true)
         formatted-lines (for [i (range start-idx (inc end-idx))]
                           (let [line-text (nth lines i)
                                 line-num (inc i)
-                                marker (if (= line-num line-number) " → " "   ")]
-                            (str marker (format-line-number line-num) " | " line-text)))]
+                                is-target? (= line-num line-number)
+                                marker (format-line-marker is-target?)
+                                marker-len (count marker)
+                                padded-num (format-line-number line-num padding marker-len)]
+                            (str marker padded-num " | " line-text)))]
     (string/join "\n" formatted-lines)))
 
 (defn target-in-context?

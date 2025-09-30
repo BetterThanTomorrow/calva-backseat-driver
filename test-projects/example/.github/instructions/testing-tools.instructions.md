@@ -87,4 +87,36 @@ Organize tests by tool category using a todo list to track progress. Create dedi
 - Verify error suggests reading the file and trying again
 - Confirm no partial edits are applied on error
 
+### Verifying Tool Responses with REPL
+
+When testing tool outputs (especially error messages and formatted responses), use REPL evaluation to verify the actual string formatting:
+
+**Pattern for testing formatted output**:
+1. Trigger the tool operation (e.g., intentional error with wrong `targetLineText`)
+2. Capture the response string (e.g., `file-context` field from error response)
+3. Use **Evaluate Clojure Code** tool to print the string and verify formatting
+
+```clojure
+(in-ns 'test.namespace)
+
+;; Define the response string exactly as received from tool
+(def response-context
+  "  95 | (defn fn-91 [] 91)\n→108 | (defn fn-104 [] 104)\n 109 | (defn fn-105 [] 105)")
+
+;; Print to see actual formatting
+(println response-context)
+```
+
+**Why this matters**:
+- JSON serialization may show escaped characters (`\n`) rather than actual formatting
+- What you see in tool response JSON may differ from how strings are actually formatted
+- Printing reveals the true visual alignment, indentation, and spacing
+- Essential for verifying adaptive formatting (e.g., line number width adjusting for file size)
+
+**Use cases**:
+- Verify error message `file-context` displays correctly aligned code
+- Check that line number formatting adapts to file size (single-digit vs triple-digit lines)
+- Confirm arrow markers (→) don't disrupt code indentation alignment
+- Validate any formatted output string before considering it production-ready
+
 This systematic approach ensures tool updates are production-ready and maintains confidence in the toolset's reliability.
