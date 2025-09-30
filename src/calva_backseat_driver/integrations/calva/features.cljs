@@ -91,14 +91,16 @@
 
 (defn exists-on-output? [] (boolean (get-in calva/calva-api [:repl :onOutputLogged])))
 
+(defn- get-editor-config []
+  (let [config (vscode/workspace.getConfiguration "calva-backseat-driver.editor")]
+    {:search-padding (.get config "fuzzyLineTargetingPadding")
+     :context-padding (.get config "lineContextResponsePadding")}))
+
 (defn replace-top-level-form+
   "Replace a top-level form using text targeting and Calva's ranges API"
   [{:ex/keys [dispatch!]
     :calva/keys [file-path line target-line-text new-form]}]
-  (let [search-padding (.get (vscode/workspace.getConfiguration "calva-backseat-driver.editor")
-                             "fuzzyLineTargetingPadding")
-        context-padding (.get (vscode/workspace.getConfiguration "calva-backseat-driver.editor")
-                             "lineContextResponsePadding")]
+  (let [{:keys [search-padding context-padding]} (get-editor-config)]
     (dispatch! [[:app/ax.log :debug "[Editor] Replacing form at line" line "in" file-path]])
     (editor/apply-form-edit-by-line-with-text-targeting
      file-path line target-line-text new-form :currentTopLevelForm search-padding context-padding)))
@@ -107,10 +109,7 @@
   "Insert a top-level form using text targeting and Calva's ranges API"
   [{:ex/keys [dispatch!]
     :calva/keys [file-path line target-line-text new-form]}]
-  (let [search-padding (.get (vscode/workspace.getConfiguration "calva-backseat-driver.editor")
-                             "fuzzyLineTargetingPadding")
-        context-padding (.get (vscode/workspace.getConfiguration "calva-backseat-driver.editor")
-                             "lineContextResponsePadding")]
+  (let [{:keys [search-padding context-padding]} (get-editor-config)]
     (dispatch! [[:app/ax.log :debug "[Editor] Inserting form at line" line "in" file-path]])
     (editor/apply-form-edit-by-line-with-text-targeting
      file-path line target-line-text new-form :insertionPoint search-padding context-padding)))
