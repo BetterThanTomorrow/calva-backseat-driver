@@ -5,7 +5,14 @@ mode: clojure-interactive-programming
 
 # Backseat Driver Tool Smoke Tests
 
-Run basic validation tests for all Backseat Driver tools to ensure core functionality works after updates. Create a dedicated test file to avoid modifying production code.
+You are an AI agent testing the Backseat Driver MCP server tools by **using them directly**. These tools are designed for AI agents like you to perform Clojure development tasks.
+
+Your mission is to manually exercise each Backseat Driver tool to validate:
+- Core functionality works as expected when you use the tools
+- Error handling provides clear, actionable feedback to you as an agent
+- Edge cases related to fuzzy line matching and error context are handled gracefully
+
+**Important**: This is NOT about writing or running automated tests. You will directly invoke each tool, observe the results, and verify they work correctly for agent-driven development workflows.
 
 ## Test Workflow
 
