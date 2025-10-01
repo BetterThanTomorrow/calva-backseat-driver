@@ -1,9 +1,16 @@
 (ns tests.mcp.server-test
-  (:require [cljs.test :refer [deftest testing is]]
-            [e2e.macros :refer [deftest-async]]
-            [promesa.core :as p]
-            ["vscode" :as vscode]
-            ["net" :as net]))
+  (:require
+   ["fs" :as fs]
+   ["net" :as net]
+   ["path" :as path]
+   ["vscode" :as vscode]
+   [cljs.test :refer [deftest is testing]]
+   [e2e.macros :refer [deftest-async]]
+   [promesa.core :as p]))
+
+(def workspace-uri (.-uri (first vscode/workspace.workspaceFolders)))
+(def settings-path (.-fsPath (vscode/Uri.joinPath workspace-uri ".vscode" "settings.json")))
+(def settings-backup-path (path/join (path/dirname settings-path) "integration-test-backup-settings.json"))
 
 (deftest minimal-test
   (testing "Basic test to verify test discovery"
@@ -175,6 +182,7 @@
 
 (deftest-async tools-validation-with-repl-eval-enabled
   (testing "MCP server includes evaluation tool when enabled and REPL is connected"
+    (fs/copyFileSync settings-path settings-backup-path)
     (-> (p/let [;; First ensure Joyride REPL is connected
                 _ (vscode/commands.executeCommand "calva.startJoyrideReplAndConnect")
                 _ (p/delay 1000) ; Give REPL time to connect
@@ -215,4 +223,6 @@
         (p/catch (fn [e]
                    (js/console.error "[eval-tool-test] Error:" (.-message e) e)
                    (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
-                   (throw e))))))
+                   (throw e)))
+        (p/finally (fn []
+                     (fs/renameSync settings-backup-path settings-path))))))
