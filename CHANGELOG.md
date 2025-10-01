@@ -4,8 +4,6 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
-## [v0.0.22] - 2025-10-01
-
 - Fix: [Evaluation tool not available in v0.0.21](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/39)
 
 ## [v0.0.21] - 2025-09-30
