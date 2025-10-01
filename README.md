@@ -87,7 +87,7 @@ Please:
 8. use structural editing tools to implement
 ```
 
-I use it together with the interactive programming chat mode. Best models for this are `gpt-5-codex` and `claude-sonnet-4.5`. And I make sure to include some relevant code files in the context, because this makes Copilot gather the right instructions files (general Clojure instructions, project Clojure instructions and my preferences and so on).
+I use it together with the interactive programming chat mode. Best models for this are `gpt-5-codex` and `claude-sonnet-4.5`. As you can see, it starts with a nudge (I call it a micro prompt, it is really tiny, but it packs a punch) about remembering interactive programming. And I make sure to include some relevant code files in the context, because this makes Copilot gather the right instructions files (general Clojure instructions, project Clojure instructions and my preferences and so on).
 
 ![Copilot Chat input for 1-shot implementation](assets/howto/repl-plan-validate-and-go-prompt.png)
 
