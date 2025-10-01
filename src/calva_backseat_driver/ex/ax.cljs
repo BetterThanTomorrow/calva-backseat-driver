@@ -42,30 +42,20 @@
        x))
    action-or-effect))
 
-(defn- config-key->path
-  "Extract the configuration path from a placeholder keyword like :vscode/config.editor.foo.
-   Returns nil when the keyword does not follow the expected pattern."
-  [k]
-  (let [k-str (str k)
-        prefix ":vscode/config."]
-    (when (string/starts-with? k-str prefix)
-      (subs k-str (count prefix)))))
-
 (defn- enrich-from-state [action-or-effect state]
   (walk/postwalk
    (fn [x]
-     (let [config-path (config-key->path x)]
-       (cond
-         (and (vector? x)
-              (= :db/get (first x)))
-         (get state (second x))
+     (cond
+       (and (vector? x)
+            (= :db/get (first x)))
+       (get state (second x))
 
-         config-path
-         (some-> ^js ((:app/getConfiguration state) "calva-backseat-driver")
-                 (.get config-path))
+       (and (keyword? x)
+            (string/starts-with? (str x) ":vscode/config."))
+       (some-> ^js ((:app/getConfiguration state) "calva-backseat-driver")
+               (.get (second (re-find #"(?:\.)(.*?)$" (str x)))))
 
-         :else
-         x)))
+       :else x))
    action-or-effect))
 
 (defn enrich-with-args [actions args]
