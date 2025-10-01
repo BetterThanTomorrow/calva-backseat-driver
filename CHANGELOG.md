@@ -4,9 +4,11 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- Fix: [MakEvaluation tool not available in v0.0.21](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/39)
+
 ## [v0.0.21] - 2025-09-30
 
-- [Make the structural editing tools return file context when the tool call is invalid ](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/37)
+- [Make the structural editing tools return file context when the tool call is invalid](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/37)
   - Add user settings/configurability: `calva-backseat-driver.editor.fuzzyLineTargetingPadding` and `calva-backseat-driver.editor.lineContextResponsePadding`
 
 ## [v0.0.20] - 2025-09-11
