@@ -84,7 +84,7 @@ Test the complete file editing lifecycle:
 - ✓ Verify: Error message is clear and actionable
 
 **Edge Case: Line number beyond fuzzy window**
-- Target line number >2 lines away from actual location (test on `tiny_edge_case.clj`)
+- Target line `fuzzyLineTargetingPadding` + 2 away from actual location (test on `tiny_edge_case.clj`)
 - ✓ Verify: Operation fails with helpful error context showing the actual matching line
 
 **Edge Case: File smaller than context window**
