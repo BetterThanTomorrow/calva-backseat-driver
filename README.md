@@ -4,7 +4,7 @@ Clojure Tools for CoPilot
 
 > It is also an MCP Server for Calva
 
-(Parts of this README is written by Claude Sonnet. Pardon any marketing language. I will clean up.)
+(Parts of this README are written by Claude Sonnet. Pardon any marketing language. I will clean it up.)
 
 [![VS Code Extension](https://img.shields.io/visual-studio-marketplace/v/betterthantomorrow.calva-backseat-driver)](https://marketplace.visualstudio.com/items?itemName=betterthantomorrow.calva-backseat-driver)
 [![Issues](https://img.shields.io/github/issues/BetterThanTomorrow/calva-backseat-driver)](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues)
@@ -66,9 +66,30 @@ As Clojure developers, we know the REPL isn't just a console - it's the center o
 - [Calva Backseat Driver](https://marketplace.visualstudio.com/items?itemName=betterthantomorrow.calva-backseat-driver)
 - GitHub CoPilot (or some MCP compliant assistant)
 
-### Code generation instructions
+### Copilot instructions
 
-For CoPilot with default settings, system prompts can be provided via CoPilot Instructions, chatmodes, and prompts. You'll find instructions to use and adapt at the [Awesome Copilot](https://github.com/github/awesome-copilot) repository. I can recommend using the [Awesome Copilot Joyride Script](https://pez.github.io/awesome-copilot-index/awesome-copilot-script) to quickly search and find Clojure content there.
+For CoPilot with default settings, system prompts can be provided via CoPilot Instructions, chatmodes, and prompts. There's a [Clojure Copilot Starter Pack](https://github.com/github/awesome-copilot/blob/main/collections/clojure-interactive-programming.md) of instructions at the [Awesome Copilot](https://github.com/github/awesome-copilot) repository. I can recommend using the [Awesome Copilot Joyride Script](https://pez.github.io/awesome-copilot-index/awesome-copilot-script) to quickly search and find Clojure content there.
+
+Here's a prompt I've been using with good results for one-shot implementations, where the agent hammers at the REPL and validates with me until it has a plan, which it validates with me, and then implements:
+
+```md
+/remember-interactive-programming [problem and task description (can be pretty brief)]
+
+Please:
+
+1. go through the code and use the repl to understand [things the model needs to understand]
+2. validate your understanding of the task with me
+3. devise the criteria you have for rating a code change with "data oriented, minimal, razor sharp focused change" being the most important, decide what you think is a 10/10 rating
+4. validate the criteria with me
+5. Use the repl to iterate on your plan for changes until it meets your 10/10 criteria
+6. use the repl to validate your plan
+7. validate the plan with me
+8. use structural editing tools to implement
+```
+
+I use it together with the interactive programming chat mode. Best models for this are `gpt-5-codex` and `claude-sonnet-4.5`. And I make sure to include some relevant code files in the context, because this makes Copilot gather the right instructions files (general Clojure instructions, project Clojure instructions and my preferences and so on).
+
+![Copilot Chat input for 1-shot implementation](assets/howto/repl-plan-validate-and-go-prompt.png)
 
 This repository has **Discussions** active. Please use it to share experience and tips with prompting.
 
@@ -94,10 +115,10 @@ The MCP server is running as a plain socket server in the VS Code Extension Host
 
 Backseat Driver is a per-project MCP server, so should be configured on the project level if the assistant you are using allows it.
 
-* **If you can use project/workspace level configuration**, then it is best to use the **port file** as the argument to the stdio script. If your MCP client doesn't support project level
+* **If you can use project/workspace level configuration**, then it is best to use the **port file** as the argument to the stdio script. If your MCP client doesn't support project level configuration.
 * **If your MCP client does not support project/workspace configuration**, then you can still configure Backseat Driver to use different socket server ports for different projects. And then configure your MCP client with the appropriate port number for your session.
 
-I am sorry that this is a bit messy. It is obvious that MCP is a bit new, and that project level MCP servers may not have been considered when creating MCP. I have tried to understand and navigate the limitiations and to provide configurability/Ux to the best of my understanding and ability.
+I am sorry that this is a bit messy. It is obvious that MCP is a bit new, and that project level MCP servers may not have been considered when creating MCP. I have tried to understand and navigate the limitations and to provide configurability/Ux to the best of my understanding and ability.
 
 #### Cursor configuration
 
@@ -151,7 +172,7 @@ Claude Desktop doesn't run in VS Code, and doesn't have any other project/worksp
     "backseat-driver": {
       "command": "node",
       "args": [
-        "<absolute path to calva-mcp-server.js in user-homme-config directory>",
+  "<absolute path to calva-mcp-server.js in user-home-config directory>",
         "1664"
       ]
     }
@@ -244,7 +265,7 @@ flowchart TD
 
 ### MCP
 
-Calva Backseat Driver implements the [Model Context Protocol](https://modelcontextprotocol.io) (MCP), creating a bridge between AI assistants and your REPL:
+Calva Backseat Driver implements the [Model Context Protocol](https://modelcontextprotocol.io) (MCP), creating a bridge between AI assistants and your REPL.
 
 ## Alternatives
 
