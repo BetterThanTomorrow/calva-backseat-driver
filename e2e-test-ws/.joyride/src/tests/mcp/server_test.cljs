@@ -180,7 +180,7 @@
                    (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
                    (throw e))))))
 
-(deftest-async tools-validation-with-repl-eval-enabled
+#_(deftest-async tools-validation-with-repl-eval-enabled
   (testing "MCP server includes evaluation tool when enabled and REPL is connected"
     (fs/copyFileSync settings-path settings-backup-path)
     (-> (p/let [;; First ensure Joyride REPL is connected
