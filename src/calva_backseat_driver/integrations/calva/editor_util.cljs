@@ -21,16 +21,18 @@
             (recur (inc line-idx))))
         nil))))
 
-(defn target-text-is-first-line?
-  "Check if target text matches the first line of a form.
-   Returns true if the trimmed target text equals the trimmed first line of the form."
+(defn form-first-line-starts-target-text?
+  "Returns true if the form's first line starts the target text.
+   Target can have trailing content (like comments) that form doesn't have.
+   Calva's ranges API returns forms without trailing
+   line comments, but users target lines that include those comments."
   [target-text form-text]
   (let [trimmed-target (string/trim target-text)
         first-line (-> form-text
                        string/split-lines
                        first
                        string/trim)]
-    (= trimmed-target first-line)))
+    (string/starts-with? trimmed-target first-line)))
 
 (defn format-line-marker
   "Returns marker string for a line. Just '→' for target, empty string otherwise."

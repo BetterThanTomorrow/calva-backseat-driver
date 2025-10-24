@@ -1,6 +1,6 @@
 ---
 description: 'Testing strategies and patterns for Calva Backseat Driver Agents/MCP toolset development and validation'
-applyTo: '**'
+applyTo: '*.clj,*.cljs,*.cljc,*.bb'
 ---
 
 # Testing Calva Backseat Driver Agent Tools
@@ -120,3 +120,22 @@ When testing tool outputs (especially error messages and formatted responses), u
 - Validate any formatted output string before considering it production-ready
 
 This systematic approach ensures tool updates are production-ready and maintains confidence in the toolset's reliability.
+
+## Testing Bracket Balance Validation
+
+When validating bracket balance features in Calva Backseat Driver MCP tools, systematically test each tool with three code scenarios to ensure robust error handling and prevent silent corruption:
+
+**Test Scenarios for Each Tool:**
+- **Balanced code**: Use complete expressions like `(+ 1 2)` or `(defn add [a b] (+ a b))` - expect normal success with results or diagnostics
+- **Unbalanced code**: Use missing closing brackets like `(+ 1 2` - expect rejection with `{"valid?":false, "error":"...", "balanced-code":"<corrected-code>"}`
+- **Malformed code**: Use bracket mismatches like `({]][((broken))` - expect rejection with `{"valid?":false, "error":"...", "parinfer-error":{...}}`
+
+**Tools to Validate:**
+- **Evaluate Clojure Code**: Test simple expressions in each scenario
+- **Structural Editing Tools** (Create, Append, Replace, Insert): Test with complete file content, function additions, and form modifications
+
+**Key Benefits:**
+- Prevents tools from auto-fixing bracket issues that could change code meaning
+- Provides clear error messages with suggested corrections
+- Ensures consistent validation behavior across all tools
+- Exposes hidden bugs through isolated testing, rather than relying on agents working around failures
