@@ -174,8 +174,7 @@
                      :file-context file-context})
 
                   ;; Validation done. Proceed with form editing
-                  (p/let [balance-result (some-> (parinfer/infer-brackets new-form)
-                                                 (js->clj :keywordize-keys true))
+                  (p/let [balance-result (parinfer/infer-brackets new-form)
                           form-data (get-ranges-form-data-by-line file-path final-line-number ranges-fn-key)
                           diagnostics-before-edit (get-diagnostics-for-file file-path)]
                     (if (:success balance-result)

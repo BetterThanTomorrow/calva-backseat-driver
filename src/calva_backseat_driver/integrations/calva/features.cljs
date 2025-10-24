@@ -4,7 +4,8 @@
    [calva-backseat-driver.bracket-balance :as balance]
    [calva-backseat-driver.integrations.calva.api :as calva]
    [calva-backseat-driver.integrations.calva.editor :as editor]
-   [promesa.core :as p]))
+   [promesa.core :as p]
+   [calva-backseat-driver.integrations.parinfer :as parinfer]))
 
 (def ^:private no-ns-eval-note
   "When evaluating without providing a namespace argument the evaluation is performed in the `user` namespace. Most often this is not what you want, and instead you should be evaluating providing the namespace argument. If it is the first time you are using a namespace, evaluate its ns-form first.")
@@ -22,46 +23,42 @@
    Takes a string of code to evaluate and a session key (clj/cljs/cljc), js/undefined means current session."
   [{:ex/keys [dispatch!]
     :calva/keys [code repl-session-key ns]}]
-  (let [inferred (balance/infer-parens code)
-        balancded-code (if (:success inferred)
-                         (:text inferred)
-                         code)
-        balancing-ocurred? (not= code balancded-code)]
-    (when balancing-ocurred?
-      (dispatch! [[:app/ax.log :debug "[Server] Code was unbalanced:" code "balancded-code:" balancded-code]]))
-    (p/let [evaluate (get-in calva/calva-api [:repl :evaluateCode])
-            result (-> (p/let [^js evaluation+ (if ns
-                                                 (evaluate repl-session-key balancded-code ns)
-                                                 (evaluate repl-session-key balancded-code))]
-                         (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" balancded-code]])
-                         (cond-> {:result (.-result evaluation+)
-                                  :ns (.-ns evaluation+)
-                                  :stdout (.-output evaluation+)
-                                  :stderr (.-errorOutput evaluation+)
-                                  :session-key (.-replSessionKey evaluation+)
-                                  :note "Remember to check the output tool now and then to see what's happening in the application."}
+  (let [{valid? :success
+         :keys [balanced-code]
+         :as validation} (parinfer/validate-brackets code)]
+    (when-not valid?
+      (dispatch! [[:app/ax.log :debug "[Server] Code was unbalanced:" code "balancded-code:" balanced-code]]))
+    (p/do
+      (if-not valid?
+        validation
+        (p/let [evaluate (get-in calva/calva-api [:repl :evaluateCode])
+                result (-> (p/let [^js evaluation+ (if ns
+                                                     (evaluate repl-session-key code ns)
+                                                     (evaluate repl-session-key code))]
+                             (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
+                             (cond-> {:result (.-result evaluation+)
+                                      :ns (.-ns evaluation+)
+                                      :stdout (.-output evaluation+)
+                                      :stderr (.-errorOutput evaluation+)
+                                      :session-key (.-replSessionKey evaluation+)
+                                      :note "Remember to check the output tool now and then to see what's happening in the application."}
 
-                           balancing-ocurred?
-                           (merge
-                            {:balancing-note "The code provided for evaluation had unbalanced brackets. The code was automatically balanced before evaluation. Use the code in the `balanced-code` to correct your code on record."
-                             :balanced-code balancded-code})
+                               (.-error evaluation+)
+                               (merge {:error (.-error evaluation+)
+                                       :stacktrace (.-stacktrace evaluation+)})
 
-                           (.-error evaluation+)
-                           (merge {:error (.-error evaluation+)
-                                   :stacktrace (.-stacktrace evaluation+)})
+                               (not ns)
+                               (merge {:note no-ns-eval-note})
 
-                           (not ns)
-                           (merge {:note no-ns-eval-note})
-
-                           (= "" (.-result evaluation+))
-                           (merge {:note empty-result-note})))
-                       (p/catch (fn [err]
-                                  (dispatch! [[:app/ax.log :debug "[Server] Evaluation failed:"
-                                               err]])
-                                  {:result "nil"
-                                   :stderr (pr-str err)
-                                   :note error-result-note})))]
-      (clj->js result))))
+                               (= "" (.-result evaluation+))
+                               (merge {:note empty-result-note})))
+                           (p/catch (fn [err]
+                                      (dispatch! [[:app/ax.log :debug "[Server] Evaluation failed:"
+                                                   err]])
+                                      {:result "nil"
+                                       :stderr (pr-str err)
+                                       :note error-result-note})))]
+          (clj->js result))))))
 
 (defn get-clojuredocs+ [{:ex/keys [dispatch!]
                          :calva/keys [clojure-symbol]}]
