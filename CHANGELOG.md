@@ -5,6 +5,7 @@ Changes to Calva Backseat Driver
 ## [Unreleased]
 
 - [Avoid using potentially incorrectly auto-balanced code in evaluations and edits](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/41)
+- Fix: [Insert and replace top level forms doesn't work on one-line forms ending in a line comment](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/43)
 
 ## [v0.0.22] - 2025-10-01
 
