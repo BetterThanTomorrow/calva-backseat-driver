@@ -1,7 +1,6 @@
 (ns calva-backseat-driver.integrations.calva.features
   (:require
    ["vscode" :as vscode]
-   [calva-backseat-driver.bracket-balance :as balance]
    [calva-backseat-driver.integrations.calva.api :as calva]
    [calva-backseat-driver.integrations.calva.editor :as editor]
    [promesa.core :as p]

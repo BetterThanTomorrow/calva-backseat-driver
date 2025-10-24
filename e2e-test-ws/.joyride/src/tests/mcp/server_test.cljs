@@ -1,6 +1,5 @@
 (ns tests.mcp.server-test
   (:require
-   ["fs" :as fs]
    ["net" :as net]
    ["path" :as path]
    ["vscode" :as vscode]

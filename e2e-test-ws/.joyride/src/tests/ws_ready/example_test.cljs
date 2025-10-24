@@ -1,5 +1,5 @@
 (ns tests.ws-ready.example-test
-  (:require [cljs.test :refer [deftest testing is]]
+  (:require [cljs.test :refer [deftest is]]
             ["vscode" :as vscode]
             workspace-activate))
 

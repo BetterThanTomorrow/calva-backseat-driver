@@ -1,5 +1,5 @@
 (ns tasks
-  (:require [babashka.process :as p]
+  (:require #_[babashka.process :as p]
             [clojure.string :as string]
             [babashka.fs :as fs]
             publish
