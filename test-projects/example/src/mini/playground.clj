@@ -181,3 +181,9 @@
   ;; Reset the game state
   (reset-game))
 
+
+(defn test-append-balanced []
+  (+ 10 20 30))
+
+(defn test-multiply [a b]
+  (* a b))
