@@ -1,10 +1,5 @@
 (ns calva-backseat-driver.bracket-balance
-  (:require ["parinfer" :as parinfer]))
-
-(defn infer-parens
-  [code]
-  (some-> (parinfer/indentMode code #js {:partialResult true})
-          (js->clj :keywordize-keys true)))
+  (:require [calva-backseat-driver.integrations.parinfer :as parinfer]))
 
 (defn infer-parens-response
   "Infer parens from the indentation"
@@ -12,7 +7,7 @@
     :calva/keys [text]}]
   (dispatch! [[:app/ax.log :debug "[Server] Infering brackets for:" text]])
   (try
-    (let [result (infer-parens text)]
+    (let [result (parinfer/infer-brackets text)]
       (clj->js
        (if (:success result)
          (let [new-text (:text result)]
