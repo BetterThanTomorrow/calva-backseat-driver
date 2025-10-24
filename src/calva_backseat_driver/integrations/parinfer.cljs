@@ -25,6 +25,7 @@
         ;; Balancer failed (malformed brackets)
         (let [error-info (:error inferred)]
           {:valid? false
+           :success false
            :error (str "Code has malformed brackets: " (:message error-info)
                        " Please fix the bracket structure before evaluation.")
            :parinfer-error {:message (:message error-info)

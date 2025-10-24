@@ -263,7 +263,6 @@
     (if-not (:valid? validation-result)
       ;; REFUSE to create - return validation failure
       (p/resolved (assoc validation-result
-                         :success false
                          :file-path file-path))
       ;; Valid brackets - proceed with file creation
       (p/let [uri (vscode/Uri.file file-path)
@@ -293,7 +292,7 @@
   (let [validation-result (parinfer/validate-brackets code)]
     (if-not (:valid? validation-result)
       ;; REFUSE to append - return validation failure
-      (p/resolved (assoc validation-result :success false))
+      (p/resolved validation-result)
       ;; Valid brackets - proceed with append
       (-> (p/let [uri (vscode/Uri.file file-path)
                   ^js vscode-document (vscode/workspace.openTextDocument uri)

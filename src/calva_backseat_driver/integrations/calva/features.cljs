@@ -23,42 +23,40 @@
    Takes a string of code to evaluate and a session key (clj/cljs/cljc), js/undefined means current session."
   [{:ex/keys [dispatch!]
     :calva/keys [code repl-session-key ns]}]
-  (let [{valid? :success
-         :keys [balanced-code]
+  (let [{:keys [valid? balanced-code]
          :as validation} (parinfer/validate-brackets code)]
     (when-not valid?
-      (dispatch! [[:app/ax.log :debug "[Server] Code was unbalanced:" code "balancded-code:" balanced-code]]))
-    (p/do
-      (if-not valid?
-        validation
-        (p/let [evaluate (get-in calva/calva-api [:repl :evaluateCode])
-                result (-> (p/let [^js evaluation+ (if ns
-                                                     (evaluate repl-session-key code ns)
-                                                     (evaluate repl-session-key code))]
-                             (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
-                             (cond-> {:result (.-result evaluation+)
-                                      :ns (.-ns evaluation+)
-                                      :stdout (.-output evaluation+)
-                                      :stderr (.-errorOutput evaluation+)
-                                      :session-key (.-replSessionKey evaluation+)
-                                      :note "Remember to check the output tool now and then to see what's happening in the application."}
+      (dispatch! [[:app/ax.log :debug "[Server] Code was unbalanced:" code "balanced-code:" balanced-code]]))
+    (if-not valid?
+      (p/resolved validation)
+      (p/let [evaluate (get-in calva/calva-api [:repl :evaluateCode])
+              result (-> (p/let [^js evaluation+ (if ns
+                                                   (evaluate repl-session-key code ns)
+                                                   (evaluate repl-session-key code))]
+                           (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
+                           (cond-> {:result (.-result evaluation+)
+                                    :ns (.-ns evaluation+)
+                                    :stdout (.-output evaluation+)
+                                    :stderr (.-errorOutput evaluation+)
+                                    :session-key (.-replSessionKey evaluation+)
+                                    :note "Remember to check the output tool now and then to see what's happening in the application."}
 
-                               (.-error evaluation+)
-                               (merge {:error (.-error evaluation+)
-                                       :stacktrace (.-stacktrace evaluation+)})
+                             (.-error evaluation+)
+                             (merge {:error (.-error evaluation+)
+                                     :stacktrace (.-stacktrace evaluation+)})
 
-                               (not ns)
-                               (merge {:note no-ns-eval-note})
+                             (not ns)
+                             (merge {:note no-ns-eval-note})
 
-                               (= "" (.-result evaluation+))
-                               (merge {:note empty-result-note})))
-                           (p/catch (fn [err]
-                                      (dispatch! [[:app/ax.log :debug "[Server] Evaluation failed:"
-                                                   err]])
-                                      {:result "nil"
-                                       :stderr (pr-str err)
-                                       :note error-result-note})))]
-          (clj->js result))))))
+                             (= "" (.-result evaluation+))
+                             (merge {:note empty-result-note})))
+                         (p/catch (fn [err]
+                                    (dispatch! [[:app/ax.log :debug "[Server] Evaluation failed:"
+                                                 err]])
+                                    {:result "nil"
+                                     :stderr (pr-str err)
+                                     :note error-result-note})))]
+        (clj->js result)))))
 
 (defn get-clojuredocs+ [{:ex/keys [dispatch!]
                          :calva/keys [clojure-symbol]}]
