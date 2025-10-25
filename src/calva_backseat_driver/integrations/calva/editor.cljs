@@ -127,7 +127,7 @@
   [{:editor/keys [file-path line-number target-text]}]
   (p/let [form-data (get-ranges-form-data-by-line file-path line-number :currentTopLevelForm)
           top-level-form-text (second (:ranges-object form-data))]
-    (if (util/target-text-is-first-line? target-text top-level-form-text)
+    (if (util/form-first-line-starts-target-text? target-text top-level-form-text)
       {:valid? true}
       {:valid? false
        :validation-error "The target text does not match the first line of a top level form in the vicinity of the target line."})))

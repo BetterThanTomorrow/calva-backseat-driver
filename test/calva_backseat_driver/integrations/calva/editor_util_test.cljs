@@ -162,3 +162,23 @@
             "Should return nil when target line is out of bounds")
         (is (str/blank? file-context)
             "Should produce empty context when target line is missing")))))
+
+;; https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/43
+(deftest form-first-line-starts-target-text-with-trailing-comments
+  (testing "Forms with trailing comment should be possible to target"
+    (is (editor-util/form-first-line-starts-target-text?
+         "(def foo 42) ; bar"
+         "(def foo 42)")
+        "Matches when target is a one-line form with trailing comment")
+    (is (editor-util/form-first-line-starts-target-text?
+         " (def foo 42) ; bar "
+         "(def foo 42)")
+        "Matches when target is a one-line form with trailing comment, trimming whitespace")
+    (is (editor-util/form-first-line-starts-target-text?
+         "(defn foo [] ; bar"
+         "(defn foo [] ; bar\nnil)")
+        "Matches multi-line form with comment on first line")
+    (is (editor-util/form-first-line-starts-target-text?
+         "(defn foo []"
+         "(defn foo []\nnil)")
+        "Matches multi-line form")))
