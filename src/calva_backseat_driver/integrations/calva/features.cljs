@@ -17,27 +17,11 @@
    * cljs: Evaluating `(.-stack *e), gives you a stack trace")
 
 
-(defn- create-pprint-options
-  "Create a JavaScript object with pretty printing options"
-  [maxLength maxDepth width]
-  (let [opts #js {}]
-    (when maxLength (set! (.-maxLength opts) maxLength))
-    (when maxDepth (set! (.-maxDepth opts) maxDepth))
-    (when width (set! (.-width opts) width))
-    opts))
-
 (defn evaluate-code+
   "Returns a promise that resolves to the result of evaluating Clojure/ClojureScript code.
-   Takes a string of code to evaluate and a session key (clj/cljs/cljc), js/undefined means current session.
-
-   Optional pretty printing options to limit result size:
-   - :pprint/maxLength - Maximum number of items in collections before truncation
-   - :pprint/maxDepth - Maximum nesting depth before truncation
-   - :pprint/width - Maximum line width for formatting"
+   Takes a string of code to evaluate and a session key (clj/cljs/cljc), js/undefined means current session."
   [{:ex/keys [dispatch!]
-    :calva/keys [code repl-session-key ns]
-    :pprint/keys [maxLength maxDepth width]
-    :as args}]
+    :calva/keys [code repl-session-key ns]}]
   (let [{:keys [valid? balanced-code]
          :as validation} (parinfer/validate-brackets code)]
     (when-not valid?
@@ -49,39 +33,25 @@
                                                    (evaluate repl-session-key code ns)
                                                    (evaluate repl-session-key code))]
                            (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
+                           (cond-> {:result (.-result evaluation+)
+                                    :ns (.-ns evaluation+)
+                                    :stdout (.-output evaluation+)
+                                    :stderr (.-errorOutput evaluation+)
+                                    :session-key (.-replSessionKey evaluation+)
+                                    :note "Remember to check the output tool now and then to see what's happening in the application."}
 
-                           ;; Apply size limiting if options are provided and result is not empty
-                           (let [raw-result (.-result evaluation+)
-                                 should-limit? (and (or maxLength maxDepth width)
-                                                    (not= "" raw-result))
-                                 limited-result (if should-limit?
-                                                  (let [prettyPrint-fn (get-in calva/calva-api [:pprint :prettyPrint])
-                                                        pprint-opts (create-pprint-options maxLength maxDepth width)]
-                                                    (.-value (prettyPrint-fn raw-result pprint-opts)))
-                                                  raw-result)]
+                             (.-error evaluation+)
+                             (merge {:error (.-error evaluation+)
+                                     :stacktrace (.-stacktrace evaluation+)})
 
-                             (cond-> {:result limited-result
-                                      :ns (.-ns evaluation+)
-                                      :stdout (.-output evaluation+)
-                                      :stderr (.-errorOutput evaluation+)
-                                      :session-key (.-replSessionKey evaluation+)
-                                      :note "Remember to check the output tool now and then to see what's happening in the application."}
+                             (not ns)
+                             (merge {:note no-ns-eval-note})
 
-                               (.-error evaluation+)
-                               (merge {:error (.-error evaluation+)
-                                       :stacktrace (.-stacktrace evaluation+)})
-
-                               (not ns)
-                               (merge {:note no-ns-eval-note})
-
-                               (= "" raw-result)
-                               (merge {:note empty-result-note})
-
-                               should-limit?
-                               (merge {:note (str "Result was limited using pretty printing options. "
-                                                  "Original note: Remember to check the output tool now and then to see what's happening in the application.")}))))
+                             (= "" (.-result evaluation+))
+                             (merge {:note empty-result-note})))
                          (p/catch (fn [err]
-                                    (dispatch! [[:app/ax.log :debug "[Server] Evaluation failed:" err]])
+                                    (dispatch! [[:app/ax.log :debug "[Server] Evaluation failed:"
+                                                 err]])
                                     {:result "nil"
                                      :stderr (pr-str err)
                                      :note error-result-note})))]
@@ -184,27 +154,6 @@
                                   :calva/clojure-symbol "clojure.core/reductions"})]
     (def docs docs))
   (js->clj docs :keywordize-keys true)
-
-  ;; Example usage of size-limited evaluation
-  (def mock-dispatch! (fn [actions] (println "Would dispatch:" (pr-str actions))))
-
-  ;; Test large result with maxLength limiting
-  (p/let [result (evaluate-code+
-                  {:ex/dispatch! mock-dispatch!
-                   :calva/code "(vec (repeat 100 {:id 1 :data \"item-1\"}))"
-                   :calva/repl-session-key "cljs"
-                   :calva/ns "user"
-                   :pprint/maxLength 3})]
-    (js->clj result))
-
-  ;; Test nested data with maxDepth limiting
-  (p/let [result (evaluate-code+
-                  {:ex/dispatch! mock-dispatch!
-                   :calva/code "{:level1 {:level2 {:level3 {:level4 \"deep value\"}}}}"
-                   :calva/repl-session-key "cljs"
-                   :calva/ns "user"
-                   :pprint/maxDepth 2})]
-    (js->clj result))
 
   :rcf)
 
