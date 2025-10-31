@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- [Restrict the depth and length of evaluation results](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/45)
+
 ## [v0.0.23] - 2025-10-25
 
 - [Avoid using potentially incorrectly auto-balanced code in evaluations and edits](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/41)
