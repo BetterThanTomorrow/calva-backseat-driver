@@ -30,6 +30,15 @@ This extension exposes the AI tools both to CoPilot directly, using the VS Code 
 Please note that for the editing tools there is no UI for reviewing the edits. I suggest using the source
 control tools for reviewing AI editing activity.
 
+## Configuration
+
+### Evaluation result size limiting
+
+To prevent large REPL evaluation results from overwhelming the agent's context window, Backseat Driver automatically limits the size of returned results:
+
+- `calva-backseat-driver.evaluation.maxLength` (default `25`) — maximum number of items to display in collections. Use `0` to disable length limiting.
+- `calva-backseat-driver.evaluation.maxDepth` (default `7`) — maximum nesting depth; deeper structures are replaced with `##`. Use `0` to disable depth limiting.
+
 ### Editor configuration
 
 The structural editing tools for inserting and replacing top level forms respect two Backseat Driver editor settings:

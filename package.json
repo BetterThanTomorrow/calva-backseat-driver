@@ -71,6 +71,20 @@
           "minimum": 0,
           "markdownDescription": "Number of lines above and below the target line to show the agent in error responses when an edit operation fails. **Trade-offs**: Larger values provide more context for the agent's retry but may consume more tokens. Or it may not, depending on how the agent uses the information (e.g. if the context contains what it needs, if may be able to avoif a full file reread).",
           "scope": "resource"
+        },
+        "calva-backseat-driver.evaluation.maxLength": {
+          "type": "number",
+          "default": 25,
+          "minimum": 0,
+          "markdownDescription": "Maximum number of items to display in collections when pretty-printing REPL evaluation results. Use `0` to disable length limiting. **Purpose**: Prevents large collections from overwhelming the agent's context window.",
+          "scope": "resource"
+        },
+        "calva-backseat-driver.evaluation.maxDepth": {
+          "type": "number",
+          "default": 7,
+          "minimum": 0,
+          "markdownDescription": "Maximum nesting depth when pretty-printing REPL evaluation results. Deeper structures are replaced with `##`. Use `0` to disable depth limiting. **Purpose**: Prevents deeply nested structures from overwhelming the agent's context window.",
+          "scope": "resource"
         }
       }
     },
