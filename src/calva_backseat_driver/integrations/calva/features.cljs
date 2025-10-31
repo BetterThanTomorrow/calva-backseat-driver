@@ -17,6 +17,11 @@
    * cljs: Evaluating `(.-stack *e), gives you a stack trace")
 
 
+(defn- get-eval-config []
+  (let [config (vscode/workspace.getConfiguration "calva-backseat-driver.evaluation")]
+    {:max-length (.get config "maxLength")
+     :max-depth (.get config "maxDepth")}))
+
 (defn evaluate-code+
   "Returns a promise that resolves to the result of evaluating Clojure/ClojureScript code.
    Takes a string of code to evaluate and a session key (clj/cljs/cljc), js/undefined means current session."
@@ -29,9 +34,16 @@
     (if-not valid?
       (p/resolved validation)
       (p/let [evaluate (get-in calva/calva-api [:repl :evaluateCode])
+              {:keys [max-length max-depth]} (get-eval-config)
+              enabled? (or max-length max-depth)
+              nrepl-eval-options (when enabled?
+                                   #js {:pprintOptions #js {:enabled true
+                                                            :printEngine "pprint"
+                                                            :maxLength max-length
+                                                            :maxDepth max-depth}})
               result (-> (p/let [^js evaluation+ (if ns
-                                                   (evaluate repl-session-key code ns)
-                                                   (evaluate repl-session-key code))]
+                                                   (evaluate repl-session-key code ns nil nrepl-eval-options)
+                                                   (evaluate repl-session-key code js/undefined nil nrepl-eval-options))]
                            (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
                            (cond-> {:result (.-result evaluation+)
                                     :ns (.-ns evaluation+)
@@ -89,6 +101,8 @@
   (let [config (vscode/workspace.getConfiguration "calva-backseat-driver.editor")]
     {:search-padding (.get config "fuzzyLineTargetingPadding")
      :context-padding (.get config "lineContextResponsePadding")}))
+
+
 
 (defn replace-top-level-form+
   "Replace a top-level form using text targeting and Calva's ranges API"
