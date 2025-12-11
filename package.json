@@ -137,12 +137,7 @@
             },
             "replSessionKey": {
               "type": "string",
-              "description": "The Calva REPL session to evaluate the code via. It should be:\n* `clj` for the Clojure REPL\n* `cljs` for the ClojureScript REPL",
-              "enum": [
-                "clj",
-                "cljs",
-                "cljc"
-              ]
+              "description": "The Calva REPL session to evaluate the code via. Use the `list_sessions` tool to discover available sessions."
             }
           },
           "required": [
@@ -150,6 +145,26 @@
             "namespace",
             "replSessionKey"
           ]
+        }
+      },
+      {
+        "name": "clojure_list_sessions",
+        "tags": [
+          "clojure",
+          "repl",
+          "sessions",
+          "discovery"
+        ],
+        "toolReferenceName": "list-sessions",
+        "displayName": "List REPL Sessions",
+        "modelDescription": "**List REPL Sessions** returns information about all available REPL sessions. Use this tool to discover which session keys are available for evaluation. Each session includes the session key, project root, and file glob patterns it handles.",
+        "userDescription": "List available REPL sessions and their details.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(list-unordered)",
+        "inputSchema": {
+          "type": "object",
+          "properties": {},
+          "required": []
         }
       },
       {
@@ -181,12 +196,7 @@
             },
             "replSessionKey": {
               "type": "string",
-              "description": "The Calva REPL session to evaluate the code in. For Clojure, ClojureScript, and Common, respectively. Often the same as the extension of the file you are working with. One of `clj`, `cljs`, or `cljc`.",
-              "enum": [
-                "clj",
-                "cljs",
-                "cljc"
-              ]
+              "description": "The Calva REPL session to evaluate the code in. Use the `list_sessions` tool to discover available sessions."
             }
           },
           "required": [
