@@ -17,17 +17,17 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download VSIX Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: /tmp
           pattern: 'Linux-*.vsix'
           merge-multiple: true
 
       - name: Install clojure tools
-        uses: DeLaGuardo/setup-clojure@12.5
+        uses: DeLaGuardo/setup-clojure@13.4
         with:
           cli: latest
           bb: latest
@@ -58,10 +58,10 @@ jobs:
     needs: github-release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
 
@@ -77,7 +77,7 @@ jobs:
         run: npm install
 
       - name: Download VSIX Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: /tmp
           pattern: 'Linux-*.vsix'
@@ -93,10 +93,10 @@ jobs:
     needs: github-release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
 
@@ -112,7 +112,7 @@ jobs:
         run: npm install
 
       - name: Download VSIX Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: /tmp
           pattern: 'Linux-*.vsix'
@@ -130,7 +130,7 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -139,7 +139,7 @@ jobs:
         run: echo "BUMP_BRANCH=$(git symbolic-ref --short HEAD || echo 'master')" >> $GITHUB_ENV
 
       - name: Setup Babashka
-        uses: DeLaGuardo/setup-clojure@12.5
+        uses: DeLaGuardo/setup-clojure@13.4
         with:
           bb: latest
 
