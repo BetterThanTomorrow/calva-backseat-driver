@@ -184,6 +184,9 @@
                           (js/JSON.stringify result))])))})
 
 (defn register-language-model-tools [dispatch!]
+  ;; Set context for conditional tool visibility in UI
+  (dispatch! [[:app/ax.set-when-context :calva-backseat-driver/listSessionsAvailable
+               (calva/exists-list-sessions?)]])
   (cond-> []
     :always
     (conj (vscode/lm.registerTool

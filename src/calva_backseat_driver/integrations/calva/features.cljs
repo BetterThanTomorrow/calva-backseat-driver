@@ -40,18 +40,10 @@
   (dispatch! [[:app/ax.log :debug "[Server] Listing REPL sessions"]])
   (if-let [list-sessions-fn (get-in calva/calva-api [:repl :listSessions])]
     (p/let [sessions (list-sessions-fn)]
-      (clj->js
-       {:sessions
-        (->> sessions
-             (mapv (fn [^js session]
-                     {:session-key (.-replSessionKey session)
-                      :project-root (.-projectRoot session)
-                      :last-activity (.-lastActivity session)
-                      :globs (vec (.-globs session))})))}))
+      #js {:sessions sessions})
     (p/resolved
-     (clj->js
-      {:sessions (mapv (fn [k] {:session-key k}) legacy-session-keys)
-       :note "Session listing API not available, showing legacy session keys"}))))
+     #js {:sessions (to-array (map (fn [k] #js {:replSessionKey k}) legacy-session-keys))
+          :note "Session listing API not available, showing legacy session keys"})))
 
 (defn- validate-session-key+
   "Validates a session key against available sessions.
