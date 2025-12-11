@@ -19,21 +19,21 @@ jobs:
     steps:
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Prepare java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '21'
 
       - name: Install clojure tools
-        uses: DeLaGuardo/setup-clojure@12.5
+        uses: DeLaGuardo/setup-clojure@13.4
         with:
           cli: latest
           bb: latest
@@ -85,13 +85,13 @@ jobs:
         run: echo "VSIX_NAME=$(ls *.vsix)" >> $GITHUB_ENV
 
       - name: Upload VSIX Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ runner.os }}-${{ env.VSIX_NAME }}
           path: ${{ env.VSIX_NAME }}
 
       - name: Upload Test Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ${{ runner.os }}-extension-tests
           path: out/extension-tests.js
@@ -104,7 +104,7 @@ jobs:
     needs: build
     steps:
       - name: Download Test Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           name: ${{ runner.os }}-extension-tests
           pattern: out/extension-tests.js
@@ -124,10 +124,10 @@ jobs:
     needs: build
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download VSIX Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: .
           pattern: '${{ runner.os }}-*.vsix'
@@ -139,7 +139,7 @@ jobs:
         run: echo "VSIX_NAME=$(ls *.vsix)" >> $GITHUB_ENV
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
 
@@ -155,13 +155,13 @@ jobs:
         run: npm install
 
       - name: Setup Babashka
-        uses: DeLaGuardo/setup-clojure@12.5
+        uses: DeLaGuardo/setup-clojure@13.4
         with:
           bb: latest
 
       - name: Run E2E Tests Unix
         if: runner.os != 'Windows'
-        uses: coactions/setup-xvfb@6b00cf1889f4e1d5a48635647013c0508128ee1a
+        uses: coactions/setup-xvfb@v1
         with:
           run: bb run-e2e-tests-vsix ${{ env.VSIX_NAME }}
 
@@ -175,10 +175,10 @@ jobs:
     needs: build
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install clojure tools
-        uses: DeLaGuardo/setup-clojure@12.5
+        uses: DeLaGuardo/setup-clojure@13.4
         with:
           clj-kondo: latest
 
@@ -192,10 +192,10 @@ jobs:
     needs: build
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install clojure tools
-        uses: DeLaGuardo/setup-clojure@12.5
+        uses: DeLaGuardo/setup-clojure@13.4
         with:
           cljfmt: latest
 
