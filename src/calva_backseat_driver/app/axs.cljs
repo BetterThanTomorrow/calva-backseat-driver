@@ -1,5 +1,6 @@
 (ns calva-backseat-driver.app.axs
   (:require
+   [calva-backseat-driver.integrations.calva.features :as calva]
    [cljs.core.match :refer [match]]))
 
 
@@ -23,6 +24,8 @@
               [:calva/ax.when-activated [[:app/ax.init-output-listener]]]
               [:app/ax.set-when-context :calva-mcp-extension/activated?
                true]
+              [:app/ax.set-when-context :calva-backseat-driver/listSessionsAvailable
+               (calva/exists-list-sessions?)]
               (when autostart-mcp-server?
                 [:mcp/ax.start-server])]}
 

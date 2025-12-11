@@ -137,7 +137,7 @@
             },
             "replSessionKey": {
               "type": "string",
-              "description": "The Calva REPL session to evaluate the code via. Use the `list_sessions` tool to discover available sessions."
+              "description": "The Calva REPL session to evaluate the code via. If there is a `list_sessions` tool, use it to discover available sessions, lin lieu of that tool use the most appropriate of `clj` or `cljs`."
             }
           },
           "required": [
@@ -161,6 +161,7 @@
         "userDescription": "List available REPL sessions and their details.",
         "canBeReferencedInPrompt": true,
         "icon": "$(list-unordered)",
+        "when": ":calva-backseat-driver/listSessionsAvailable",
         "inputSchema": {
           "type": "object",
           "properties": {},
