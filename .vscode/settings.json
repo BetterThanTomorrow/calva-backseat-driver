@@ -12,7 +12,6 @@
             "projectType": "deps.edn",
             "cljsType": "shadow-cljs",
             "projectRootPath": ["."],
-            "autoSelectForJackIn": true,
             "autoSelectForConnect": true,
             "menuSelections": {
                 "cljAliases": [],

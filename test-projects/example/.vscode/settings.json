@@ -11,7 +11,7 @@
     {
       "name": "Mini Clojure Project",
       "autoSelectForConnect": true,
-      "autoSelectForJackIn": true,
+      // "autoSelectForJackIn": true,
       "projectRootPath": ["."],
       "cljsType": "none",
       "projectType": "deps.edn",
