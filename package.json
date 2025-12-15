@@ -157,7 +157,7 @@
         ],
         "toolReferenceName": "list-sessions",
         "displayName": "List REPL Sessions",
-        "modelDescription": "**List REPL Sessions** returns information about all available REPL sessions. Use this tool to discover which session keys are available for evaluation. Each session includes the session key, project root, and file glob patterns it handles.",
+        "modelDescription": "**List REPL Sessions** returns information about all available REPL sessions. Use this tool to discover which session keys are available for evaluation. Each session includes the session key, project root, and file glob patterns it handles. The session serving the user's active file is marked with `isActiveSession: true`.",
         "userDescription": "List available REPL sessions and their details.",
         "canBeReferencedInPrompt": true,
         "icon": "$(list-unordered)",
