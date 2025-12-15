@@ -22,9 +22,58 @@
     {:max-length (.get config "maxLength")
      :max-depth (.get config "maxDepth")}))
 
+;; Session listing and validation
+
+(def ^:private legacy-session-keys
+  "Fallback session keys for older Calva versions without listSessions API"
+  #{"clj" "cljs" "cljc"})
+
+(defn exists-list-sessions?
+  "Returns true if the Calva API supports listing sessions"
+  []
+  (boolean (get-in calva/calva-api [:repl :listSessions])))
+
+(defn list-sessions+
+  "Returns a promise that resolves to a list of available REPL sessions.
+   Falls back to legacy session keys when API is not available."
+  [{:ex/keys [dispatch!]}]
+  (dispatch! [[:app/ax.log :debug "[Server] Listing REPL sessions"]])
+  (if-let [list-sessions-fn (get-in calva/calva-api [:repl :listSessions])]
+    (p/let [sessions (list-sessions-fn)]
+      #js {:sessions sessions})
+    (p/resolved
+     #js {:sessions (to-array (map (fn [k] #js {:replSessionKey k}) legacy-session-keys))
+          :note "Session listing API not available, showing legacy session keys"})))
+
+(defn- validate-session-key+
+  "Validates a session key against available sessions.
+   Returns {:valid? true} or {:valid? false :error ... :available-sessions ...}"
+  [session-key]
+  (if-let [list-sessions-fn (get-in calva/calva-api [:repl :listSessions])]
+    ;; New Calva with listSessions API
+    (p/let [sessions (list-sessions-fn)
+            session-keys (->> sessions
+                              (map #(.-replSessionKey ^js %))
+                              set)]
+      (if (contains? session-keys session-key)
+        {:valid? true}
+        {:valid? false
+         :error (str "Session '" session-key "' not found.")
+         :available-sessions (mapv (fn [^js s]
+                                     {:session-key (.-replSessionKey s)
+                                      :project-root (.-projectRoot s)})
+                                   sessions)}))
+    ;; Fallback for older Calva
+    (p/resolved
+     (if (contains? legacy-session-keys session-key)
+       {:valid? true}
+       {:valid? false
+        :error (str "Session '" session-key "' not recognized.")
+        :available-sessions (mapv (fn [k] {:session-key k}) legacy-session-keys)}))))
+
 (defn evaluate-code+
   "Returns a promise that resolves to the result of evaluating Clojure/ClojureScript code.
-   Takes a string of code to evaluate and a session key (clj/cljs/cljc), js/undefined means current session."
+   Pre-validates session key against available sessions before evaluation."
   [{:ex/keys [dispatch!]
     :calva/keys [code repl-session-key ns]}]
   (let [{:keys [valid? balanced-code]
@@ -32,42 +81,45 @@
     (when-not valid?
       (dispatch! [[:app/ax.log :debug "[Server] Code was unbalanced:" code "balanced-code:" balanced-code]]))
     (if-not valid?
-      (p/resolved validation)
-      (p/let [evaluate (get-in calva/calva-api [:repl :evaluateCode])
-              {:keys [max-length max-depth]} (get-eval-config)
-              enabled? (or max-length max-depth)
-              nrepl-eval-options (when enabled?
-                                   #js {:pprintOptions #js {:enabled true
-                                                            :printEngine "pprint"
-                                                            :maxLength max-length
-                                                            :maxDepth max-depth}})
-              result (-> (p/let [^js evaluation+ (if ns
-                                                   (evaluate repl-session-key code ns nil nrepl-eval-options)
-                                                   (evaluate repl-session-key code js/undefined nil nrepl-eval-options))]
-                           (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
-                           (cond-> {:result (.-result evaluation+)
-                                    :ns (.-ns evaluation+)
-                                    :stdout (.-output evaluation+)
-                                    :stderr (.-errorOutput evaluation+)
-                                    :session-key (.-replSessionKey evaluation+)
-                                    :note "Remember to check the output tool now and then to see what's happening in the application."}
+      (p/resolved (clj->js validation))
+      (p/let [session-validation (validate-session-key+ repl-session-key)]
+        (if-not (:valid? session-validation)
+          (clj->js session-validation)
+          (p/let [evaluate (get-in calva/calva-api [:repl :evaluateCode])
+                  {:keys [max-length max-depth]} (get-eval-config)
+                  enabled? (or max-length max-depth)
+                  nrepl-eval-options (when enabled?
+                                       #js {:pprintOptions #js {:enabled true
+                                                                :printEngine "pprint"
+                                                                :maxLength max-length
+                                                                :maxDepth max-depth}})
+                  result (-> (p/let [^js evaluation+ (if ns
+                                                       (evaluate repl-session-key code ns nil nrepl-eval-options)
+                                                       (evaluate repl-session-key code js/undefined nil nrepl-eval-options))]
+                               (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
+                               (cond-> {:result (.-result evaluation+)
+                                        :ns (.-ns evaluation+)
+                                        :stdout (.-output evaluation+)
+                                        :stderr (.-errorOutput evaluation+)
+                                        :session-key (.-replSessionKey evaluation+)
+                                        :note "Remember to check the output tool now and then to see what's happening in the application."}
 
-                             (.-error evaluation+)
-                             (merge {:error (.-error evaluation+)
-                                     :stacktrace (.-stacktrace evaluation+)})
+                                 (.-error evaluation+)
+                                 (merge {:error (.-error evaluation+)
+                                         :stacktrace (.-stacktrace evaluation+)})
 
-                             (not ns)
-                             (merge {:note no-ns-eval-note})
+                                 (not ns)
+                                 (merge {:note no-ns-eval-note})
 
-                             (= "" (.-result evaluation+))
-                             (merge {:note empty-result-note})))
-                         (p/catch (fn [err]
-                                    (dispatch! [[:app/ax.log :debug "[Server] Evaluation failed:"
-                                                 err]])
-                                    {:result "nil"
-                                     :stderr (pr-str err)
-                                     :note error-result-note})))]
-        (clj->js result)))))
+                                 (= "" (.-result evaluation+))
+                                 (merge {:note empty-result-note})))
+                             (p/catch (fn [err]
+                                        (dispatch! [[:app/ax.log :debug "[Server] Evaluation failed:"
+                                                     err]])
+                                        {:result "nil"
+                                         :stderr (pr-str err)
+                                         :note error-result-note})))]
+            (clj->js result)))))))
 
 (defn get-clojuredocs+ [{:ex/keys [dispatch!]
                          :calva/keys [clojure-symbol]}]

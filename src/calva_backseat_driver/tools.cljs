@@ -171,12 +171,32 @@
                     #js [(vscode/LanguageModelTextPart.
                           (js/JSON.stringify (clj->js result)))])))})
 
+(defn ListSessionsTool [dispatch!]
+  #js {:prepareInvocation (fn prepareInvocation [^js _options _token]
+                            #js {:invocationMessage "Listing REPL sessions"
+                                 :confirmationMessages #js {:title "List REPL Sessions"
+                                                            :message "List available REPL sessions"}})
+
+       :invoke (fn invoke [^js _options _token]
+                 (p/let [result (calva/list-sessions+ {:ex/dispatch! dispatch!})]
+                   (vscode/LanguageModelToolResult.
+                    #js [(vscode/LanguageModelTextPart.
+                          (js/JSON.stringify result))])))})
+
 (defn register-language-model-tools [dispatch!]
+  ;; Set context for conditional tool visibility in UI
+  (dispatch! [[:app/ax.set-when-context :calva-backseat-driver/listSessionsAvailable
+               (calva/exists-list-sessions?)]])
   (cond-> []
     :always
     (conj (vscode/lm.registerTool
            "clojure_evaluate_code"
            (#'EvaluateClojureCodeTool dispatch!)))
+
+    (calva/exists-list-sessions?)
+    (conj (vscode/lm.registerTool
+           "clojure_list_sessions"
+           (#'ListSessionsTool dispatch!)))
 
     (calva/exists-get-symbol-info?)
     (conj (vscode/lm.registerTool

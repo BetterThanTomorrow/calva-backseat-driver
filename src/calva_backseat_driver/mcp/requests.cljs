@@ -62,6 +62,16 @@
                    :audience ["user" "assistant"]
                    :priority 9}}))
 
+(def list-sessions-tool-listing
+  (let [tool-name "clojure_list_sessions"]
+    {:name tool-name
+     :description (tool-description tool-name)
+     :inputSchema {:type "object"
+                   :properties {}
+                   :required []
+                   :audience ["user" "assistant"]
+                   :priority 9}}))
+
 (def symbol-info-tool-listing
   (let [tool-name "clojure_symbol_info"]
     {:name tool-name
@@ -197,6 +207,9 @@
                                       (= true repl-enabled?)
                                       (conj evaluate-code-tool-listing)
 
+                                      (calva/exists-list-sessions?)
+                                      (conj list-sessions-tool-listing)
+
                                       (calva/exists-get-symbol-info?)
                                       (conj symbol-info-tool-listing)
 
@@ -249,6 +262,13 @@
                                                      :calva/repl-session-key replSessionKey}
                                                     (when ns
                                                       {:calva/ns ns})))]
+          {:jsonrpc "2.0"
+           :id id
+           :result {:content [{:type "text"
+                               :text (js/JSON.stringify result)}]}})
+
+        (= tool "clojure_list_sessions")
+        (p/let [result (calva/list-sessions+ options)]
           {:jsonrpc "2.0"
            :id id
            :result {:content [{:type "text"
