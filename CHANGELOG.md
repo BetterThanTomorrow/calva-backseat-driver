@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.25] - 2025-12-15
+
 - [Make Backseat driver compatible with multi-repl-sessions Calva](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/47)
 
 ## [v0.0.24] - 2025-10-31
