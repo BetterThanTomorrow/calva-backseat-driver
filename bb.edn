@@ -1,5 +1,5 @@
 {:paths ["scripts"]
- :deps {org.babashka/cli {:mvn/version "0.2.23"}}
+ :deps {org.babashka/cli {:mvn/version "0.8.67"}}
  :tasks
  {:requires [[babashka.cli :as cli]
              [tasks :as t]
