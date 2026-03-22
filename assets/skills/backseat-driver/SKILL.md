@@ -75,26 +75,7 @@ The community examples on ClojureDocs are often more valuable than the docstring
 
 ### The rule
 
-If you're about to write a function call and you're not 100% certain of its exact semantics, argument order, or return value — **look it up**. The cost is one tool call. The cost of not looking it up is broken code and lost trust.
-
-### Example: the skill changes behavior
-
-Without the skill:
-```clojure
-;; Agent writes this from training data
-(update-in m [:a :b] inc)
-;; Fails at runtime — inc on nil gives NPE
-```
-
-With the skill:
-```clojure
-;; Agent calls clojuredocs_info for update-in
-;; Sees examples showing nil intermediate values
-;; Tests in REPL first:
-(update-in {} [:a :b] inc) ;; => sees the nil issue
-;; Chooses correct approach:
-(update-in {} [:a :b] (fnil inc 0)) ;; => {:a {:b 1}}
-```
+If you're about to write a function call and you're not 100% certain of its exact semantics, argument order, or return value — **look it up**.
 
 ## REPL Evaluation Strategy
 
