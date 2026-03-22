@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- Leverage Calva's Who's evaluating API, in both the evaluation and REPL output tools
+
 ## [v0.0.25] - 2025-12-15
 
 - [Make Backseat driver compatible with multi-repl-sessions Calva](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/47)
