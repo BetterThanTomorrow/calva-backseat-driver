@@ -44,24 +44,17 @@ You have access to Backseat Driver's Clojure-focused MCP tools. Use them to foll
 
 ### Testing Backseat Driver
 
-When testing tool updates:
-- Create dedicated test files (e.g., `test_round_<n>.clj`)
-- Test complete workflows: create → append → insert → replace → evaluate
-- Verify both success paths and error handling
-- Check that diagnostics are meaningful
-
-See `.github/instructions/testing-tools.instructions.md` for comprehensive testing strategies.
+When testing tool updates, use the `backseat-driver-testing` skill for comprehensive strategies covering structural editing, REPL evaluation with who-tracking, output log filtering, bracket balancing, and legacy compatibility.
 
 ## Project Structure
 
 ```
 src/mini/          - Test Clojure files
 test/mini/         - Test namespace (future use)
-.github/           - Instructions and memory files
+.github/           - Instructions, prompts, and skills
 ```
 
 ## Resources
 
 - [Backseat Driver Documentation](https://github.com/BetterThanTomorrow/calva-backseat-driver)
 - [Interactive Programming Guide](AI_INTERACTIVE_PROGRAMMING.md)
-- [Testing Strategies](.github/instructions/testing-tools.instructions.md)
