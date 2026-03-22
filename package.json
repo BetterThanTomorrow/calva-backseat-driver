@@ -1,7 +1,7 @@
 {
   "name": "calva-backseat-driver",
   "displayName": "Calva Backseat Driver",
-  "description": "Make CoPilot an Interactive Programmer, tools for VS Code CoPilot. Can also be run as an MCP server",
+  "description": "Make Copilot an Interactive Programmer, tools for VS Code Copilot. Can also be run as an MCP server",
   "version": "0.0.26",
   "publisher": "betterthantomorrow",
   "author": {
@@ -43,7 +43,7 @@
         "calva-backseat-driver.enableMcpReplEvaluation": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Enable the REPL evaluation tool through MCP.\n\n **⚠️ SECURITY WARNING**: _When enabled and you have also started the MCP server, any network client with access to the MCP server can execute arbitrary code in your REPL environment._ That said, CoPilot and other compliant MCP clients will default to a low-trust mode with confirmation before any evaluation.",
+          "markdownDescription": "Enable the REPL evaluation tool through MCP.\n\n **⚠️ SECURITY WARNING**: _When enabled and you have also started the MCP server, any network client with access to the MCP server can execute arbitrary code in your REPL environment._ That said, Copilot and other compliant MCP clients will default to a low-trust mode with confirmation before any evaluation.",
           "scope": "resource"
         },
         "calva-backseat-driver.autoStartMCPServer": {
@@ -69,7 +69,7 @@
           "type": "number",
           "default": 10,
           "minimum": 0,
-          "markdownDescription": "Number of lines above and below the target line to show the agent in error responses when an edit operation fails. **Trade-offs**: Larger values provide more context for the agent's retry but may consume more tokens. Or it may not, depending on how the agent uses the information (e.g. if the context contains what it needs, if may be able to avoif a full file reread).",
+          "markdownDescription": "Number of lines above and below the target line to show the agent in error responses when an edit operation fails. **Trade-offs**: Larger values provide more context for the agent's retry but may consume more tokens. Or it may not, depending on how the agent uses the information (e.g. if the context contains what it needs, it may be able to avoid a full file reread).",
           "scope": "resource"
         },
         "calva-backseat-driver.evaluation.maxLength": {
@@ -120,7 +120,7 @@
         ],
         "toolReferenceName": "clojure-eval",
         "displayName": "Evaluate Clojure Code",
-        "modelDescription": "**Evaluate Clojure Code** using Calva’s REPL connection. Enables AI Interactive Programming. Use this to make sure your edits work as you advertise, before applying them. The REPL holds the truth!\n\n## Identifying Yourself\n\nAlways provide your `who` slug (a short, stable kebab-case identifier. Base it on your role in the session. This tags your evaluations in the output log so you and others can filter by evaluator. Reuse the same `who` across all evaluations in a session.\n\n## Tracking Other Evaluators\n\nThe result may include `otherWhosSinceLast` — a list of other evaluators who produced output since your last call. Use this to stay aware of concurrent REPL activity.\n\n## Providing Context\n\nOptionally provide `description` — a short human-readable note (shown as green text in the REPL output) explaining what you are evaluating and why. Useful for the user to follow your reasoning.\n\n## Code Indentation Before REPL Evaluation\n\n**Always ensure Clojure code is properly indented before evaluating it in the REPL.** Proper indentation is essential for the bracket balancer and other tooling to work correctly. Agents often get maps misaligned, for some reason. Take extra care with maps.\n\n### Essential Rule:\n- **Indent code properly** - Align nested forms with consistent indentation before evaluation\n\n### Pattern:\n```clojure\n;; ❌ Poor indentation - will cause issues\n(defn my-function [x]\n  {:foo 1\n  :bar 2}) ; `:bar` is not properly “inside” the enclosing map\n\n;; ✅ Proper indentation - ready for evaluation\n(defn my-function [x]\n  {:foo 1\n   :bar 2}) ; `:bar` is properly “inside” the enclosing map\n```\n\n## Evaluating ClojureScript code?\n* remember to use the `\"cljs\"` `replSessionKey`\n* The user namespace is probably/often `cljs.user`\n* `js-keys` is a handy function to explore JS objects with\n",
+        "modelDescription": "**Evaluate Clojure Code** using Calva’s REPL connection. Enables AI Interactive Programming. Use this to make sure your edits work as you advertise, before applying them. The REPL holds the truth!\n\n## Identifying Yourself\n\nAlways provide your `who` slug (a short, stable kebab-case identifier). Base it on your role in the session. This tags your evaluations in the output log so you and others can filter by evaluator. Reuse the same `who` across all evaluations in a session.\n\n## Tracking Other Evaluators\n\nThe result may include `otherWhosSinceLast` — a list of other evaluators who produced output since your last call. Use this to stay aware of concurrent REPL activity.\n\n## Providing Context\n\nOptionally provide `description` — a short human-readable note (shown as green text in the REPL output) explaining what you are evaluating and why. Useful for the user to follow your reasoning.\n\n## Code Indentation Before REPL Evaluation\n\n**Always ensure Clojure code is properly indented before evaluating it in the REPL.** Proper indentation is essential for the bracket balancer and other tooling to work correctly. Agents often get maps misaligned, for some reason. Take extra care with maps.\n\n### Essential Rule:\n- **Indent code properly** - Align nested forms with consistent indentation before evaluation\n\n### Pattern:\n```clojure\n;; ❌ Poor indentation - will cause issues\n(defn my-function [x]\n  {:foo 1\n  :bar 2}) ; `:bar` is not properly “inside” the enclosing map\n\n;; ✅ Proper indentation - ready for evaluation\n(defn my-function [x]\n  {:foo 1\n   :bar 2}) ; `:bar` is properly “inside” the enclosing map\n```\n\n## Evaluating ClojureScript code?\n* remember to use the `\"cljs\"` `replSessionKey`\n* The user namespace is probably/often `cljs.user`\n* `js-keys` is a handy function to explore JS objects with\n",
         "userDescription": "Evaluate Clojure or ClojureScript code in the connected REPL.",
         "canBeReferencedInPrompt": true,
         "icon": "$(terminal-bash)",
@@ -137,7 +137,7 @@
             },
             "replSessionKey": {
               "type": "string",
-              "description": "The Calva REPL session to evaluate the code via. If there is a `list_sessions` tool, use it to discover available sessions, lin lieu of that tool use the most appropriate of `clj` or `cljs`."
+              "description": "The Calva REPL session to evaluate the code via. If there is a `list_sessions` tool, use it to discover available sessions."
             },
             "who": {
               "type": "string",
@@ -145,7 +145,7 @@
             },
             "description": {
               "type": "string",
-              "description": "Optional short human-readable note explaining what you are evaluating and why. Shown as green text in the REPL output."
+              "description": "Optional succinct human-readable note explaining what you are evaluating and why. Shows up in the repl output tool's log, and is also in the human's output view. Use this instead of line comments in the code you are evaluating."
             }
           },
           "required": [
@@ -256,7 +256,7 @@
         ],
         "toolReferenceName": "calva-output",
         "displayName": "Calva REPL Output Log",
-        "modelDescription": "**Calva REPL Output** gets you REPL output messages from the Calva output window. Returns REPL output since `since-line`. Start with since-line=0 and use the last line number from previous output for subsequent calls. This is a window into the running application. Invoke it often as files are edited and/or you evaluate code.\n\n## Filtering by Evaluator\n\nOutput messages may include a `who` field identifying which evaluator produced them. Use `includeWho` or `excludeWho` to filter:\n\n- `includeWho: [\"my-agent\"]` — only messages from your own evaluations\n- `excludeWho: [\"ui\"]` — everything except the user's manual REPL interactions\n- `includeWho: [\"my-agent\", \"ui\"]` — your evaluations plus user interactions\n\nWhen using `includeWho`, messages without a `who` field are excluded. When using `excludeWho`, messages without `who` are included. If both are provided, `includeWho` takes precedence.",
+        "modelDescription": "**Calva REPL Output** gets you REPL output messages from the Calva output window. Returns REPL output since `since-line`. Start with since-line=0 and use the last line number from previous output for subsequent calls. This is a window into the running application. Invoke it often as files are edited and/or you evaluate code.\n\n## Filtering by Evaluator\n\nOutput messages may include a `who` field identifying which evaluator produced them. `\"ui\"` most often is the human user. Use `includeWho` or `excludeWho` to filter:\n\n- `includeWho: [\"my-agent\"]` — only messages from your own evaluations\n- `excludeWho: [\"ui\"]` — everything except the user's manual REPL interactions\n- `includeWho: [\"my-agent\", \"ui\"]` — your evaluations plus user interactions\n\nWhen using `includeWho`, messages without a `who` field are excluded. When using `excludeWho`, messages without `who` are included. If both are provided, `includeWho` takes precedence.",
         "userDescription": "Read Calva's REPL output log",
         "canBeReferencedInPrompt": true,
         "icon": "$(list-ordered)",
@@ -368,7 +368,7 @@
         "toolReferenceName": "insert-top-level-form",
         "displayName": "Edit: Insert Top Level Form",
         "modelDescription": "This is the **Insert Top Level Form** tool. Use it to insert new forms to a file, the forms will be inserted before an existing, targeted, top level form.\n\n**Important**: This tool is **only** for inserting Clojure forms/s-expressions\n* For inserting line comments (`; ...` which are not structural), use your built in edit tool\n\nProcess:\n\n1. Find the top level form you want to insert code before.\n2. Read the first line of the form and use the text for the `targetLineText` param\n3. Use the 1-based line number for the `line` param\n\n# Editing Clojure files\n\nWe refer to all files of reasonably Clojure-ish type as **Clojure files**, be it Clojure, ClojureScript, Babashka, nbb, Joyride, Jank, you-name-it.\n\nEven as an interactive programmer, now and then you do edit files.\n\n* The structural editing tools attempt to automatically balance brackets before applying edits.\n* The tools return post-edit diagnostics/linting info. Make use of it!\n\nThe specific processes look different depending on if you are creating files, appending forms, inserting forms, or editing existing forms.\n\n## Code Indentation Before REPL Evaluation\n\n**Always ensure that Clojure code is properly indented.** Proper indentation is essential for the structural editing tools to work correctly.\n\n### Essential Rule:\n- **Indent code properly** - Align nested forms with consistent indentation before evaluation\n\n### Pattern:\n```clojure\n;; ❌ Poor indentation - will cause issues\n(defn my-function [x]\n  {:foo 1\n  :bar 2}) ; `:bar` is not properly “inside” the enclosing map\n\n;; ✅ Proper indentation - ready for use with the structural editing tools\n(defn my-function [x]\n  {:foo 1\n   :bar 2}) ; `:bar` is properly “inside” the enclosing map\n```\n\n## When the bracket balance is off\n\nWhen you have a situation where e.g. the problem tool or Clojure compiler complains about missing brackets or anything suggesting the bracket balance is off (probably because you have used non-structural editing tools):\n* Instead of going ahead trying to fix it, **use the tool for requesting human input to ask for guidance/help.**\n\n## About top level forms\n\nThe structural editing tools appends/inserts/replaces top level forms/s-expressions, such as the `ns` form, `def`, `defn`, `def...` forms, and many Rich Comment Forms. Top level form is Calva nomenclature for referring to forms at the root/top level of the Clojure code structure.\n\n**Rich Comment Forms/RCF**: Calva treats forms immediately enclosed within `(comment <like this>)` as top level forms, making them valid targets for the top_level_form editing tools. (The `(comment ... )` form itself is also a top level form, as far as Calva and the tools are concerned.)\n\n## Structural editing process\n\nFollow this process for making safe and working updates:\n\n1. **Always edit whole top level forms** (typically `ns`, `def` and `defn` and such) using the structural editing tools (**Replace Top Level Form** or **Insert Top Level Form** )\n2. Always check with the problem tool what the current linting state is\n3. If you are doing multiple edits to a file: **Plan your edits**, breaking it up in one edit per complete top level form you are editing or inserting. Use the todo list.\n   - **Work from bottom to top of the file** - Because editing tools use line numbers, and edits can shift line numbers of content below them, always apply your edits starting from the lowest line number (bottom of file) and work upward. This keeps your planned line numbers accurate.\n\n     Example: If you plan to edit lines 10, 20, and 30, edit them in this order: line 30 → line 20 → line 10.\n\n     1. For each top level form in your edit plan (starting at the bottom of the file):\n        * Edit the file using the appropriate structural editing tool\n\n    Remember that in Clojure, functions need to be defined before they are called, so during the edits this way, linter complaints about symbols not found are to be expected. When the edit plan is carried out, you should have no new such warnings.\n\n",
-        "userDescription": "Edit Clojure files by replacing top level forms",
+        "userDescription": "Edit Clojure files by inserting top level forms",
         "canBeReferencedInPrompt": true,
         "icon": "$(edit)",
         "inputSchema": {
