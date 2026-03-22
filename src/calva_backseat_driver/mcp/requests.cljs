@@ -57,8 +57,12 @@
                                 "namespace" {:type "string"
                                              :description (param-description tool-name "namespace")}
                                 "replSessionKey" {:type "string"
-                                                  :description (param-description tool-name "replSessionKey")}}
-                   :required ["code" "namespace" "replSessionKey"]
+                                                  :description (param-description tool-name "replSessionKey")}
+                                "who" {:type "string"
+                                       :description (param-description tool-name "who")}
+                                "description" {:type "string"
+                                               :description (param-description tool-name "description")}}
+                   :required ["code" "namespace" "replSessionKey" "who"]
                    :audience ["user" "assistant"]
                    :priority 9}}))
 
@@ -93,7 +97,13 @@
      :description (tool-description tool-name)
      :inputSchema {:type "object"
                    :properties {"sinceLine" {:type "integer"
-                                             :description (param-description tool-name "sinceLine")}}
+                                             :description (param-description tool-name "sinceLine")}
+                                "includeWho" {:type "array"
+                                              :items {:type "string"}
+                                              :description (param-description tool-name "includeWho")}
+                                "excludeWho" {:type "array"
+                                              :items {:type "string"}
+                                              :description (param-description tool-name "excludeWho")}}
                    :required ["sinceLine"]
                    :audience ["user" "assistant"]
                    :priority 10}}))
@@ -255,17 +265,25 @@
       (cond
         (and (= tool "clojure_evaluate_code")
              (= true repl-enabled?))
-        (p/let [{:keys [code replSessionKey]
-                 ns :namespace} arguments
-                result (calva/evaluate-code+ (merge options
-                                                    {:calva/code code
-                                                     :calva/repl-session-key replSessionKey}
-                                                    (when ns
-                                                      {:calva/ns ns})))]
-          {:jsonrpc "2.0"
-           :id id
-           :result {:content [{:type "text"
-                               :text (js/JSON.stringify result)}]}})
+        (let [{:keys [code replSessionKey who description]
+               ns :namespace} arguments
+              who-error (calva/validate-who who)]
+          (if who-error
+            {:jsonrpc "2.0"
+             :id id
+             :result {:content [{:type "text"
+                                 :text (js/JSON.stringify (clj->js {:error who-error}))}]}}
+            (p/let [result (calva/evaluate-code+ (merge options
+                                                        {:calva/code code
+                                                         :calva/repl-session-key replSessionKey
+                                                         :calva/who who
+                                                         :calva/description description}
+                                                        (when ns
+                                                          {:calva/ns ns})))]
+              {:jsonrpc "2.0"
+               :id id
+               :result {:content [{:type "text"
+                                   :text (js/JSON.stringify result)}]}})))
 
         (= tool "clojure_list_sessions")
         (p/let [result (calva/list-sessions+ options)]
@@ -296,9 +314,11 @@
                                :text (js/JSON.stringify clojure-docs)}]}})
 
         (= tool "clojure_repl_output_log")
-        (p/let [{:keys [sinceLine]} arguments
-                output (calva/get-output (merge options
-                                                {:calva/since-line sinceLine}))]
+        (let [{:keys [sinceLine includeWho excludeWho]} arguments
+              output (calva/get-output (merge options
+                                              {:calva/since-line sinceLine
+                                               :calva/include-who includeWho
+                                               :calva/exclude-who excludeWho}))]
           {:jsonrpc "2.0"
            :id id
            :result {:content [{:type "text"

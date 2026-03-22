@@ -19,10 +19,20 @@
                      :calva/output-buffer capped-buffer
                      :calva/output-message-count message-count)})
 
-    [:calva/ax.get-output since-line limit]
+    [:calva/ax.get-output since-line limit filter-opts]
     {:ex/fxs [[:app/fx.return (->> (:calva/output-buffer state)
                                    (filter (fn [message]
                                              (> (:line message 0) since-line)))
+                                   (filter (fn [message]
+                                             (let [{:keys [include-who exclude-who]} filter-opts]
+                                               (cond
+                                                 (seq include-who)
+                                                 (contains? (set include-who) (:who message))
+
+                                                 (seq exclude-who)
+                                                 (not (contains? (set exclude-who) (:who message)))
+
+                                                 :else true))))
                                    (take-last limit))]]}
 
     :else

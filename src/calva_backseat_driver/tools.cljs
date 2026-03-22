@@ -10,22 +10,33 @@
                             (let [code (-> options .-input .-code)
                                   ns (-> options .-input .-namespace)
                                   session-key (-> options .-input .-replSessionKey)
+                                  who (-> options .-input .-who)
                                   message (str "Evaluate?\n```clojure\n(in-ns " ns ")\n\n" code "\n```")]
                               #js {:invocationMessage "Evaluating code"
-                                   :confirmationMessages #js {:title (str "Evaluate code in the **" session-key "** REPL")
+                                   :confirmationMessages #js {:title (str "Evaluate as **" (or who "unknown") "** in the **" session-key "** REPL")
                                                               :message message}}))
 
        :invoke (fn invoke [^js options _token]
-                 (p/let [code (.-code (.-input options))
-                         ns (.-namespace (.-input options))
-                         session-key (.-replSessionKey (.-input options))
-                         result (calva/evaluate-code+ {:ex/dispatch! dispatch!
-                                                       :calva/code code
-                                                       :calva/ns ns
-                                                       :calva/repl-session-key session-key})]
-                   (vscode/LanguageModelToolResult.
-                    #js [(vscode/LanguageModelTextPart.
-                          (js/JSON.stringify (clj->js result)))])))})
+                 (let [who (-> options .-input .-who)]
+                   (if-let [who-error (calva/validate-who who)]
+                     (p/resolved
+                      (vscode/LanguageModelToolResult.
+                       #js [(vscode/LanguageModelTextPart.
+                             (js/JSON.stringify (clj->js {:error who-error})))]))
+                     (p/let [code (-> options .-input .-code)
+                             ns (-> options .-input .-namespace)
+                             session-key (-> options .-input .-replSessionKey)
+                             description (-> options .-input .-description)
+                             result (calva/evaluate-code+ {:ex/dispatch! dispatch!
+                                                           :calva/code code
+                                                           :calva/ns ns
+                                                           :calva/repl-session-key session-key
+                                                           :calva/who who
+                                                           :calva/description description})]
+                       (vscode/LanguageModelToolResult.
+                        #js [(vscode/LanguageModelTextPart.
+                              (js/JSON.stringify (clj->js result)))])))))})
+
 
 (defn GetSymbolInfoTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
@@ -73,11 +84,16 @@
 
        :invoke (fn invoke [^js options _token]
                  (let [since-line (-> options .-input .-sinceLine)
+                       include-who (some-> options .-input .-includeWho js->clj)
+                       exclude-who (some-> options .-input .-excludeWho js->clj)
                        result (calva/get-output {:ex/dispatch! dispatch!
-                                                 :calva/since-line since-line})]
+                                                 :calva/since-line since-line
+                                                 :calva/include-who include-who
+                                                 :calva/exclude-who exclude-who})]
                    (vscode/LanguageModelToolResult.
                     #js [(vscode/LanguageModelTextPart.
                           (js/JSON.stringify (clj->js result)))])))})
+
 
 (defn InferBracketsTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
