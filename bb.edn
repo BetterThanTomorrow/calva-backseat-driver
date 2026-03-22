@@ -55,6 +55,6 @@
                                                                    :args->opts [:vsix]}))}
 
   run-mcp-inspector
-  {:doc "Run the MCP Inspector against the installed extension"
-   :task (t/run-mcp-inspector! (cli/parse-opts *command-line-args* {:require [:vsix]
+  {:doc "Run the MCP Inspector (defaults to local dev build; use --vsix for installed extension)"
+   :task (t/run-mcp-inspector! (cli/parse-opts *command-line-args* {:restrict [:vsix :port-file]
                                                                     :args->opts [:vsix]}))}}}

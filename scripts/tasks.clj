@@ -85,16 +85,21 @@
   (util/shell false "code-insiders" vsix-test-workspace))
 
 #_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
-(defn run-mcp-inspector! [{:keys [vsix]}]
-  (let [vsix-basename (fs/strip-ext (fs/file-name vsix))
-        extension-path (str (fs/home)
-                            "/.vscode-insiders/extensions/betterthantomorrow."
-                            vsix-basename)
-        server-script (fs/path extension-path "dist" "calva-mcp-server.js")
-        port-file (fs/path vsix-test-workspace ".calva" "mcp-server" "port")]
+(defn run-mcp-inspector! [{:keys [vsix port-file]}]
+  (let [server-script (if vsix
+                        (let [vsix-basename (fs/strip-ext (fs/file-name vsix))
+                              extension-path (str (fs/home)
+                                                  "/.vscode-insiders/extensions/betterthantomorrow."
+                                                  vsix-basename)]
+                          (println "Using installed extension at:" extension-path)
+                          (fs/path extension-path "dist" "calva-mcp-server.js"))
+                        (do
+                          (println "Using local dev build")
+                          (fs/path "dist" "calva-mcp-server.js")))
+        port-file (or port-file
+                      (fs/path "test-projects" "example" ".calva" "mcp-server" "port"))]
 
-    (println "Using installed extension at:" extension-path)
-    (println "Server script:" server-script)
-    (println "Port file:" port-file)
+    (println "Server script:" (str server-script))
+    (println "Port file:" (str port-file))
 
     (util/shell false "npx" "@modelcontextprotocol/inspector" "node" (str server-script) (str port-file))))
