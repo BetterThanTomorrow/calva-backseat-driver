@@ -13,38 +13,11 @@ Test and validate Backseat Driver's toolset:
 
 ## For AI Agents Working in This Project
 
-You have access to Backseat Driver's Clojure-focused MCP tools. Use them to follow **interactive programming** (REPL-driven development) practices:
+You have access to Backseat Driver's Clojure-focused MCP tools for interactive programming (REPL-driven development). See these skills for comprehensive guidance before beginning work:
 
-### Interactive Programming Principles
-
-1. **Start small and build incrementally** - Begin with simple expressions, build up complexity
-2. **Validate each step through REPL evaluation** - Test every piece of code as you develop it
-3. **Use rich comment blocks for experimentation** - Develop in `(comment ...)` forms before moving to production code
-4. **Let REPL feedback guide the design** - The REPL holds the truth
-5. **Prefer composable, functional transformations** - Think data-first, functional approaches
-
-### Development Workflow
-
-**When editing Clojure files:**
-1. Use structural editing tools (**Create Clojure File**, **Append Code**, **Insert Top Level Form**, **Replace Top Level Form**)
-2. Develop solutions in the REPL before applying file edits
-3. Evaluate code incrementally - test subexpressions rather than using `println`
-4. Reload namespaces after file changes with **Evaluate Clojure Code** tool
-5. Verify diagnostics after each structural edit
-
-**When exploring APIs:**
-- Use **Clojure Symbol Info** tool for REPL-connected documentation
-- Use **ClojureDocs Info** tool for community examples and patterns
-- Follow "see also" links to discover related functions
-
-**When debugging:**
-- Evaluate subexpressions to understand behavior
-- Use inline `def` debugging to capture values (in REPL evaluation, not in files)
-- Query **REPL Output Log** to see application state
-
-### Testing Backseat Driver
-
-When testing tool updates, use the `backseat-driver-testing` skill for comprehensive strategies covering structural editing, REPL evaluation with who-tracking, output log filtering, bracket balancing, and legacy compatibility.
+- **`backseat-driver`** — REPL tool usage: session awareness, ClojureDocs discipline, incremental development, output log monitoring, and the orient → research → explore → build → apply workflow.
+- **`editing-clojure-files`** — Structural editing: which tool to use, targeting forms, indentation rules, multi-edit sequencing, and error recovery.
+- **`backseat-driver-testing`** — Testing strategies for BD tool behavior: structural editing workflows, REPL who-tracking, output log filtering, bracket balancing, and compatibility testing. Use when validating tool updates or new features.
 
 ## Project Structure
 
@@ -57,4 +30,3 @@ test/mini/         - Test namespace (future use)
 ## Resources
 
 - [Backseat Driver Documentation](https://github.com/BetterThanTomorrow/calva-backseat-driver)
-- [Interactive Programming Guide](AI_INTERACTIVE_PROGRAMMING.md)
