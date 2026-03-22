@@ -114,32 +114,7 @@ Filter with `includeWho`/`excludeWho` when needed. Use `sinceLine` for increment
 
 ## Structural Editing
 
-Use Backseat Driver's structural editing tools for all Clojure file modifications. See `dev/tool-instructions/editing-cLojure-files.md` for the complete workflow.
-
-### Quick tool selection
-
-| Situation | Tool |
-|---|---|
-| New file | `clojure_create_file` |
-| Add forms to end | `clojure_append_code` |
-| Insert before a form | `insert_top_level_form` |
-| Modify a form | `replace_top_level_form` |
-| Delete a form | `replace_top_level_form` with empty `newForm` |
-| Fix broken brackets | `clojure_balance_brackets` |
-
-### Critical rules
-
-- **Bottom-to-top**: When making multiple edits, start with the highest line number and work down. Edits above shift line numbers below.
-- **`targetLineText`**: Must be the exact first line of the target form. The tool scans ±2 lines around the given line number.
-- **Rich Comment Forms**: Forms inside `(comment ...)` are valid top-level targets.
-- **Indentation**: Align code properly before evaluating or editing. Misaligned maps are a common source of bracket balance issues.
-
-See the tool-specific docs for parameters and examples:
-- `dev/tool-instructions/replace_top_level_form.md`
-- `dev/tool-instructions/insert_top_level_form.md`
-- `dev/tool-instructions/append_code.md`
-- `dev/tool-instructions/structural_create_file.md`
-- `dev/tool-instructions/clojure_evaluate_code.md`
+Use Backseat Driver's structural editing tools for all Clojure file modifications — not generic text replacement. The `editing-clojure-files` skill covers tool selection, targeting, multi-edit sequencing, indentation, error recovery, and subagent delegation in detail.
 
 ## Boundaries
 
@@ -158,7 +133,7 @@ This skill teaches effective tool usage. It does not prescribe workflow preferen
 | Guess at core function semantics | `clojuredocs_info` to verify |
 | `(println "debug:" x)` | Evaluate `x` directly |
 | Write complete function, hope it works | Build up from subexpressions |
-| Use generic text replacement for Clojure | Structural editing tools |
+| Use generic text replacement for Clojure | Structural editing tools (see `editing-clojure-files` skill) |
 | Skip session discovery | `clojure_list_sessions` first |
 | Use `"eval"` as description | Describe intent: `"Testing filter with empty input"` |
 | Ignore output log | `clojure_repl_output_log` after side effects |
