@@ -1,0 +1,27 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"calva.autoStartRepl": true,
+		"calva.replConnectSequences": [
+			{
+				"name": "Mini Clojure Project",
+				"autoSelectForConnect": true,
+				"projectRootPath": [
+					"."
+				],
+				"cljsType": "none",
+				"projectType": "deps.edn",
+				"menuSelections": {
+					"cljAliases": [
+						"test"
+					]
+				}
+			}
+		],
+		"calva.autoOpenInspector": false
+	}
+}

@@ -1,0 +1,38 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"calva.replConnectSequences": [
+			{
+				"name": "vsc-et",
+				"projectType": "deps.edn",
+				"cljsType": "shadow-cljs",
+				"projectRootPath": [
+					"."
+				],
+				"autoSelectForConnect": true,
+				"menuSelections": {
+					"cljAliases": [],
+					"cljsDefaultBuild": ":extension",
+					"cljsLaunchBuilds": [
+						":extension",
+						":test-watch",
+						":stdio-wrapper"
+					]
+				}
+			}
+		],
+		"calva.customREPLCommandSnippets": [
+			{
+				"name": "Re-activate extension",
+				"key": ".",
+				"repl": "cljs",
+				"snippet": "(calva-backseat-driver.ex.ex/dispatch! (calva-backseat-driver.extension/extension-context) [[:app/ax.cleanup]]) (calva-backseat-driver.extension/activate (calva-backseat-driver.extension/extension-context))",
+				"evaluationSendCodeToOutputWindow": true
+			}
+		]
+	}
+}
