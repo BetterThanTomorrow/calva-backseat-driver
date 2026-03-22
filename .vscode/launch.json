@@ -6,21 +6,6 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Launch Extension",
-			"type": "extensionHost",
-			"request": "launch",
-			"runtimeExecutable": "${execPath}",
-			"args": [
-				"--extensionDevelopmentPath=${workspaceRoot}",
-				"--enable-proposed-api",
-				"betterthantomorrow.calva-backseat-driver",
-			],
-			"sourceMaps": true,
-			"outFiles": [
-				"${workspaceFolder}/out/**/*.js"
-			]
-		},
-		{
 			"name": "Launch Extension w/ example-ws folder",
 			"type": "extensionHost",
 			"request": "launch",
@@ -30,6 +15,21 @@
 				"--enable-proposed-api",
 				"betterthantomorrow.calva-backseat-driver",
 				"${workspaceFolder}/test-projects/example/bd-example.code-workspace",
+			],
+			"sourceMaps": true,
+			"outFiles": [
+				"${workspaceFolder}/out/**/*.js"
+			]
+		},
+		{
+			"name": "Launch Extension",
+			"type": "extensionHost",
+			"request": "launch",
+			"runtimeExecutable": "${execPath}",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceRoot}",
+				"--enable-proposed-api",
+				"betterthantomorrow.calva-backseat-driver",
 			],
 			"sourceMaps": true,
 			"outFiles": [
