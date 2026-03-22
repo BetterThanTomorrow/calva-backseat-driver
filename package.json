@@ -108,6 +108,14 @@
       }
     ],
     "keybindings": [],
+    "chatSkills": [
+      {
+        "path": "./assets/skills/backseat-driver/SKILL.md"
+      },
+      {
+        "path": "./assets/skills/editing-clojure-files/SKILL.md"
+      }
+    ],
     "languageModelTools": [
       {
         "name": "clojure_evaluate_code",
