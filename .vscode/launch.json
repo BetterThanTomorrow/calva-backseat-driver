@@ -29,7 +29,7 @@
 				"--extensionDevelopmentPath=${workspaceRoot}",
 				"--enable-proposed-api",
 				"betterthantomorrow.calva-backseat-driver",
-				"${workspaceFolder}/test-projects/example",
+				"${workspaceFolder}/test-projects/example/bd-example.code-workspace",
 			],
 			"sourceMaps": true,
 			"outFiles": [
