@@ -71,6 +71,8 @@ bb run-mcp-inspector    # Test MCP tools interactively
 bb package-pre-release  # Package pre-release VSIX
 ```
 
+**Note**: When running `bb run-e2e-tests-ws`: Detailed output goes to .tmp/e2e-output.log — read that file for details, if needed. The command outputs a very brief summary. Don't pipe or redirect.
+
 ## Key Implementation Patterns
 
 ### Enrichment System

@@ -46,7 +46,7 @@
           (cli/parse-opts *command-line-args* {:restrict [:is-ci]}))}
 
   run-e2e-tests-vsix
-  {:doc "Run e2e tests using <vsix>. Output goes to .tmp/e2e-output.log — read that file for details, don't pipe or redirect."
+  {:doc "Run e2e tests using <vsix>"
    :task (t/run-e2e-tests-with-vsix! (cli/parse-opts *command-line-args* {:require [:vsix]
                                                                           :args->opts [:vsix]}))}
 

@@ -64,6 +64,15 @@
         (print (str "\r" (apply str (repeat (+ 3 (count message)) " ")) "\r"))
         (flush)))))
 
+(defn- parse-test-counts
+  "Parse test output log for pass/fail markers."
+  [log-file]
+  (let [content (slurp log-file)
+        passed (count (re-seq #"✓" content))
+        failed (count (re-seq #"✗" content))
+        total (+ passed failed)]
+    {:passed passed :failed failed :total total}))
+
 (defn- run-e2e-launch!
   "Run e2e tests via launch.js with output redirected to log file.
    Shows spinner during execution, prints brief summary when done."
@@ -73,18 +82,20 @@
   (with-open [writer (io/writer (io/file e2e-output-log))]
     (let [exit-code (with-spinner "Running e2e tests..."
                       #(:exit @(p/process (into ["node" "./e2e-test-ws/launch.js"] args)
-                                          {:out writer :err writer})))]
+                                          {:out writer :err writer})))
+          {:keys [passed failed total]} (parse-test-counts e2e-output-log)]
       (println)
+      (println (format "Tests: %d/%d passed" passed total))
       (if (zero? exit-code)
         (println "Status: ALL TESTS PASSED")
         (do
-          (println "Status: TESTS FAILED (exit code" (str exit-code) ")")
+          (println (format "Status: TESTS FAILED (%d failed, exit code %d)" failed exit-code))
           (throw (ex-info "E2E tests failed" {:babashka/exit exit-code})))))))
 
 #_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
 (defn run-e2e-tests-with-vsix! [{:keys [vsix]}]
   (println "Running end-to-end tests using vsix:" vsix)
-  (run-e2e-launch! (str "--vsix=" vsix)))
+  (util/shell false "node" "./e2e-test-ws/launch.js" (str "--vsix=" vsix)))
 
 (defn- prepare-tmp-test-workspace! []
   (println "Preparing temporary test workspace...")
@@ -102,7 +113,7 @@
 (defn run-e2e-tests-from-working-dir! [{:keys [is-ci]}]
   (println "Running end-to-end tests using working directory")
   (if is-ci
-    (run-e2e-launch!)
+    (util/shell false "node" "./e2e-test-ws/launch.js")
     (let [tmp-ws (prepare-tmp-test-workspace!)]
       (println "Using temporary test workspace:" tmp-ws)
       (run-e2e-launch! (str "--test-workspace=" tmp-ws)))))
