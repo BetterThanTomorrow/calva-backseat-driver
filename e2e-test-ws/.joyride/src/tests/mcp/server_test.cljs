@@ -186,11 +186,15 @@
     (fs/copyFileSync settings-path settings-backup-path)
     (-> (p/let [;; First ensure Joyride REPL is connected
                 _ (vscode/commands.executeCommand "calva.startJoyrideReplAndConnect")
-                _ (p/delay 1000) ; Give REPL time to connect
+                _ (p/delay 500)
 
                 ;; Enable the evaluation tool setting
                 config (vscode/workspace.getConfiguration "calva-backseat-driver")
                 _ (.update config "enableMcpReplEvaluation" true vscode/ConfigurationTarget.Workspace)
+                _ (wait-for+ #(true? (.get (vscode/workspace.getConfiguration "calva-backseat-driver")
+                                           "enableMcpReplEvaluation"))
+                             :timeout 15000
+                             :message "[eval-tool-test] Config enableMcpReplEvaluation not propagated within 15s")
 
                 _ (js/console.log "[eval-tool-test] Starting MCP server with eval enabled...")
                 server-info+ (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer")
