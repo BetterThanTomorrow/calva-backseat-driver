@@ -6,19 +6,7 @@
       "type": "npm",
       "script": "watch",
       "isBackground": true,
-      "problemMatcher": {
-        "owner": "shadow-cljs",
-        "severity": "error",
-        "pattern": {
-          "regexp": "^--\\s+(.+)$",
-          "message": 1
-        },
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": "shadow-cljs - (?:compiling|watching)",
-          "endsPattern": "shadow-cljs - (?:Build completed|nREPL server)"
-        }
-      },
+      "problemMatcher": [],
       "group": {
         "kind": "build",
         "isDefault": true
