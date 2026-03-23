@@ -73,6 +73,19 @@ bb package-pre-release  # Package pre-release VSIX
 
 **Note**: When running `bb run-e2e-tests-ws`: Detailed output goes to .tmp/e2e-output.log — read that file for details, if needed. The command outputs a very brief summary. Don't pipe or redirect.
 
+### E2E Test Timing: Polling over Delays
+Always use `wait-for+` polling instead of `p/delay`/`setTimeout` when waiting for async conditions in e2e tests. The `wait-for+` utility (in `e2e-test-ws/.joyride/src/e2e/utils.cljs`) polls a predicate every 50ms and rejects after a configurable timeout.
+
+```clojure
+;; ✅ Deterministic — polls until true or timeout
+(wait-for+ #(.-isActive (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver"))
+           :timeout 15000
+           :message "Extension not active within 15s")
+
+;; ❌ Hope-based — arbitrary delay that may be too short in CI
+(p/delay 500)
+```
+
 ## Key Implementation Patterns
 
 ### Enrichment System
