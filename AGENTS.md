@@ -138,6 +138,13 @@ When making multiple edits, work from highest line number to lowest (line number
 - stdio wrapper (`dist/calva-mcp-server.js`) relays stdio ↔ socket
 - One server per workspace folder
 
+### Skills as MCP Resources
+- Skills declared in `package.json` under `contributes.chatSkills` are exposed as MCP resources
+- Discovery: `resources/list` returns skill name, description, and URI
+- Reading: `resources/read` at `/skills/{name}/SKILL.md` returns full skill content
+- Dynamic instructions: the `initialize` response includes instructions composed from available tools and skills
+- Implementation: `src/calva_backseat_driver/mcp/requests.cljs` — `skill-manifests`, `get-skills`, `compose-instructions`
+
 ### Configuration Access
 Settings read via enrichment:
 ```clojure
@@ -148,6 +155,11 @@ Settings read via enrichment:
 ```
 
 ## Adding New Features
+
+### New Skill
+1. Create `assets/skills/{name}/SKILL.md` with YAML frontmatter (`name`, `description`)
+2. Add entry to `package.json` → `contributes.chatSkills`: `{"path": "./assets/skills/{name}/SKILL.md"}`
+3. The MCP server picks it up automatically — no code changes needed
 
 ### New Tool Implementation
 1. **Tool manifest**: `package.json` → `languageModelTools`

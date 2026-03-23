@@ -12,6 +12,9 @@ var Extension = {};
 Extension.packageJSON = {};
 Extension.packageJSON.contributes = {};
 Extension.packageJSON.contributes.languageModelTools = [];
+Extension.packageJSON.contributes.chatSkills = [];
+Extension.extensionUri = {};
+Extension.extensionUri.fsPath = "";
 
 // Tool properties
 var Tool = {};

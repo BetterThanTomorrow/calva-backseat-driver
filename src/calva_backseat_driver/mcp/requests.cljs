@@ -1,5 +1,7 @@
 (ns calva-backseat-driver.mcp.requests
   (:require
+   ["fs" :as fs]
+   ["path" :as path]
    ["vscode" :as vscode]
    [calva-backseat-driver.bracket-balance :as bracket-balance]
    [calva-backseat-driver.integrations.calva.features :as calva]
@@ -190,6 +192,63 @@
                    :audience ["user" "assistant"]
                    :priority 7}}))
 
+(defn- skill-manifests []
+  (try
+    (let [extension (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver")]
+      (if extension
+        (let [^js skills (some-> extension
+                                 .-packageJSON
+                                 .-contributes
+                                 .-chatSkills)]
+          (when skills
+            (->> skills
+                 (keep (fn [^js entry]
+                         (when-let [[_ skill-name] (re-find #"\./assets/skills/([^/]+)/SKILL\.md" (.-path entry))]
+                           {:skill/name skill-name
+                            :skill/path (.-path entry)}))))))
+        (do
+          (js/console.warn "[Server] Extension not found when looking for skill manifests")
+          [])))
+    (catch :default err
+      (js/console.error "[Server] Error getting skill manifests:" (.-message err))
+      [])))
+
+(defn- parse-skill-frontmatter [content]
+  (when-let [[_ frontmatter] (re-find #"(?s)^---\n(.*?)\n---" content)]
+    (when-let [[_ desc] (re-find #"(?m)^description:\s*['\"]?(.*?)['\"]?\s*$" frontmatter)]
+      {:description desc})))
+
+(defn- get-skills []
+  (let [manifests (skill-manifests)
+        extension (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver")
+        ext-path (when extension (.. extension -extensionUri -fsPath))]
+    (when ext-path
+      (->> manifests
+           (keep (fn [{:skill/keys [name] :as manifest}]
+                   (try
+                     (let [rel-path (string/replace-first (:skill/path manifest) "./" "")
+                           abs-path (path/join ext-path rel-path)
+                           content (str (fs/readFileSync abs-path "utf8"))
+                           {:keys [description]} (parse-skill-frontmatter content)]
+                       {:skill/name name
+                        :skill/description (or description "")
+                        :skill/uri (str "/skills/" name "/SKILL.md")
+                        :skill/content content})
+                     (catch :default err
+                       (js/console.warn "[Server] Error reading skill" name ":" (.-message err))
+                       nil))))
+           vec))))
+
+(defn- compose-instructions [repl-enabled? skills]
+  (str "You have access to Clojure structural editing tools (`replace_top_level_form`, `insert_top_level_form`, `clojure_create_file`, `clojure_append_code`) with automatic bracket balancing."
+       (when repl-enabled?
+         " You can evaluate Clojure/ClojureScript code via the `clojure_evaluate_code` tool, check REPL output with `get-output-log`, look up symbol info, and query clojuredocs.org.")
+       (when (seq skills)
+         (str "\n\nSpecialized skills are available as resources. Use `resources/list` to discover them and `resources/read` to load their full instructions before starting work in their domain:"
+              (apply str (map (fn [{:skill/keys [name description]}]
+                                (str "\n- **" name "**: " description))
+                              skills))))))
+
 (defn handle-request-fn [{:ex/keys [dispatch!] :as options
                           :mcp/keys [repl-enabled?]}
                          {:keys [id method params] :as request}]
@@ -203,7 +262,7 @@
                              :protocolVersion "2024-11-05"
                              :capabilities {:tools {:listChanged true}
                                             :resources {:listChanged true}}
-                             :instructions "Use the `get-output-log` tool to tap into output that gives insight in how the program under development is doing, use the `clojure_evaluate_code` tool (if available) to evaluate Clojure/ClojureScript code. There are also tools for getting symbol info and for getting clojuredocs.org info. The `replace_top_level_form` and `insert_top_level_form` tools enable structural editing of Clojure code."
+                             :instructions (compose-instructions repl-enabled? (get-skills))
                              :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (if this is enabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."}}]
       response)
 
@@ -406,10 +465,23 @@
            :result {:contents [{:uri uri
                                 :text (js/JSON.stringify info)}]}})
 
+        (string/starts-with? uri "/skills/")
+        (let [[_ skill-name] (re-find #"^/skills/([^/]+)/SKILL\.md$" uri)
+              skill (some #(when (= (:skill/name %) skill-name) %) (get-skills))]
+          (if skill
+            {:jsonrpc "2.0"
+             :id id
+             :result {:contents [{:uri uri
+                                  :text (:skill/content skill)
+                                  :mimeType "text/markdown"}]}}
+            {:jsonrpc "2.0"
+             :id id
+             :error {:code -32602 :message (str "Skill not found: " uri)}}))
+
         :else
         {:jsonrpc "2.0"
          :id id
-         :error {:code -32601 :message "Unknown resource URI"}}))
+         :error {:code -32602 :message "Unknown resource URI"}}))
 
     (= method "ping")
     (let [response {:jsonrpc "2.0"
@@ -418,9 +490,16 @@
       response)
 
     (= method "resources/list")
-    (let [response {:jsonrpc "2.0"
+    (let [skills (get-skills)
+          response {:jsonrpc "2.0"
                     :id id
-                    :result {:resources []}}]
+                    :result {:resources (into []
+                                              (map (fn [{:skill/keys [name description uri]}]
+                                                     {:uri uri
+                                                      :name name
+                                                      :description description
+                                                      :mimeType "text/markdown"}))
+                                              skills)}}]
       response)
 
 
@@ -429,3 +508,5 @@
 
     :else ;; returning nil so that the response is not sent
     nil))
+
+

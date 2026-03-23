@@ -26,6 +26,7 @@ This extension exposes the AI tools both to CoPilot directly, using the VS Code 
 * Tool: **clojuredocs.org lookup**, docs, examples, and *see also* information on Clojure core-ish symbols
 * Resource: **Symbol info lookup**, (a bit experimental) same as the tool
 * Resource: **clojuredocs.org lookup**, (a bit experimental) same as the tool
+* Resource: **Skills**, specialized instructions discoverable via `resources/list` and readable via `resources/read`
 
 Please note that for the editing tools there is no UI for reviewing the edits. I suggest using the source
 control tools for reviewing AI editing activity.
