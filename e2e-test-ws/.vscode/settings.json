@@ -6,6 +6,5 @@
 "snippet": "(require '[e2e.test-runner :as runner]) (runner/run-all-tests \".joyride/src\")"
         }
 
-    ],
-    "calva-backseat-driver.provideBdSkill": false
+    ]
 }

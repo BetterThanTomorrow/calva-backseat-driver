@@ -1,10 +1,12 @@
 (ns tests.mcp.server-test
   (:require
+   ["fs" :as fs]
    ["net" :as net]
    ["path" :as path]
    ["vscode" :as vscode]
    [cljs.test :refer [deftest is testing]]
    [e2e.macros :refer [deftest-async]]
+   [e2e.utils :refer [wait-for+]]
    [promesa.core :as p]))
 
 (def workspace-uri (.-uri (first vscode/workspace.workspaceFolders)))
@@ -399,20 +401,19 @@
                    (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
                    (throw e))))))
 
-
-
-
-
-
-
-
-
 (deftest-async conditional-skills-filtering
   (testing "Disabled skills are filtered from MCP responses"
+    (fs/copyFileSync settings-path settings-backup-path)
     (-> (p/let [config (vscode/workspace.getConfiguration "calva-backseat-driver")
 
                 ;; Disable the backseat-driver skill
                 _ (.update config "provideBdSkill" false vscode/ConfigurationTarget.Workspace)
+
+                ;; Wait for config to propagate
+                _ (wait-for+
+                   #(= false (.get (vscode/workspace.getConfiguration "calva-backseat-driver")
+                                   "provideBdSkill"))
+                   :message "provideBdSkill did not become false")
 
                 _ (js/console.log "[conditional-skills] Starting MCP server with BD skill disabled...")
                 server-info+ (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer")
@@ -463,17 +464,8 @@
               (is (not (re-find #"backseat-driver" instructions))
                   "Instructions should not mention disabled backseat-driver skill")
               (is (re-find #"editing-clojure-files" instructions)
-                  "Instructions should mention enabled editing-clojure-files skill")
+                  "Instructions should mention enabled editing-clojure-files skill"))))
 
-              ;; Cleanup
-              (p/let [_ (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
-                      _ (.end socket)
-                      _ (.update config "provideBdSkill" true vscode/ConfigurationTarget.Workspace)]))))
-
-        (p/catch (fn [e]
-                   (js/console.error "[conditional-skills] Error:" (.-message e) e)
-                   (-> (p/let [config (vscode/workspace.getConfiguration "calva-backseat-driver")
-                               _ (.update config "provideBdSkill" true vscode/ConfigurationTarget.Workspace)]
-                         (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
-                       (p/catch (fn [_])))
-                   (throw e))))))
+        (p/finally (fn []
+                     (p/do (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                           (fs/renameSync settings-backup-path settings-path)))))))
