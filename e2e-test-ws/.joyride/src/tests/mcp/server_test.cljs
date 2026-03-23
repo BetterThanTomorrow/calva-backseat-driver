@@ -225,3 +225,184 @@
                    (throw e)))
         (p/finally (fn []
                      (fs/renameSync settings-backup-path settings-path))))))
+
+(deftest-async resources-list-validation
+  (testing "MCP server returns skill resources"
+    (-> (p/let [_ (js/console.log "[resources-list] Starting MCP server...")
+                server-info+ (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer")
+                server-info (js->clj server-info+ :keywordize-keys true)
+                port (:port server-info)
+
+                _ (js/console.log "[resources-list] Connecting to MCP server...")
+                socket (connect-to-mcp-server port)
+
+                _ (send-request socket {:jsonrpc "2.0" :id 1 :method "initialize"})
+
+                _ (js/console.log "[resources-list] Sending resources/list request...")
+                resources-response (send-request socket {:jsonrpc "2.0"
+                                                         :id 2
+                                                         :method "resources/list"})
+                resources (-> resources-response
+                              (js->clj :keywordize-keys true)
+                              (get-in [:result :resources]))
+
+                _ (js/console.log "[resources-list] Resources:" (pr-str resources))
+                _ (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                _ (.end socket)]
+
+          (is (sequential? resources)
+              "Response includes a resources array")
+          (is (>= (count resources) 2)
+              "At least 2 skill resources are returned")
+
+          (doseq [resource resources]
+            (is (string? (:uri resource))
+                (str "Resource has a URI: " (:name resource)))
+            (is (string? (:name resource))
+                (str "Resource has a name: " (:uri resource)))
+            (is (string? (:description resource))
+                (str "Resource has a description: " (:name resource)))
+            (is (= "text/markdown" (:mimeType resource))
+                (str "Resource mimeType is text/markdown: " (:name resource)))
+            (is (re-find #"^/skills/[^/]+/SKILL\.md$" (:uri resource))
+                (str "URI matches /skills/{name}/SKILL.md pattern: " (:uri resource)))))
+
+        (p/catch (fn [e]
+                   (js/console.error "[resources-list] Error:" (.-message e) e)
+                   (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                   (throw e))))))
+
+(deftest-async resources-read-skill
+  (testing "MCP server returns skill content via resources/read"
+    (-> (p/let [_ (js/console.log "[resources-read] Starting MCP server...")
+                server-info+ (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer")
+                server-info (js->clj server-info+ :keywordize-keys true)
+                port (:port server-info)
+
+                socket (connect-to-mcp-server port)
+
+                _ (send-request socket {:jsonrpc "2.0" :id 1 :method "initialize"})
+
+                resources-response (send-request socket {:jsonrpc "2.0"
+                                                         :id 2
+                                                         :method "resources/list"})
+                resources (-> resources-response
+                              (js->clj :keywordize-keys true)
+                              (get-in [:result :resources]))
+
+                first-uri (:uri (first resources))
+                _ (js/console.log "[resources-read] Reading resource:" first-uri)
+                read-response (send-request socket {:jsonrpc "2.0"
+                                                    :id 3
+                                                    :method "resources/read"
+                                                    :params {:uri first-uri}})
+                read-result (-> read-response
+                                (js->clj :keywordize-keys true)
+                                :result)
+                contents (:contents read-result)
+
+                _ (js/console.log "[resources-read] Got" (count contents) "content entries")
+                _ (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                _ (.end socket)]
+
+          (is (sequential? contents)
+              "Response has contents array")
+          (is (= 1 (count contents))
+              "Exactly one content entry")
+
+          (let [content (first contents)]
+            (is (= first-uri (:uri content))
+                "Content URI matches requested URI")
+            (is (string? (:text content))
+                "Content has text")
+            (is (seq (:text content))
+                "Content text is not empty")
+            (is (= "text/markdown" (:mimeType content))
+                "Content mimeType is text/markdown")
+            (is (re-find #"---" (:text content))
+                "Content contains frontmatter markers")))
+
+        (p/catch (fn [e]
+                   (js/console.error "[resources-read] Error:" (.-message e) e)
+                   (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                   (throw e))))))
+
+(deftest-async resources-read-unknown-skill
+  (testing "MCP server returns error for unknown skill URI"
+    (-> (p/let [_ (js/console.log "[resources-read-unknown] Starting MCP server...")
+                server-info+ (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer")
+                server-info (js->clj server-info+ :keywordize-keys true)
+                port (:port server-info)
+
+                socket (connect-to-mcp-server port)
+
+                _ (send-request socket {:jsonrpc "2.0" :id 1 :method "initialize"})
+
+                _ (js/console.log "[resources-read-unknown] Reading nonexistent skill...")
+                read-response (send-request socket {:jsonrpc "2.0"
+                                                    :id 2
+                                                    :method "resources/read"
+                                                    :params {:uri "/skills/nonexistent/SKILL.md"}})
+                result (js->clj read-response :keywordize-keys true)
+
+                _ (js/console.log "[resources-read-unknown] Response:" (pr-str result))
+                _ (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                _ (.end socket)]
+
+          (is (some? (:error result))
+              "Response has error")
+          (is (= -32602 (get-in result [:error :code]))
+              "Error code is -32602 (invalid params)"))
+
+        (p/catch (fn [e]
+                   (js/console.error "[resources-read-unknown] Error:" (.-message e) e)
+                   (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                   (throw e))))))
+
+(deftest-async initialize-dynamic-instructions
+  (testing "MCP server initialize response contains dynamic instructions"
+    (-> (p/let [_ (js/console.log "[init-instructions] Starting MCP server...")
+                server-info+ (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer")
+                server-info (js->clj server-info+ :keywordize-keys true)
+                port (:port server-info)
+
+                socket (connect-to-mcp-server port)
+
+                _ (js/console.log "[init-instructions] Sending initialize request...")
+                init-response (send-request socket {:jsonrpc "2.0"
+                                                    :id 1
+                                                    :method "initialize"})
+                init-result (-> init-response
+                                (js->clj :keywordize-keys true)
+                                :result)
+                instructions (:instructions init-result)
+
+                _ (js/console.log "[init-instructions] Instructions length:" (count instructions))
+                _ (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                _ (.end socket)]
+
+          (is (string? instructions)
+              "Initialize response has instructions string")
+          (is (seq instructions)
+              "Instructions are not empty")
+          (is (re-find #"resources/list" instructions)
+              "Instructions mention resources/list")
+          (is (re-find #"resources/read" instructions)
+              "Instructions mention resources/read")
+          (is (re-find #"backseat-driver" instructions)
+              "Instructions mention backseat-driver skill")
+          (is (re-find #"editing-clojure-files" instructions)
+              "Instructions mention editing-clojure-files skill"))
+
+        (p/catch (fn [e]
+                   (js/console.error "[init-instructions] Error:" (.-message e) e)
+                   (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                   (throw e))))))
+
+
+
+
+
+
+
+

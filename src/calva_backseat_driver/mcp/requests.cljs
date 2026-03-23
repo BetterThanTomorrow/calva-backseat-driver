@@ -5,6 +5,7 @@
    ["vscode" :as vscode]
    [calva-backseat-driver.bracket-balance :as bracket-balance]
    [calva-backseat-driver.integrations.calva.features :as calva]
+   [calva-backseat-driver.mcp.skills :as skills]
    [clojure.string :as string]
    [promesa.core :as p]))
 
@@ -213,10 +214,7 @@
       (js/console.error "[Server] Error getting skill manifests:" (.-message err))
       [])))
 
-(defn- parse-skill-frontmatter [content]
-  (when-let [[_ frontmatter] (re-find #"(?s)^---\n(.*?)\n---" content)]
-    (when-let [[_ desc] (re-find #"(?m)^description:\s*['\"]?(.*?)['\"]?\s*$" frontmatter)]
-      {:description desc})))
+
 
 (defn- get-skills []
   (let [manifests (skill-manifests)
@@ -229,7 +227,7 @@
                      (let [rel-path (string/replace-first (:skill/path manifest) "./" "")
                            abs-path (path/join ext-path rel-path)
                            content (str (fs/readFileSync abs-path "utf8"))
-                           {:keys [description]} (parse-skill-frontmatter content)]
+                           {:keys [description]} (skills/parse-skill-frontmatter content)]
                        {:skill/name name
                         :skill/description (or description "")
                         :skill/uri (str "/skills/" name "/SKILL.md")
@@ -239,15 +237,7 @@
                        nil))))
            vec))))
 
-(defn- compose-instructions [repl-enabled? skills]
-  (str "You have access to Clojure structural editing tools (`replace_top_level_form`, `insert_top_level_form`, `clojure_create_file`, `clojure_append_code`) with automatic bracket balancing."
-       (when repl-enabled?
-         " You can evaluate Clojure/ClojureScript code via the `clojure_evaluate_code` tool, check REPL output with `get-output-log`, look up symbol info, and query clojuredocs.org.")
-       (when (seq skills)
-         (str "\n\nSpecialized skills are available as resources. Use `resources/list` to discover them and `resources/read` to load their full instructions before starting work in their domain:"
-              (apply str (map (fn [{:skill/keys [name description]}]
-                                (str "\n- **" name "**: " description))
-                              skills))))))
+
 
 (defn handle-request-fn [{:ex/keys [dispatch!] :as options
                           :mcp/keys [repl-enabled?]}
@@ -262,7 +252,7 @@
                              :protocolVersion "2024-11-05"
                              :capabilities {:tools {:listChanged true}
                                             :resources {:listChanged true}}
-                             :instructions (compose-instructions repl-enabled? (get-skills))
+                             :instructions (skills/compose-instructions repl-enabled? (get-skills))
                              :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (if this is enabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."}}]
       response)
 
