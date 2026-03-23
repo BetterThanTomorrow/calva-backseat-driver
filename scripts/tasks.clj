@@ -38,10 +38,30 @@
   (println "Running end-to-end tests using vsix:" vsix)
   (util/shell false "node" "./e2e-test-ws/launch.js" (str "--vsix=" vsix)))
 
+(def ^:private e2e-test-ws-dir "e2e-test-ws")
+
+(def ^:private e2e-tmp-dir ".tmp/e2e-test-ws")
+
+(defn- prepare-tmp-test-workspace! []
+  (println "Preparing temporary test workspace...")
+  (when (fs/exists? e2e-tmp-dir)
+    (fs/delete-tree e2e-tmp-dir))
+  (fs/create-dirs e2e-tmp-dir)
+  (doseq [item [".joyride" ".vscode" "deps.edn"]]
+    (let [src (fs/path e2e-test-ws-dir item)]
+      (if (fs/directory? src)
+        (fs/copy-tree src (fs/path e2e-tmp-dir item))
+        (fs/copy src (fs/path e2e-tmp-dir item)))))
+  e2e-tmp-dir)
+
 #_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
-(defn run-e2e-tests-from-working-dir! []
+(defn run-e2e-tests-from-working-dir! [{:keys [is-ci]}]
   (println "Running end-to-end tests using working directory")
-  (util/shell false "node" "./e2e-test-ws/launch.js"))
+  (if is-ci
+    (util/shell false "node" "./e2e-test-ws/launch.js")
+    (let [tmp-ws (prepare-tmp-test-workspace!)]
+      (println "Using temporary test workspace:" tmp-ws)
+      (util/shell false "node" "./e2e-test-ws/launch.js" (str "--test-workspace=" tmp-ws)))))
 
 #_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
 (defn package-pre-release! [{:keys [slug dry]}]

@@ -41,8 +41,9 @@
                                                :args->opts [:bump-branch :email :user-name]}))}
 
   run-e2e-tests-ws
-  {:doc "Run end-to-end tests using working directory"
-   :task t/run-e2e-tests-from-working-dir!}
+  {:doc "Run end-to-end tests using working directory [--is-ci]"
+   :task (t/run-e2e-tests-from-working-dir!
+          (cli/parse-opts *command-line-args* {:restrict [:is-ci]}))}
 
   run-e2e-tests-vsix
   {:doc "Run end-to-end tests using <vsix>"

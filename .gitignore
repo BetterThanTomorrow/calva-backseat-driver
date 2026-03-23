@@ -28,6 +28,9 @@ dist/
 # Portal
 **/.portal/vs-code.edn
 
+# Temp e2e test workspace
+.tmp/
+
 # vscode test-electron
 .vscode-test/
 
