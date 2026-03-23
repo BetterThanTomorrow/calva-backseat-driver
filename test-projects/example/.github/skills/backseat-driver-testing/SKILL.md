@@ -191,6 +191,21 @@ Verify graceful degradation — tools should never crash, just provide informati
 - Clean up test files after validation
 - Never modify production source files for testing
 
+## Skills Opt-Out
+
+Backseat Driver provides skills conditionally. The `backseat-driver` and `editing-clojure-files` skills referenced in AGENTS.md are injected by BD into the agent's skills list only when enabled. They can be opted out, in which case they will not appear in the agent's `<skills>` section at all.
+
+**VS Code settings**:
+- `calva-backseat-driver.provideBdSkill` — controls the `backseat-driver` skill
+- `calva-backseat-driver.provideEditSkill` — controls the `editing-clojure-files` skill
+
+**Test protocol**:
+1. Ask the agent to list all skills it sees in its context
+2. When a setting is disabled, the corresponding skill should be absent from the agent's `<skills>` section
+3. When a setting is enabled, the corresponding skill should appear as a loadable skill with a file path
+
+This verifies that BD's conditional skill injection works correctly.
+
 ## Success Criteria
 
 - All tool IDs resolve correctly
@@ -201,3 +216,4 @@ Verify graceful degradation — tools should never crash, just provide informati
 - Error messages are clear and actionable
 - Bracket balance validation catches malformed code
 - Legacy Calva degrades gracefully
+- BD-provided skills appear/disappear based on opt-in/opt-out setting
