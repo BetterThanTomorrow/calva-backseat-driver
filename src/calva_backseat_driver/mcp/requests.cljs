@@ -214,8 +214,6 @@
       (js/console.error "[Server] Error getting skill manifests:" (.-message err))
       [])))
 
-
-
 (defn- get-skills []
   (let [manifests (skill-manifests)
         extension (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver")
