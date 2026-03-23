@@ -66,7 +66,9 @@
 
 (deftest-async server-lifecycle
   (testing "MCP server can be started and stopped via commands"
-    (-> (p/let [_ (p/delay 500) ; Allow log file to have been created
+    (-> (p/let [_ (wait-for+ #(.-isActive (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver"))
+                             :timeout 15000
+                             :message "[server-lifecycle] Extension not active within 15s")
                 _ (js/console.log "[server-lifecycle] Attempting to start MCP server...")
                 server-info+ (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer")
                 {:keys [instance port]} (js->clj server-info+ :keywordize-keys true)
@@ -186,7 +188,9 @@
     (fs/copyFileSync settings-path settings-backup-path)
     (-> (p/let [;; First ensure Joyride REPL is connected
                 _ (vscode/commands.executeCommand "calva.startJoyrideReplAndConnect")
-                _ (p/delay 500)
+                _ (wait-for+ #(some? (.currentSessionKey (.-repl (.-v1 (.-exports (vscode/extensions.getExtension "betterthantomorrow.calva"))))))
+                             :timeout 15000
+                             :message "[eval-tool-test] REPL session not available within 15s")
 
                 ;; Enable the evaluation tool setting
                 config (vscode/workspace.getConfiguration "calva-backseat-driver")
