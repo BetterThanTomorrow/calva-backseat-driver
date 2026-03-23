@@ -181,7 +181,7 @@
                    (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
                    (throw e))))))
 
-#_(deftest-async tools-validation-with-repl-eval-enabled
+(deftest-async tools-validation-with-repl-eval-enabled
   (testing "MCP server includes evaluation tool when enabled and REPL is connected"
     (fs/copyFileSync settings-path settings-backup-path)
     (-> (p/let [;; First ensure Joyride REPL is connected
@@ -210,12 +210,8 @@
 
                 _ (js/console.log "[eval-tool-test] Tool names with eval enabled:" (pr-str tool-names))
 
-                ;; Cleanup
                 _ (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
-                _ (.end socket)
-
-                ;; Restore setting to default
-                _ (.update config "enableMcpReplEvaluation" false vscode/ConfigurationTarget.Workspace)]
+                _ (.end socket)]
 
           ;; The evaluation tool should now be present
           (is (contains? tool-names "clojure_evaluate_code")
