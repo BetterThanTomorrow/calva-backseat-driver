@@ -116,6 +116,7 @@ jobs:
 
   e2e-test:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
         # TODO: Fix e2e tests so that they are actually run on Windows
