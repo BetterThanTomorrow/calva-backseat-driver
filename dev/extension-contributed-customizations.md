@@ -148,7 +148,10 @@ Ships the `get-search-view-results` skill via its extension assets.
 Backseat Driver bridges `chatSkills` to MCP resources, making skills accessible to any MCP client:
 
 1. Skills declared in `package.json` `chatSkills` are read from `assets/skills/{name}/SKILL.md`
-2. The MCP server exposes them via `resources/list` (name, description, URI) and `resources/read` (full content)
-3. The `initialize` response includes dynamic instructions that list available skills and guide agents to discover them via resources
+2. Each `chatSkills` entry uses a `when` clause gated on a VS Code setting, allowing users to enable/disable individual skills:
+   - `config.calva-backseat-driver.provideBdSkill` — gates the Backseat Driver skill
+   - `config.calva-backseat-driver.provideEditSkill` — gates the structural editing skill
+3. The MCP server exposes them via `resources/list` (name, description, URI) and `resources/read` (full content), filtering by the same settings
+4. The `initialize` response includes dynamic instructions that list available skills and guide agents to discover them via resources
 
-This allows a single skill definition to serve both VS Code Copilot (native `chatSkills`) and any MCP-compatible AI client.
+This allows a single skill definition to serve both VS Code Copilot (native `chatSkills`) and any MCP-compatible AI client. The same boolean settings control visibility in both channels.

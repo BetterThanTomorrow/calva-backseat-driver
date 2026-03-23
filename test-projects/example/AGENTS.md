@@ -13,9 +13,9 @@ Test and validate Backseat Driver's toolset:
 
 ## For AI Agents Working in This Project
 
-You have access to Backseat Driver's Clojure-focused MCP tools for interactive programming (REPL-driven development). See these skills for comprehensive guidance before beginning work:
+You have access to Backseat Driver's Clojure-focused MCP tools. See these skills for comprehensive guidance before beginning work:
 
-- **`backseat-driver`** — REPL tool usage: session awareness, ClojureDocs discipline, incremental development, output log monitoring, and the orient → research → explore → build → apply workflow.
+- **`backseat-driver`** — Effective use of Backseat Driver tools: session awareness, ClojureDocs discipline, incremental development, output log monitoring, and the orient → research → explore → build → apply workflow.
 - **`editing-clojure-files`** — Structural editing: which tool to use, targeting forms, indentation rules, multi-edit sequencing, and error recovery.
 - **`backseat-driver-testing`** — Testing strategies for BD tool behavior: structural editing workflows, REPL who-tracking, output log filtering, bracket balancing, and compatibility testing. Use when validating tool updates or new features.
 

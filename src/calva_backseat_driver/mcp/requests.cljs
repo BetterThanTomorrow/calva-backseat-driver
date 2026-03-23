@@ -254,7 +254,7 @@
                                             :resources {:listChanged true}}
                              :instructions (skills/compose-instructions repl-enabled?
                                                                         (skills/filter-skills (get-skills)
-                                                                                              {:provide-repl-skill? provide-bd-skill?
+                                                                                              {:provide-bd-skill? provide-bd-skill?
                                                                                                :provide-edit-skill? provide-edit-skill?}))
                              :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (if this is enabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."}}]
       response)
@@ -461,7 +461,7 @@
         (string/starts-with? uri "/skills/")
         (let [[_ skill-name] (re-find #"^/skills/([^/]+)/SKILL\.md$" uri)
               filtered-skills (skills/filter-skills (get-skills)
-                                                    {:provide-repl-skill? provide-bd-skill?
+                                                    {:provide-bd-skill? provide-bd-skill?
                                                      :provide-edit-skill? provide-edit-skill?})
               skill (some #(when (= (:skill/name %) skill-name) %) filtered-skills)]
           (if skill
@@ -487,7 +487,7 @@
 
     (= method "resources/list")
     (let [skills (skills/filter-skills (get-skills)
-                                       {:provide-repl-skill? provide-bd-skill?
+                                       {:provide-bd-skill? provide-bd-skill?
                                         :provide-edit-skill? provide-edit-skill?})
           response {:jsonrpc "2.0"
                     :id id

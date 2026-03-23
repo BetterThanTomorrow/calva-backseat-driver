@@ -6,7 +6,7 @@
       {:description desc})))
 
 (def skill-setting-keys
-  {"backseat-driver" :provide-repl-skill?
+  {"backseat-driver" :provide-bd-skill?
    "editing-clojure-files" :provide-edit-skill?})
 
 (defn filter-skills [skills settings]

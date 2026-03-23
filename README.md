@@ -40,6 +40,13 @@ To prevent large REPL evaluation results from overwhelming the agent's context w
 - `calva-backseat-driver.evaluation.maxLength` (default `25`) — maximum number of items to display in collections. Use `0` to disable length limiting.
 - `calva-backseat-driver.evaluation.maxDepth` (default `7`) — maximum nesting depth; deeper structures are replaced with `##`. Use `0` to disable depth limiting.
 
+### Skills
+
+Backseat Driver provides two skills to AI agents:
+
+- `calva-backseat-driver.provideBdSkill` (default `true`) — provide the Backseat Driver skill to agents
+- `calva-backseat-driver.provideEditSkill` (default `true`) — provide the Clojure structural editing skill to agents
+
 ### Editor configuration
 
 The structural editing tools for inserting and replacing top level forms respect two Backseat Driver editor settings:

@@ -152,6 +152,8 @@ Settings read via enrichment:
 :vscode/config.enableMcpReplEvaluation  ; boolean
 :vscode/config.mcpSocketServerPort      ; number (default 1664, 0=random)
 :vscode/config.autoStartMCPServer       ; boolean
+:vscode/config.provideBdSkill           ; boolean (default true) — enable/disable Backseat Driver skill
+:vscode/config.provideEditSkill         ; boolean (default true) — enable/disable structural editing skill
 ```
 
 ## Adding New Features
