@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.26] - 2026-03-23
+
 - Leverage Calva's Who's evaluating API, in both the evaluation and REPL output tools
 - Provide Backseat Driver Skill to Copilot and MCP (opt-out)
 - Provide Clojure Editing Skill to Copilot and MCP (opt-out)
