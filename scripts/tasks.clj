@@ -1,5 +1,6 @@
 (ns tasks
-  (:require #_[babashka.process :as p]
+  (:require [babashka.process :as p]
+            [clojure.java.io :as io]
             [clojure.string :as string]
             [babashka.fs :as fs]
             publish
@@ -33,14 +34,57 @@
         (util/shell dry "git" "push" "origin" (str "HEAD:refs/heads/" branch))))
     (println "Use --force to actually bump the version")))
 
-#_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
-(defn run-e2e-tests-with-vsix! [{:keys [vsix]}]
-  (println "Running end-to-end tests using vsix:" vsix)
-  (util/shell false "node" "./e2e-test-ws/launch.js" (str "--vsix=" vsix)))
-
 (def ^:private e2e-test-ws-dir "e2e-test-ws")
 
 (def ^:private e2e-tmp-dir ".tmp/e2e-test-ws")
+
+(def ^:private e2e-output-log ".tmp/e2e-output.log")
+
+(def ^:private spinner-frames ["⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏"])
+
+(defn- with-spinner
+  "Run f while displaying an animated spinner with message.
+   Clears the spinner line when done."
+  [message f]
+  (let [stop? (atom false)
+        spinner-thread (Thread.
+                        (fn []
+                          (loop [i 0]
+                            (when-not @stop?
+                              (print (str "\r" (nth spinner-frames (mod i (count spinner-frames))) " " message))
+                              (flush)
+                              (Thread/sleep 80)
+                              (recur (inc i))))))]
+    (.start spinner-thread)
+    (try
+      (f)
+      (finally
+        (reset! stop? true)
+        (.join spinner-thread 200)
+        (print (str "\r" (apply str (repeat (+ 3 (count message)) " ")) "\r"))
+        (flush)))))
+
+(defn- run-e2e-launch!
+  "Run e2e tests via launch.js with output redirected to log file.
+   Shows spinner during execution, prints brief summary when done."
+  [& args]
+  (fs/create-dirs (fs/parent e2e-output-log))
+  (println "Output:" e2e-output-log)
+  (with-open [writer (io/writer (io/file e2e-output-log))]
+    (let [exit-code (with-spinner "Running e2e tests..."
+                      #(:exit @(p/process (into ["node" "./e2e-test-ws/launch.js"] args)
+                                          {:out writer :err writer})))]
+      (println)
+      (if (zero? exit-code)
+        (println "Status: ALL TESTS PASSED")
+        (do
+          (println "Status: TESTS FAILED (exit code" (str exit-code) ")")
+          (throw (ex-info "E2E tests failed" {:babashka/exit exit-code})))))))
+
+#_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
+(defn run-e2e-tests-with-vsix! [{:keys [vsix]}]
+  (println "Running end-to-end tests using vsix:" vsix)
+  (run-e2e-launch! (str "--vsix=" vsix)))
 
 (defn- prepare-tmp-test-workspace! []
   (println "Preparing temporary test workspace...")
@@ -58,10 +102,10 @@
 (defn run-e2e-tests-from-working-dir! [{:keys [is-ci]}]
   (println "Running end-to-end tests using working directory")
   (if is-ci
-    (util/shell false "node" "./e2e-test-ws/launch.js")
+    (run-e2e-launch!)
     (let [tmp-ws (prepare-tmp-test-workspace!)]
       (println "Using temporary test workspace:" tmp-ws)
-      (util/shell false "node" "./e2e-test-ws/launch.js" (str "--test-workspace=" tmp-ws)))))
+      (run-e2e-launch! (str "--test-workspace=" tmp-ws)))))
 
 #_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
 (defn package-pre-release! [{:keys [slug dry]}]

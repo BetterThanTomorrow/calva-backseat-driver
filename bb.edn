@@ -41,12 +41,12 @@
                                                :args->opts [:bump-branch :email :user-name]}))}
 
   run-e2e-tests-ws
-  {:doc "Run end-to-end tests using working directory [--is-ci]"
+  {:doc "Run e2e tests using working directory [--is-ci]. Output goes to .tmp/e2e-output.log — read that file for details, don't pipe or redirect."
    :task (t/run-e2e-tests-from-working-dir!
           (cli/parse-opts *command-line-args* {:restrict [:is-ci]}))}
 
   run-e2e-tests-vsix
-  {:doc "Run end-to-end tests using <vsix>"
+  {:doc "Run e2e tests using <vsix>. Output goes to .tmp/e2e-output.log — read that file for details, don't pipe or redirect."
    :task (t/run-e2e-tests-with-vsix! (cli/parse-opts *command-line-args* {:require [:vsix]
                                                                           :args->opts [:vsix]}))}
 
