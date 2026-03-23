@@ -240,7 +240,7 @@
 
 
 (defn handle-request-fn [{:ex/keys [dispatch!] :as options
-                          :mcp/keys [repl-enabled?]}
+                          :mcp/keys [repl-enabled? provide-bd-skill? provide-edit-skill?]}
                          {:keys [id method params] :as request}]
   (dispatch! [[:app/ax.log :debug "[Server] handle-request " (pr-str request)]])
   (cond
@@ -252,7 +252,10 @@
                              :protocolVersion "2024-11-05"
                              :capabilities {:tools {:listChanged true}
                                             :resources {:listChanged true}}
-                             :instructions (skills/compose-instructions repl-enabled? (get-skills))
+                             :instructions (skills/compose-instructions repl-enabled?
+                                                                        (skills/filter-skills (get-skills)
+                                                                                              {:provide-repl-skill? provide-bd-skill?
+                                                                                               :provide-edit-skill? provide-edit-skill?}))
                              :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (if this is enabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."}}]
       response)
 
@@ -457,7 +460,10 @@
 
         (string/starts-with? uri "/skills/")
         (let [[_ skill-name] (re-find #"^/skills/([^/]+)/SKILL\.md$" uri)
-              skill (some #(when (= (:skill/name %) skill-name) %) (get-skills))]
+              filtered-skills (skills/filter-skills (get-skills)
+                                                    {:provide-repl-skill? provide-bd-skill?
+                                                     :provide-edit-skill? provide-edit-skill?})
+              skill (some #(when (= (:skill/name %) skill-name) %) filtered-skills)]
           (if skill
             {:jsonrpc "2.0"
              :id id
@@ -480,7 +486,9 @@
       response)
 
     (= method "resources/list")
-    (let [skills (get-skills)
+    (let [skills (skills/filter-skills (get-skills)
+                                       {:provide-repl-skill? provide-bd-skill?
+                                        :provide-edit-skill? provide-edit-skill?})
           response {:jsonrpc "2.0"
                     :id id
                     :result {:resources (into []

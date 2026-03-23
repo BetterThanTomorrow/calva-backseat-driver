@@ -406,3 +406,74 @@
 
 
 
+
+(deftest-async conditional-skills-filtering
+  (testing "Disabled skills are filtered from MCP responses"
+    (-> (p/let [config (vscode/workspace.getConfiguration "calva-backseat-driver")
+
+                ;; Disable the backseat-driver skill
+                _ (.update config "provideBdSkill" false vscode/ConfigurationTarget.Workspace)
+
+                _ (js/console.log "[conditional-skills] Starting MCP server with BD skill disabled...")
+                server-info+ (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer")
+                server-info (js->clj server-info+ :keywordize-keys true)
+                port (:port server-info)
+
+                socket (connect-to-mcp-server port)
+
+                _ (send-request socket {:jsonrpc "2.0" :id 1 :method "initialize"})
+
+                ;; Test resources/list — BD skill should be absent
+                resources-response (send-request socket {:jsonrpc "2.0"
+                                                         :id 2
+                                                         :method "resources/list"})
+                resources (-> resources-response
+                              (js->clj :keywordize-keys true)
+                              (get-in [:result :resources]))
+                resource-names (set (map :name resources))
+                _ (js/console.log "[conditional-skills] Resource names:" (pr-str resource-names))]
+
+          (is (not (contains? resource-names "backseat-driver"))
+              "Disabled BD skill should not appear in resources/list")
+          (is (contains? resource-names "editing-clojure-files")
+              "Enabled edit skill should appear in resources/list")
+
+          ;; Test resources/read — reading disabled skill should return error
+          (p/let [read-response (send-request socket {:jsonrpc "2.0"
+                                                      :id 3
+                                                      :method "resources/read"
+                                                      :params {:uri "/skills/backseat-driver/SKILL.md"}})
+                  read-result (js->clj read-response :keywordize-keys true)
+                  _ (js/console.log "[conditional-skills] Read disabled skill response:" (pr-str read-result))]
+
+            (is (some? (:error read-result))
+                "Reading disabled skill should return error")
+            (is (= -32602 (get-in read-result [:error :code]))
+                "Error code should be -32602 for disabled skill")
+
+            ;; Test initialize — instructions should not mention disabled skill
+            (p/let [init-response (send-request socket {:jsonrpc "2.0"
+                                                        :id 4
+                                                        :method "initialize"})
+                    instructions (-> init-response
+                                     (js->clj :keywordize-keys true)
+                                     (get-in [:result :instructions]))
+                    _ (js/console.log "[conditional-skills] Instructions length:" (count instructions))]
+
+              (is (not (re-find #"backseat-driver" instructions))
+                  "Instructions should not mention disabled backseat-driver skill")
+              (is (re-find #"editing-clojure-files" instructions)
+                  "Instructions should mention enabled editing-clojure-files skill")
+
+              ;; Cleanup
+              (p/let [_ (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                      _ (.end socket)
+                      _ (.update config "provideBdSkill" true vscode/ConfigurationTarget.Workspace)]))))
+
+        (p/catch (fn [e]
+                   (js/console.error "[conditional-skills] Error:" (.-message e) e)
+                   (-> (p/let [config (vscode/workspace.getConfiguration "calva-backseat-driver")
+                               _ (.update config "provideBdSkill" true vscode/ConfigurationTarget.Workspace)]
+                         (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
+                       (p/catch (fn [_])))
+                   (throw e))))))

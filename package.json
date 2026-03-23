@@ -85,6 +85,18 @@
           "minimum": 0,
           "markdownDescription": "Maximum nesting depth when pretty-printing REPL evaluation results. Deeper structures are replaced with `##`. Use `0` to disable depth limiting. **Purpose**: Prevents deeply nested structures from overwhelming the agent's context window.",
           "scope": "resource"
+        },
+        "calva-backseat-driver.provideBdSkill": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Provide the Backseat Driver skill to agents",
+          "scope": "resource"
+        },
+        "calva-backseat-driver.provideEditSkill": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Provide the Clojure structural editing skill to agents",
+          "scope": "resource"
         }
       }
     },
@@ -110,10 +122,12 @@
     "keybindings": [],
     "chatSkills": [
       {
-        "path": "./assets/skills/backseat-driver/SKILL.md"
+        "path": "./assets/skills/backseat-driver/SKILL.md",
+        "when": "config.calva-backseat-driver.provideBdSkill"
       },
       {
-        "path": "./assets/skills/editing-clojure-files/SKILL.md"
+        "path": "./assets/skills/editing-clojure-files/SKILL.md",
+        "when": "config.calva-backseat-driver.provideEditSkill"
       }
     ],
     "languageModelTools": [

@@ -57,3 +57,42 @@
       (let [result (skills/compose-instructions true nil)]
         (is (re-find #"structural editing" result) "has base content")
         (is (nil? (re-find #"resources/list" result)) "no resources mention")))))
+
+(deftest filter-skills-test
+  (let [all-skills [{:skill/name "backseat-driver"
+                     :skill/description "REPL tools"}
+                    {:skill/name "editing-clojure-files"
+                     :skill/description "Structural editing"}]]
+
+    (testing "all enabled returns all skills"
+      (is (= 2 (count (skills/filter-skills all-skills
+                                            {:provide-repl-skill? true
+                                             :provide-edit-skill? true})))))
+
+    (testing "REPL skill disabled returns only editing skill"
+      (let [result (skills/filter-skills all-skills
+                                         {:provide-repl-skill? false
+                                          :provide-edit-skill? true})]
+        (is (= 1 (count result)))
+        (is (= "editing-clojure-files" (:skill/name (first result))))))
+
+    (testing "edit skill disabled returns only REPL skill"
+      (let [result (skills/filter-skills all-skills
+                                         {:provide-repl-skill? true
+                                          :provide-edit-skill? false})]
+        (is (= 1 (count result)))
+        (is (= "backseat-driver" (:skill/name (first result))))))
+
+    (testing "both disabled returns empty"
+      (is (empty? (skills/filter-skills all-skills
+                                        {:provide-repl-skill? false
+                                         :provide-edit-skill? false}))))
+
+    (testing "unknown skill defaults to included"
+      (let [skills-with-unknown (conj all-skills {:skill/name "future-skill"
+                                                  :skill/description "New skill"})
+            result (skills/filter-skills skills-with-unknown
+                                         {:provide-repl-skill? true
+                                          :provide-edit-skill? true})]
+        (is (= 3 (count result)))
+        (is (some #(= "future-skill" (:skill/name %)) result))))))

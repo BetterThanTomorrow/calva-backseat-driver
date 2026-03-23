@@ -48,7 +48,9 @@
         {:ex/fxs [[:vscode/fx.show-error-message (str "MCP server error: " err)]]})
 
     [:mcp/ax.handle-request request]
-    {:ex/fxs [[:mcp/fx.handle-request {:mcp/repl-enabled? :vscode/config.enableMcpReplEvaluation} request]]}
+    {:ex/fxs [[:mcp/fx.handle-request {:mcp/repl-enabled? :vscode/config.enableMcpReplEvaluation
+                                       :mcp/provide-bd-skill? :vscode/config.provideBdSkill
+                                       :mcp/provide-edit-skill? :vscode/config.provideEditSkill} request]]}
 
     :else
     {:ex/fxs [[:node/fx.log-error "Unknown action:" (pr-str action)]]}))
