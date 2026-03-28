@@ -1,6 +1,6 @@
 ---
 name: backseat-driver
-description: 'Effective use of the Backseat Driver extension and its tools. Use when: working in Clojure (including all dialects) project, be it reading, planning, developing, or evaluating code in the REPL, looking up function documentation, choosing REPL sessions, editing Clojure files structurally, checking REPL output, planning implementations, reviewing code, or developing solutions incrementally. Whenever you consider any of these tools: clojure_evaluate_code, clojuredocs_info, clojure_list_sessions, clojure_symbol_info, clojure_repl_output_log, replace_top_level_form, insert_top_level_form, clojure_append_code, clojure_create_file, clojure_balance_brackets.'
+description: 'Effective use of the Backseat Driver extension and its tools. Use when: working in Clojure (including all dialects) project, be it reading, planning, developing, or evaluating code in the REPL, looking up function documentation, choosing REPL sessions, editing Clojure files structurally, checking REPL output, planning implementations, reviewing code, or developing solutions incrementally. Whenever you consider any of these tools: clojure_evaluate_code, clojuredocs_info, clojure_list_sessions, clojure_symbol_info, clojure_repl_output_log, replace_top_level_form, insert_top_level_form, clojure_append_code, clojure_create_file, clojure_balance_brackets. IMPORTANT: Also load this skill when PLANNING or DISCUSSING Clojure development approaches — not only at the moment of REPL evaluation.'
 ---
 
 # Backseat Driver — Effective Tool Usage

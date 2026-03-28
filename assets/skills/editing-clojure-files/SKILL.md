@@ -1,6 +1,6 @@
 ---
 name: editing-clojure-files
-description: 'Structural editing of Clojure files using Backseat Driver tools. Use when: creating .clj/.cljs/.cljc/.bb files, adding/inserting/replacing/deleting top-level forms, fixing bracket balance, planning multi-edit sequences, recovering from failed edits, or working with Rich Comment Forms. Whenever you consider any of these tools: clojure_create_file, clojure_append_code, insert_top_level_form, replace_top_level_form, clojure_balance_brackets. Also use when editing Clojure and unsure which tool to pick.'
+description: 'Structural editing of Clojure files using Backseat Driver tools. Use when: creating .clj/.cljs/.cljc/.bb files, adding/inserting/replacing/deleting top-level forms, fixing bracket balance, planning multi-edit sequences, recovering from failed edits, or working with Rich Comment Forms. Whenever you consider any of these tools: clojure_create_file, clojure_append_code, insert_top_level_form, replace_top_level_form, clojure_balance_brackets. Also use when editing Clojure and unsure which tool to pick. IMPORTANT: Also load this skill when PLANNING or DISCUSSING Clojure file edits — not only at the moment of editing.'
 ---
 
 # Editing Clojure Files — Structural Editing with Backseat Driver
