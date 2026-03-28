@@ -130,6 +130,16 @@
         "when": "config.calva-backseat-driver.provideEditSkill"
       }
     ],
+    "chatInstructions": [
+      {
+        "path": "./assets/instructions/test-universal.instructions.md"
+      }
+    ],
+    "chatPromptFiles": [
+      {
+        "path": "./assets/prompts/test-repl-check.prompt.md"
+      }
+    ],
     "languageModelTools": [
       {
         "name": "clojure_evaluate_code",
