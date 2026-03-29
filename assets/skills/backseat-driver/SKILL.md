@@ -1,37 +1,29 @@
 ---
 name: backseat-driver
-description: 'Effective use of the Backseat Driver extension and its tools. Use when: working in Clojure (including all dialects) project, be it reading, planning, developing, or evaluating code in the REPL, looking up function documentation, choosing REPL sessions, editing Clojure files structurally, checking REPL output, planning implementations, reviewing code, or developing solutions incrementally. Whenever you consider any of these tools: clojure_evaluate_code, clojuredocs_info, clojure_list_sessions, clojure_symbol_info, clojure_repl_output_log, replace_top_level_form, insert_top_level_form, clojure_append_code, clojure_create_file, clojure_balance_brackets. IMPORTANT: Also load this skill when PLANNING or DISCUSSING Clojure development approaches — not only at the moment of REPL evaluation.'
+description: 'Effective use of the Backseat Driver extension and its tools for Clojure interactive programming. Use when: working in Clojure (including all dialects and runtimes) project, be it reading, planning, developing, or evaluating code in the REPL, looking up function documentation or ClojureDocs examples, choosing REPL sessions, editing Clojure files structurally, checking REPL output, planning implementations, reviewing code, or developing solutions incrementally. Whenever you consider any of these tools: clojure_evaluate_code, clojuredocs_info, clojure_list_sessions, clojure_symbol_info, clojure_repl_output_log, replace_top_level_form, insert_top_level_form, clojure_append_code, clojure_create_file, clojure_balance_brackets. Also use this skill when PLANNING or DISCUSSING Clojure development approaches — not only at the moment of REPL evaluation.'
 ---
 
 # Backseat Driver — Effective Tool Usage
 
-You have a live REPL connected to the running system. The system is your source of truth — not your training data. Use it.
+**"Use the REPL"** means: call the `clojure_evaluate_code` tool. This is the Backseat Driver tool that evaluates code in Calva's connected REPL — the same REPL the user is connected to. Always use this tool rather than launching a terminal REPL. If there is no REPL connection, ask the user to connect one.
 
 ## Core Principles
 
-1. **The REPL holds the truth** — Your training data may be wrong about function semantics, argument order, or return types. The running system is always current. Evaluate to verify.
+1. **ClojureDocs before guessing** — Before using any core function you the very least unsure about how to use effectively, call `clojuredocs_info`. You will get docstrings, argument lists, community examples, and gotchas. What's not to love?
 
-2. **ClojureDocs before guessing** — Before using any core function you the very least unsure about how to use effectively, call `clojuredocs_info`. You will get docstrings, argument lists, community examples, and gotchas. What's not to love?
-
-3. **Build up in small steps** — Start with the innermost subexpression. Verify each piece. Compose verified pieces into the solution. This often beats writing a complete function and hope it works.
-
-4. **Planning is development** — The REPL is as relevant to a planner and reviewer as to an implementer. Use it to verify assumptions, test feasibility, and explore APIs during planning. Use it to verify assumptions during review.
-
-5. **Structural editing for structural code** — Clojure is a structural language. Use the structural editing tools, not generic text replacement. See `dev/tool-instructions/editing-clojure-files.md` for detailed workflows.
+2. **Structural editing for structural code** — Clojure is a structural language. Use the structural editing tools, not generic text replacement. See `dev/tool-instructions/editing-clojure-files.md` for detailed workflows.
 
 ## The Workflow
 
 Every task — implementing, debugging, planning, reviewing — follows this loop:
 
-```
 1. ORIENT    → clojure_list_sessions (know your REPLs)
-2. RESEARCH  → clojuredocs_info / clojure_symbol_info (understand the functions)
+2. RESEARCH  → clojuredocs_info / clojure_symbol_info / clojure_evaluate_code (understand the functions)
 3. EXPLORE   → clojure_evaluate_code (test ideas in the REPL)
 4. BUILD UP  → clojure_evaluate_code (compose verified pieces)
-5. APPLY     → structural editing tools (edit files with verified code)
-6. VERIFY    → clojure_evaluate_code (load namespace, call functions)
-7. MONITOR   → clojure_repl_output_log (check for side effects, errors)
-```
+5. APPLY     → structural editing tools (edit files with verified code — check returned linter diagnostics)
+6. VERIFY    → clojure_evaluate_code (load namespace, call functions) + get_errors (Problems report)
+7. MONITOR   → clojure_repl_output_log (side effects, errors) + get_errors (new warnings/errors)
 
 Not every task needs all steps. A planner might stop at step 4. A reviewer might focus on steps 1-3. But the sequence is always orient → research → explore.
 
@@ -93,6 +85,12 @@ Call `clojure_repl_output_log` to see what's happened in the REPL — evaluation
 
 Filter with `includeWho`/`excludeWho` when needed. Use `sinceLine` for incremental reads.
 
+### JSON Escaping in Tool Calls
+
+- The `code` parameter is a JSON string — use standard JSON escaping only
+- `\"` inside code → `\"` in JSON (single escape) — never `\\\"` (double escape)
+- Double-escaping produces garbled code in the REPL — the tool receives the literal backslashes
+
 ## Structural Editing
 
 Use Backseat Driver's structural editing tools for all Clojure file modifications — not generic text replacement. The `editing-clojure-files` skill covers tool selection, targeting, multi-edit sequencing, indentation, error recovery, and subagent delegation in detail.
@@ -101,35 +99,27 @@ Use Backseat Driver's structural editing tools for all Clojure file modification
 
 ### Joyride projects
 
-When working with Joyride code, use **Joyride's own evaluation tool** instead of Backseat Driver's `clojure_evaluate_code`. Joyride's REPL is promise-aware in ways that BD's is not, and using BD's eval for Joyride code leads to async problems. BD's other tools (ClojureDocs, symbol info, structural editing, output log) remain useful.
+When working in a Joyride context **"use the REPL" means `joyride_evaluate_code`**, not Backseat Driver's `clojure_evaluate_code`. Joyride's REPL runs in the VS Code Extension Host and is promise-aware in ways that Backseat Driver's REPL is not — using Backseat Driver's eval for Joyride code leads to async problems. Other tools of Backseat Driver (ClojureDocs, symbol info, structural editing, output log) remain useful.
 
 ### Workflow preferences
 
-This skill teaches effective tool usage. It does not prescribe workflow preferences — those belong to the developer's own instructions and chat modes. Different developers will have different opinions about when to write tests first, how much REPL exploration to do, and how to structure their sessions.
+This skill teaches effective tool usage. It does not prescribe workflow preferences — those belong to the developer's own instructions and skills, and agents. Make sure to orient what is available from the user and workspace level in terms of instructions, skill, agents, and preferences.
 
-## Anti-Pattern Quick Reference
+## Extend with Your Own Skills
 
-| Don't | Do instead |
-|---|---|
-| Guess at core function semantics | `clojuredocs_info` to verify |
-| `(println "debug:" x)` | Evaluate `x` directly |
-| Write complete function, hope it works | Build up from subexpressions |
-| Use generic text replacement for Clojure | Structural editing tools (see `editing-clojure-files` skill) |
-| Skip session discovery | `clojure_list_sessions` first |
-| Use `"eval"` as description | Describe intent: `"Testing filter with empty input"` |
-| Ignore output log | `clojure_repl_output_log` after side effects |
-| Edit top-to-bottom in multi-edit | Bottom-to-top (highest line first) |
-| Modify bracket balancer output | Accept it as authoritative |
-| Use BD eval for Joyride | Use Joyride's own evaluation tool |
+This skill provides the shared baseline for Backseat Driver tool usage. Your user-level and workspace-level skills can extend it with workflow preferences, coding conventions, and project-specific patterns.
 
-## Quick Reference
+When this skill is loaded, also load any corresponding Clojure coding/planning/reviewing/etcetera skills from your user profile or workspace — they carry user and workflow preferences that complement this tool-usage baseline.
 
-```
-ORIENT:     clojure_list_sessions → know your REPLs, pick who handle
-RESEARCH:   clojuredocs_info → verify core fns before using them
-EXPLORE:    clojure_evaluate_code → test ideas, verify assumptions
-BUILD UP:   clojure_evaluate_code → compose verified subexpressions
-EDIT:       structural tools → create, append, insert, replace
-VERIFY:     clojure_evaluate_code → load ns, call functions
-MONITOR:    clojure_repl_output_log → check output, errors, other whos
-```
+## Invariants
+
+- Verify core function semantics via `clojuredocs_info` before use
+- Evaluate expressions directly — return values over print side effects
+- Build up from verified subexpressions, composing into the solution
+- Structural editing tools for all Clojure files (see `editing-clojure-files` skill)
+- `clojure_list_sessions` at task start — know your REPLs
+- Descriptions state intent: `"Testing filter with empty input"`
+- `clojure_repl_output_log` after side effects — stay aware
+- Multi-edit order: bottom-to-top (highest line first)
+- Bracket balancer output is authoritative — accept as-is
+- Joyride context → `joyride_evaluate_code`, not Backseat Driver eval

@@ -1,6 +1,6 @@
 ---
 name: editing-clojure-files
-description: 'Structural editing of Clojure files using Backseat Driver tools. Use when: creating .clj/.cljs/.cljc/.bb files, adding/inserting/replacing/deleting top-level forms, fixing bracket balance, planning multi-edit sequences, recovering from failed edits, or working with Rich Comment Forms. Whenever you consider any of these tools: clojure_create_file, clojure_append_code, insert_top_level_form, replace_top_level_form, clojure_balance_brackets. Also use when editing Clojure and unsure which tool to pick. IMPORTANT: Also load this skill when PLANNING or DISCUSSING Clojure file edits — not only at the moment of editing.'
+description: 'Structural editing of Clojure files using Backseat Driver tools. Use when: creating .clj/.cljs/.cljc/.bb files, adding/inserting/replacing/deleting top-level forms, fixing bracket balance, resolving indentation issues, planning multi-edit sequences, recovering from failed edits, or working with Rich Comment Forms. Use whenever you consider any of these tools: clojure_create_file, clojure_append_code, insert_top_level_form, replace_top_level_form, clojure_balance_brackets. Use when editing Clojure and unsure which tool to pick. Use this skill when PLANNING or DISCUSSING Clojure file edits — not only at the moment of editing.'
 ---
 
 # Editing Clojure Files — Structural Editing with Backseat Driver
@@ -61,6 +61,8 @@ Parameters:
   targetLineText: "(defn process-data"
 ```
 
+**Scan window**: To help you target the correct form, the tool searches for `targetLineText` within ±2 lines of the given `line` number. If the line number is off by more than 2, the tool will fail even if the text exists elsewhere in the file. Always read the file immediately before editing to get accurate line numbers — don't rely on line numbers from earlier reads, as previous edits shift them.
+
 **Rich Comment Forms**: Forms directly inside `(comment ...)` are valid top-level targets. The `(comment ...)` wrapper itself is also a top-level target.
 
 ## Indentation Is Structure
@@ -114,6 +116,30 @@ During bottom-to-top editing, expect temporary linter warnings about undefined s
 1. Use `clojure_balance_brackets` — pass the complete file content
 2. Accept the balancer's output as authoritative — do NOT analyze or modify it
 3. If the balancer doesn't resolve it, ask the human for help using the #askQuestions tool.
+
+### Common Error Messages
+
+**Target text not found** — the `targetLineText` doesn't match any line in the ±2 scan window:
+```
+Target line text not found. Expected: '(defn wrong-function [x]' near line 23
+```
+*Fix*: Search the file for the target text (e.g. `grep_search` scoped to the file) to find its current line number — cheaper than reading the whole file. Plain text mode works for exact matches; if using regex (e.g. `^` anchor), escape parens as `\(`.
+
+**Comment targeting** — structural tools only operate on forms, not line comments:
+```
+Target line text cannot start with a comment (;). You can only target forms/sexpressions. (To edit line comments, use your line based editing tools.)
+```
+*Fix*: Use `replace_string_in_file` or equivalent text tool for line comments.
+
+**Scan window miss** — the text exists in the file but outside the ±2 window, so the tool reports the same "Target line text not found" error. Previous edits shift line numbers, making this the most common cause of retargeting failures.
+
+*Fix*: Search the file for the target text to get its current line number. Previous edits shift lines.
+
+## Extend with Your Own Skills
+
+This skill provides the shared baseline for structural editing mechanics. Your user-level and workspace-level skills can extend it with editing workflow preferences, delegation patterns, and project-specific conventions.
+
+When this skill is loaded, also load any corresponding `clojure-coding` or `clojure-editor` skills from your user profile or workspace — they carry workflow preferences that complement this editing baseline.
 
 ## Quick Reference
 

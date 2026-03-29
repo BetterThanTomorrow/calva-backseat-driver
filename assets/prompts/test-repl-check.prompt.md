@@ -4,7 +4,7 @@ description: 'Test prompt — verifying how extension-contributed chatPromptFile
 
 # Test REPL Check (from Calva Backseat Driver)
 
-This is a test prompt contributed via `contributes.chatPromptFiles` in CBD's `package.json`.
+This is a test prompt contributed via `contributes.chatPromptFiles` in Backseat Driver's `package.json`.
 
 If a user can invoke this via slash command, it confirms that extension-provided prompts work.
 
