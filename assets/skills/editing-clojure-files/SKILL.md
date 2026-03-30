@@ -13,6 +13,18 @@ Unless you have been specifically tasked with editing files yourself, you should
 
 **When delegating**: Provide exact file paths, the code to write (already REPL-verified and properly indented), target line info, any context you have that helps takes decisions around the editing, and explicit edit order instructions.
 
+## Code Shape for Tool Success
+
+Structural editing tools operate on complete top-level forms. Smaller, simpler forms mean less code to get right in a single edit, fewer indentation levels to manage, lower chance of Parinfer misinterpreting structure, and easier error recovery when edits fail.
+
+When writing or modifying code:
+
+- Keep functions focused — one responsibility, appropriate abstraction level
+- Prefer shallow nesting over deeply nested `let`/`if`/`when`/`loop` chains — extract named helpers
+- Keep `case`/`cond`/`condp` branches lean — complex bodies belong in named functions
+
+When a function you need to modify is already long or deeply nested, improve its structure first, then make the requested change. Structural edits on bloated forms are error-prone.
+
 ## Which Tool?
 
 ```
@@ -86,13 +98,18 @@ Rules:
 
 **Always ensure proper indentation before passing code to structural editing tools.**
 
+## Definition Order
+
+Ensure definitions precede their call sites in the file. When edits would create a call-before-define situation, rearrange the code. Consider factoring code in separate namespaces to break circular dependencies instead of using `declare`. `declare` is a rare last resort.
+
 ## Edit process
 
 Verify your edits!:
 
-1. **Edit the file** — use the structural tool with REPL-verified code
-2. **Check diagnostics** — the tool returns post-edit linting info; read and act on it
-3. **Reload** — `(require 'the.namespace :reload)` to confirm the file loads cleanly
+1. **Check problems first** — review the file's current diagnostics before editing; fix existing compilation problems before introducing new edits
+2. **Edit the file** — use the structural tool with REPL-verified code
+3. **Check diagnostics** — the tool returns post-edit linting info; read and act on unexpected problems before the next edit
+4. **Reload** — `(require 'the.namespace :reload)` to confirm the file loads cleanly
 
 In a hot-reload environment, the repl output log will show any compile errors or warnings immediately after the edit. Read and act on them before proceeding.
 
