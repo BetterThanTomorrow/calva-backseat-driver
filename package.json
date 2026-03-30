@@ -133,11 +133,9 @@
     "chatInstructions": [
       {
         "path": "./assets/instructions/editing-clojure-files.instructions.md"
-      }
-    ],
-    "chatPromptFiles": [
+      },
       {
-        "path": "./assets/prompts/test-repl-check.prompt.md"
+        "path": "./assets/instructions/backseat-driver.instructions.md"
       }
     ],
     "languageModelTools": [
