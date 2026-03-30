@@ -7,6 +7,7 @@ Changes to Calva Backseat Driver
 - Provide Backseat Driver instructions for the AI
 - Update provided skills
 - Add information about [Awesome Backseat Driver](https://github.com/BetterThanTomorrow/awesome-backseat-driver)
+- Fix: [Version >= 0.0.26 is not compatible with Cursor, Windsurf, possibly other forks](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/50)
 
 ## [v0.0.26] - 2026-03-23
 
