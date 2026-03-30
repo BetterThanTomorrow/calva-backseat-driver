@@ -4,6 +4,10 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- Provide Backseat Driver instructions for the AI
+- Update provided skills
+- Add information about [Awesome Backseat Driver](https://github.com/BetterThanTomorrow/awesome-backseat-driver)
+
 ## [v0.0.26] - 2026-03-23
 
 - Leverage Calva's Who's evaluating API, in both the evaluation and REPL output tools

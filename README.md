@@ -37,19 +37,7 @@ Backseat Driver gives Copilot the tools for Clojure Interactive Programming and 
 
 For Copilot to be trully effective it needs to know about you prefer Clojure to be written and how to use the REPL effectively.
 
-To avoid starting with a blank slate, where bad training data and hallucinations about Clojure ruin the day, consider installing the **backseat-driver** Copilot plugin from the [Awesome Backseat Driver](https://github.com/BetterThanTomorrow/awesome-backseat-driver) repository.
-
-To install the plugin:
-
-1. Install/configure **Awesome Backseat Driver** as a provider of plugins:
-  1. From the VS Code command palette: **Chat: Install Plugin from Source**
-  1. Paste: https://github.com/BetterThanTomorrow/awesome-backseat-driver
-1. Install the plugin:
-  1. From the VS Code command palette: **Chat: Plugins**
-  1. Append **backseat driver** in the search box
-  1. Click **Install**
-
-See [Awesome Backseat Driver](https://github.com/BetterThanTomorrow/awesome-backseat-driver) for a hopefully growing collection of Copilot configuration for Clojure developers.
+To avoid starting with a blank slate, where bad training data and hallucinations about Clojure ruin the day, consider installing the **clojure** Copilot plugin from the [Awesome Backseat Driver](https://github.com/BetterThanTomorrow/awesome-backseat-driver) repository. There are some instructions in the README for that repository.
 
 ## Configuring Backseat Driver
 
