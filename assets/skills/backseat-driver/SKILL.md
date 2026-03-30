@@ -71,6 +71,10 @@ If you're about to write a function call and you're not 100% certain of its exac
 
 ## REPL Evaluation Strategy
 
+### Code blocks shown to the user
+
+When showing Clojure code in chat, prepend with `(in-ns 'relevant.namespace)` so the user can evaluate it directly from the code block. The relevant namespace is typically where the code belongs. Include `(in-ns)` in every code block — not just the first one.
+
 ### Evaluate subexpressions, not println
 
 When you need to understand what a value is, **evaluate the expression directly**. Do not wrap it in `println`. Direct evaluation gives you the actual data; println gives you a string representation that's harder to work with.
