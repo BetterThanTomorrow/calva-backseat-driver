@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.27] - 2026-03-30
+
 - Provide Backseat Driver instructions for the AI
 - Update provided skills
 - Add information about [Awesome Backseat Driver](https://github.com/BetterThanTomorrow/awesome-backseat-driver)
