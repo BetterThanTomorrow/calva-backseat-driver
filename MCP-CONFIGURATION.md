@@ -97,6 +97,25 @@ Claude Desktop doesn't run in VS Code, and doesn't have any other project/worksp
 
 There doesn't seem to be a way to refresh/reload the server info, so if you started the Backseat Driver MCP server after Claude, you probably need to restart Claude for the refresh to happen.
 
+### Antigravity
+
+- open command palette
+- enter: MCP Add Server
+- select "Command: (stdio)"
+- enter the full command "/path/to/node /path/to/calva-mcp-server.js port-number"
+
+a config file will be created in `.vscode/mcp_config.json`, but for some reason it won't be available to the agents.
+
+since this per workspace approach failed, we go for the global config approach, which works:
+
+- open the agents tab
+- click at the `...` at the top right
+- click on "MCP Servers"
+- click on "Manage MCP Servers"
+- click on "View Raw Config"
+- copy and paste the content of `.vscode/mcp_config.json`
+- at the "Manage MCP Servers" window click on "Refresh" and it should be set.
+
 ### Other MCP client?
 
 Please add configuration for other AI clients! 🙏
