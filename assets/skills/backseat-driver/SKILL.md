@@ -75,6 +75,22 @@ If you're about to write a function call and you're not 100% certain of its exac
 
 When showing Clojure code in chat, prepend with `(in-ns 'relevant.namespace)` so the user can evaluate it directly from the code block. The relevant namespace is typically where the code belongs. Include `(in-ns)` in every code block — not just the first one.
 
+### Chat vs files: REPL evaluation vs Rich Comment Forms
+
+In chat, show direct REPL evaluation the user can run. In files, document validated work with Rich Comment Forms.
+
+```clojure
+;; In chat - show direct REPL evaluation:
+(in-ns 'my.namespace)
+(let [test-data {:user/name "example"}]
+  (process-user-data test-data))
+
+;; In files - document with RCF:
+(comment
+  (process-user-data {:user/name "example"})
+  :rcf)
+```
+
 ### Evaluate subexpressions, not println
 
 When you need to understand what a value is, **evaluate the expression directly**. Do not wrap it in `println`. Direct evaluation gives you the actual data; println gives you a string representation that's harder to work with.
