@@ -35,7 +35,7 @@ control tools for reviewing AI editing activity.
 
 Backseat Driver gives Copilot the tools for Clojure Interactive Programming and the skills for using the tools. To allow you to keep the control of how Copilot holds Clojure and the REPL, the extension does not provide much in the way of Clojure knowledge, philosophy, nor for REPL methodology.
 
-For Copilot to be trully effective it needs to know about you prefer Clojure to be written and how to use the REPL effectively.
+For Copilot to be truly effective it needs to know how you prefer Clojure to be written and how to use the REPL effectively.
 
 To avoid starting with a blank slate, where bad training data and hallucinations about Clojure ruin the day, consider installing the **clojure** Copilot plugin from the [Awesome Backseat Driver](https://github.com/BetterThanTomorrow/awesome-backseat-driver) repository. There are some instructions in the README for that repository.
 

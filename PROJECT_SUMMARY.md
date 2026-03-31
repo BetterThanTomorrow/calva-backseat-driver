@@ -2,20 +2,32 @@
 
 ## Overview
 
-Calva Backseat Driver (v0.0.14) is a VS Code extension that transforms AI coding assistants into Interactive Programmers by giving them access to a live Clojure/ClojureScript REPL. It exposes Calva's powerful REPL-driven development capabilities to AI assistants through both VS Code's Language Model API and the Model Context Protocol (MCP).
+Calva Backseat Driver (v0.0.27) is a VS Code extension that transforms AI coding assistants into Interactive Programmers by giving them access to a live Clojure/ClojureScript REPL. It exposes Calva's powerful REPL-driven development capabilities to AI assistants through both VS Code's Language Model API and the Model Context Protocol (MCP).
 
 **Core Value Proposition**: Turn "plausible-looking code that might work" into "tested code that actually works" by enabling AI to evaluate and iterate on solutions in real-time.
 
 ## Key Features
 
-- **REPL Evaluation Tool** (opt-in): AI can execute Clojure/ClojureScript code in your connected REPL
-- **Form-Aware Editing Tools**: Two structural editing tools (`replace_top_level_form` and `insert_top_level_form`) that respect form boundaries with automatic bracket balancing and text targeting for precise edits
-- **Bracket Balancer**: Powered by Parinfer to help AI generate properly balanced Clojure code
-- **Symbol Info Lookup**: Access to Clojure symbol documentation, argument lists, and metadata
-- **ClojureDocs.org Integration**: Examples, usage patterns, and "see also" references for Clojure core symbols
-- **REPL Output Log Access**: AI can monitor application output for debugging and understanding
-- **MCP Inspector Testing**: Built-in Babashka tasks for testing MCP server functionality with the MCP inspector
-- **Dual Interface**: Works with VS Code CoPilot (Language Model API) and any MCP-compliant AI client
+### 10 Tools (VS Code Language Model API + MCP)
+
+**REPL Exploration & Understanding**: `clojure_evaluate_code` (opt-in for MCP), `clojure_list_sessions`, `clojure_repl_output_log`, `clojure_symbol_info`, `clojuredocs_info`
+
+**Structural Editing**: `clojure_create_file`, `clojure_append_code`, `replace_top_level_form`, `insert_top_level_form`, `clojure_balance_brackets`
+
+### 2 Skills, 2 Instructions
+
+- **Backseat Driver skill**: REPL workflow, tool usage patterns, evaluation strategy
+- **Editing Clojure Files skill**: Structural editing tool selection, targeting, indentation rules
+- **Backseat Driver instruction**: Directs agents to load the backseat-driver skill
+- **Editing Clojure Files instruction**: Directs agents to load the editing skill when editing Clojure
+
+Skills are also exposed as MCP resources for non-Copilot clients.
+
+### Other
+
+- **Dual Interface**: Works with VS Code Copilot (Language Model API) and any MCP-compliant AI client
+- **MCP Inspector Testing**: Built-in Babashka tasks for testing MCP server functionality
+- **Clojure Copilot Plugins**: See [Awesome Backseat Driver](https://github.com/BetterThanTomorrow/awesome-backseat-driver) for community plugins providing Clojure knowledge, agents, and workflows
 
 ## Architecture Overview
 
@@ -40,7 +52,7 @@ User ↔ AI Agent ↔ [VS Code LM API | MCP Server] ↔ Calva ↔ REPL ↔ Runni
    - **Tool Definitions**: Expose evaluation, symbol lookup, and utility functions
 
 4. **VS Code Integration** (`src/calva_backseat_driver/integrations/vscode/`)
-   - **Language Model Tools** (`tools.cljs`): CoPilot tool implementations
+   - **Language Model Tools** (`tools.cljs`): Copilot tool implementations
    - **VS Code API Wrappers**: Commands, configuration, and UI integration
 
 5. **Calva Integration** (`src/calva_backseat_driver/integrations/calva/`)
@@ -106,39 +118,53 @@ User ↔ AI Agent ↔ [VS Code LM API | MCP Server] ↔ Calva ↔ REPL ↔ Runni
 
 ## Available Tools/APIs
 
-### AI Agent Tools
+### AI Agent Tools (10 tools)
 
-The tools are exposed as VS Code Language ModelAPI (for CoPilot) and MCP (for external AI clients).
+The tools are exposed as VS Code Language Model API (for Copilot) and MCP (for external AI clients).
 
-1. **clojure_evaluate_code** (if enabled)
+**REPL Exploration & Understanding:**
+
+1. **clojure_evaluate_code** (opt-in for MCP, enabled by default for Copilot)
    - Execute Clojure/ClojureScript code in connected REPL
-   - Parameters: `code`, `namespace`, `replSessionKey`
+   - Parameters: `code`, `namespace`, `replSessionKey`, `who`, `description`
 
-2. **clojure_symbol_info**
+2. **clojure_list_sessions**
+   - Discover available REPL sessions and their details
+   - Returns session keys, project roots, file glob patterns, active session
+
+3. **clojure_symbol_info**
    - Retrieve symbol documentation and metadata
    - Parameters: `clojureSymbol`, `namespace`, `replSessionKey`
 
-3. **clojuredocs_info**
+4. **clojuredocs_info**
    - Fetch examples and documentation from clojuredocs.org
    - Parameters: `clojureSymbol`
 
-4. **clojure_repl_output_log**
+5. **clojure_repl_output_log**
    - Access REPL output for monitoring and debugging
-   - Parameters: `sinceLine`
+   - Parameters: `sinceLine`, `includeWho`, `excludeWho`
 
-5. **clojure_balance_brackets**
-   - Fix bracket imbalances in Clojure code using Parinfer
-   - Parameters: `text`
+**Structural Editing:**
 
-6. **replace_top_level_form**
-   - Form-aware editing of Clojure code with semantic awareness
-   - Parameters: `filePath`, `line`, `targetLineText` (optional), `newForm`
-   - Features: Text targeting, automatic bracket balancing, rich comment support
+6. **clojure_create_file**
+   - Create a new Clojure file with automatic bracket balancing
+   - Parameters: `filePath`, `content`
 
-7. **insert_top_level_form**
-   - Form-aware insertion of new Clojure forms
-   - Parameters: `filePath`, `line`, `targetLineText` (optional), `newForm`
-   - Features: Text targeting, automatic bracket balancing, rich comment support
+7. **clojure_append_code**
+   - Append top-level forms to an existing file with bracket balancing
+   - Parameters: `filePath`, `code`
+
+8. **replace_top_level_form**
+   - Form-aware editing with text targeting, bracket balancing, rich comment support
+   - Parameters: `filePath`, `line`, `targetLineText`, `newForm`
+
+9. **insert_top_level_form**
+   - Form-aware insertion of new forms before an existing form
+   - Parameters: `filePath`, `line`, `targetLineText`, `newForm`
+
+10. **clojure_balance_brackets**
+    - Fix bracket imbalances in Clojure code using Parinfer
+    - Parameters: `text`
 
 ## Implementation Patterns
 
