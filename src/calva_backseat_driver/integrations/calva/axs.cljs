@@ -4,7 +4,7 @@
             [datascript.core :as d]
             [calva-backseat-driver.app.db :as db]))
 
-(defn handle-action [_state _context action]
+(defn handle-action [state _context action]
   (match action
     [:calva/ax.when-activated actions]
     {:ex/fxs [[:calva/fx.when-activated actions]]}
@@ -13,7 +13,14 @@
     {:ex/fxs [[:calva/fx.subscribe-to-output [:calva/ax.add-output]]]}
 
     [:calva/ax.add-output message]
-    {:ex/fxs [[:calva/fx.add-output message]]}
+    (let [line (inc (:calva/output-line-counter state 0))
+          entity (cond-> {:output/line line
+                          :output/category (:category message)
+                          :output/text (:text message)
+                          :output/timestamp (js/Date.now)}
+                   (:who message) (assoc :output/who (:who message)))]
+      {:ex/db (assoc state :calva/output-line-counter line)
+       :ex/fxs [[:calva/fx.transact-output entity]]})
 
     [:calva/ax.query-output query-edn-str]
     (let [query (reader/read-string query-edn-str)

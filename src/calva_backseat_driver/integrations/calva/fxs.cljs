@@ -17,22 +17,17 @@
                                                           :calva/on-output on-output})]
       (.push (.-subscriptions context) disposable))
 
-    [:calva/fx.add-output message]
-    (let [line (swap! db/!output-line-counter inc)
-          entity (cond-> {:output/line line
-                          :output/category (:category message)
-                          :output/text (:text message)
-                          :output/timestamp (js/Date.now)}
-                   (:who message) (assoc :output/who (:who message)))]
+    [:calva/fx.transact-output entity]
+    (do
       (d/transact! db/!output-conn [entity])
       (let [max-size 1000
             total (d/q '[:find (count ?e) . :where [?e :output/line]] @db/!output-conn)]
         (when (and total (> total max-size))
           (let [excess (- total max-size)
                 oldest-lines (take excess (sort (d/q '[:find [?l ...] :where [?e :output/line ?l]] @db/!output-conn)))
-                retractions (mapv (fn [line]
+                retractions (mapv (fn [l]
                                     [:db.fn/retractEntity
-                                     (d/q '[:find ?e . :in $ ?l :where [?e :output/line ?l]] @db/!output-conn line)])
+                                     (d/q '[:find ?e . :in $ ?l :where [?e :output/line ?l]] @db/!output-conn l)])
                                   oldest-lines)]
             (d/transact! db/!output-conn retractions)))))
 
