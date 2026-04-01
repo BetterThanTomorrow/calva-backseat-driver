@@ -286,34 +286,20 @@
         ],
         "toolReferenceName": "calva-output",
         "displayName": "Calva REPL Output Log",
-        "modelDescription": "**Calva REPL Output** gets you REPL output messages from the Calva output window. Returns REPL output since `since-line`. Start with since-line=0 and use the last line number from previous output for subsequent calls. This is a window into the running application. Invoke it often as files are edited and/or you evaluate code.\n\n## Filtering by Evaluator\n\nOutput messages may include a `who` field identifying which evaluator produced them. `\"ui\"` most often is the human user. Use `includeWho` or `excludeWho` to filter:\n\n- `includeWho: [\"my-agent\"]` — only messages from your own evaluations\n- `excludeWho: [\"ui\"]` — everything except the user's manual REPL interactions\n- `includeWho: [\"my-agent\", \"ui\"]` — your evaluations plus user interactions\n\nWhen using `includeWho`, messages without a `who` field are excluded. When using `excludeWho`, messages without `who` are included. If both are provided, `includeWho` takes precedence.\n\nAlways load the `backseat-driver` skill when using this tool.",
-        "userDescription": "Read Calva's REPL output log",
+        "modelDescription": "**Calva REPL Output** queries the REPL output log using Datalog. The output log stores messages as entities with these attributes:\n\n- `:output/line` — monotonic integer (message sequence number)\n- `:output/category` — `\"evaluationResults\"`, `\"clojureCode\"`, `\"evaluationOutput\"`, `\"evaluationErrorOutput\"`, `\"otherOutput\"`, or `\"otherErrorOutput\"`\n- `:output/text` — the message content\n- `:output/who` — who triggered it (e.g. `\"ui\"`, `\"copilot\"`, or your `who` slug). May be absent on some messages.\n- `:output/timestamp` — milliseconds since epoch\n\nProvide a Datalog query as an EDN string. Examples:\n\n- All errors: `[:find [(pull ?e [:output/line :output/text :output/who]) ...] :where [?e :output/category \\\"evaluationErrorOutput\\\"]]`\n- Count by category: `[:find ?cat (count ?e) :where [?e :output/category ?cat]]`\n- Recent from a specific who: `[:find [(pull ?e [:output/line :output/category :output/text]) ...] :in $ ?who ?since :where [?e :output/who ?who] [?e :output/line ?l] [(> ?l ?since)]]` — pass inputs via `:in` clause\n- Overview (lines + categories only): `[:find [(pull ?e [:output/line :output/category :output/who]) ...] :where [?e :output/line]]`\n\nUse `:in $` clauses for parameterized queries. The `$` (database) is passed automatically. Use `pull` to select only the attributes you need — this protects your context window.\n\nAlways load the `backseat-driver` skill when using this tool.",
+        "userDescription": "Query Calva's REPL output log with Datalog",
         "canBeReferencedInPrompt": true,
         "icon": "$(list-ordered)",
         "inputSchema": {
           "type": "object",
           "properties": {
-            "sinceLine": {
-              "type": "integer",
-              "description": "Output line-number after which you want output. Use `0` for your first request of output."
-            },
-            "includeWho": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Only return output messages from these evaluators. Messages without a `who` field are excluded. Example: [\"copilot\"] to see only your own output."
-            },
-            "excludeWho": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              },
-              "description": "Exclude output messages from these evaluators. Messages without a `who` field are included. Example: [\"ui\"] to hide the user's manual REPL interactions."
+            "query": {
+              "type": "string",
+              "description": "A Datalog query as an EDN string to run against the REPL output log. The database is passed automatically as the first argument. Use `:in $ ?param` for parameterized queries. Prefer `pull` expressions to select only needed attributes."
             }
           },
           "required": [
-            "sinceLine"
+            "query"
           ]
         }
       },

@@ -76,20 +76,16 @@
 
 (defn GetOutputLogTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [since-line (-> options .-input .-sinceLine)
-                                  message (str "Fetch REPL output from line " since-line)]
-                              #js {:invocationMessage "Fetching REPL output"
-                                   :confirmationMessages #js {:title "Get REPL Output Log"
+                            (let [query (-> options .-input .-query)
+                                  message (str "Query REPL output log: " query)]
+                              #js {:invocationMessage "Querying REPL output log"
+                                   :confirmationMessages #js {:title "Query REPL Output Log"
                                                               :message message}}))
 
        :invoke (fn invoke [^js options _token]
-                 (let [since-line (-> options .-input .-sinceLine)
-                       include-who (some-> options .-input .-includeWho js->clj)
-                       exclude-who (some-> options .-input .-excludeWho js->clj)
-                       result (calva/get-output {:ex/dispatch! dispatch!
-                                                 :calva/since-line since-line
-                                                 :calva/include-who include-who
-                                                 :calva/exclude-who exclude-who})]
+                 (let [query (-> options .-input .-query)
+                       result (calva/query-output {:ex/dispatch! dispatch!
+                                                   :calva/query-edn-str query})]
                    (vscode/LanguageModelToolResult.
                     #js [(vscode/LanguageModelTextPart.
                           (js/JSON.stringify (clj->js result)))])))})

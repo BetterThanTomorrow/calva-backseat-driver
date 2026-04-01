@@ -209,14 +209,11 @@
    (fn [message]
      (dispatch! (conj on-output (js->clj message :keywordize-keys true))))))
 
-(defn get-output [{:ex/keys [dispatch!]
-                   :calva/keys [since-line include-who exclude-who]}]
+(defn query-output [{:ex/keys [dispatch!]
+                     :calva/keys [query-edn-str]}]
   (clj->js
-   (dispatch! [[:app/ax.log :debug "[Server] Getting output since line:" since-line]
-               [:calva/ax.get-output since-line [:db/get :output/limit]
-                (cond-> {}
-                  (seq include-who) (assoc :include-who include-who)
-                  (seq exclude-who) (assoc :exclude-who exclude-who))]])))
+   (dispatch! [[:app/ax.log :debug "[Server] Querying output log with:" query-edn-str]
+               [:calva/ax.query-output query-edn-str]])))
 
 (defn exists-on-output? [] (boolean (get-in calva/calva-api [:repl :onOutputLogged])))
 

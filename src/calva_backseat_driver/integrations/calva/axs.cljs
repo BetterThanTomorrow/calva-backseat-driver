@@ -1,7 +1,10 @@
 (ns calva-backseat-driver.integrations.calva.axs
-  (:require [clojure.core.match :refer [match]]))
+  (:require [clojure.core.match :refer [match]]
+            [cljs.reader :as reader]
+            [datascript.core :as d]
+            [calva-backseat-driver.app.db :as db]))
 
-(defn handle-action [state _context action]
+(defn handle-action [_state _context action]
   (match action
     [:calva/ax.when-activated actions]
     {:ex/fxs [[:calva/fx.when-activated actions]]}
@@ -10,30 +13,12 @@
     {:ex/fxs [[:calva/fx.subscribe-to-output [:calva/ax.add-output]]]}
 
     [:calva/ax.add-output message]
-    (let [message-count (inc (:calva/output-message-count state))
-          max-buffer-size (:calva/max-output-buffer-size state 1000)
-          output-buffer (conj (:calva/output-buffer state [])
-                              (assoc message :line message-count))
-          capped-buffer (subvec output-buffer (max 0 (- (count output-buffer) max-buffer-size)))]
-      {:ex/db (assoc state
-                     :calva/output-buffer capped-buffer
-                     :calva/output-message-count message-count)})
+    {:ex/fxs [[:calva/fx.add-output message]]}
 
-    [:calva/ax.get-output since-line limit filter-opts]
-    {:ex/fxs [[:app/fx.return (->> (:calva/output-buffer state)
-                                   (filter (fn [message]
-                                             (> (:line message 0) since-line)))
-                                   (filter (fn [message]
-                                             (let [{:keys [include-who exclude-who]} filter-opts]
-                                               (cond
-                                                 (seq include-who)
-                                                 (contains? (set include-who) (:who message))
-
-                                                 (seq exclude-who)
-                                                 (not (contains? (set exclude-who) (:who message)))
-
-                                                 :else true))))
-                                   (take-last limit))]]}
+    [:calva/ax.query-output query-edn-str]
+    (let [query (reader/read-string query-edn-str)
+          result (d/q query @db/!output-conn)]
+      {:ex/fxs [[:app/fx.return result]]})
 
     :else
     {:ex/fxs [[:node/fx.log-error "Unknown action:" (pr-str action)]]}))

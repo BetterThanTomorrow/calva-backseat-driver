@@ -99,15 +99,9 @@
     {:name tool-name
      :description (tool-description tool-name)
      :inputSchema {:type "object"
-                   :properties {"sinceLine" {:type "integer"
-                                             :description (param-description tool-name "sinceLine")}
-                                "includeWho" {:type "array"
-                                              :items {:type "string"}
-                                              :description (param-description tool-name "includeWho")}
-                                "excludeWho" {:type "array"
-                                              :items {:type "string"}
-                                              :description (param-description tool-name "excludeWho")}}
-                   :required ["sinceLine"]
+                   :properties {"query" {:type "string"
+                                         :description (param-description tool-name "query")}}
+                   :required ["query"]
                    :audience ["user" "assistant"]
                    :priority 10}}))
 
@@ -364,11 +358,9 @@
                                :text (js/JSON.stringify clojure-docs)}]}})
 
         (= tool "clojure_repl_output_log")
-        (let [{:keys [sinceLine includeWho excludeWho]} arguments
-              output (calva/get-output (merge options
-                                              {:calva/since-line sinceLine
-                                               :calva/include-who includeWho
-                                               :calva/exclude-who excludeWho}))]
+        (let [{:keys [query]} arguments
+              output (calva/query-output (merge options
+                                                {:calva/query-edn-str query}))]
           {:jsonrpc "2.0"
            :id id
            :result {:content [{:type "text"
@@ -478,31 +470,14 @@
          :error {:code -32602 :message "Unknown resource URI"}}))
 
     (= method "ping")
-    (let [response {:jsonrpc "2.0"
-                    :id id
-                    :result {}}]
-      response)
+    {:jsonrpc "2.0"
+     :id id
+     :result {}}
 
-    (= method "resources/list")
-    (let [skills (skills/filter-skills (get-skills)
-                                       {:provide-bd-skill? provide-bd-skill?
-                                        :provide-edit-skill? provide-edit-skill?})
-          response {:jsonrpc "2.0"
-                    :id id
-                    :result {:resources (into []
-                                              (map (fn [{:skill/keys [name description uri]}]
-                                                     {:uri uri
-                                                      :name name
-                                                      :description description
-                                                      :mimeType "text/markdown"}))
-                                              skills)}}]
-      response)
-
-
-    id
-    {:jsonrpc "2.0" :id id :error {:code -32601 :message "Method not found"}}
-
-    :else ;; returning nil so that the response is not sent
-    nil))
+    :else
+    {:jsonrpc "2.0"
+     :id id
+     :error {:code -32601
+             :message "Unknown method"}}))
 
 

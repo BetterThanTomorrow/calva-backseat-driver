@@ -86,28 +86,59 @@ Test pure API-to-API tracking (UI eval tracking is a known Calva limitation):
 
 **Known limitation**: Human UI evaluations (editor eval commands, load file) do not participate in `who` tracking. This is a Calva-side issue, not a BD issue.
 
-### 3. Output Log with Who-Filtering
+### 3. Output Log Queries
 
-The `clojure_repl_output_log` tool supports filtering by evaluator identity.
+The `clojure_repl_output_log` tool takes a single `query` parameter — a Datalog query as an EDN string. The output log is a DataScript database where each message is an entity with these attributes:
 
-**Parameters**:
-- `sinceLine` (optional): Return entries after this line number
-- `includeWho` (optional): Array of `who` slugs to include (whitelist)
-- `excludeWho` (optional): Array of `who` slugs to exclude (blacklist)
+- `:output/line` — monotonic integer (message sequence number, useful as a cursor)
+- `:output/category` — `"evaluationResults"`, `"clojureCode"`, `"evaluationOutput"`, `"evaluationErrorOutput"`, `"otherOutput"`, or `"otherErrorOutput"`
+- `:output/text` — the message content
+- `:output/who` — evaluator slug (e.g. `"copilot"`, `"joyride-test"`, `"ui"`) or absent
+- `:output/timestamp` — milliseconds since epoch
+
+Use `pull` to select only the attributes you need — this protects the context window.
 
 **Test protocol**:
 
-1. **Unfiltered**: Call with just `sinceLine` — verify all entries returned with `who` field on each
-2. **Include filter**: `includeWho: ["copilot"]` — verify only BD evals returned
-3. **Include different who**: `includeWho: ["joyride-test"]` — verify only Joyride API evals returned
-4. **Exclude filter**: `excludeWho: ["copilot"]` — verify BD evals excluded, everything else included
+1. **Overview** — count entries per category:
+   ```edn
+   [:find ?cat (count ?e) :where [?e :output/category ?cat]]
+   ```
+   Verify multiple categories present.
 
-**Output entry shape**:
-```json
-{"category": "evaluationResults", "text": "6", "who": "copilot", "line": 42}
-```
+2. **Recent entries** — find the max line, then fetch entries after a threshold:
+   ```edn
+   [:find (max ?l) . :where [?e :output/line ?l]]
+   ```
+   ```edn
+   [:find [(pull ?e [:output/line :output/category :output/text :output/who]) ...]
+    :where [?e :output/line ?l] [(> ?l 20)]]
+   ```
+   Verify entries returned with expected attributes.
 
-Categories: `"evaluationResults"`, `"otherOutput"`. The `who` field is `null` for UI-triggered evaluations and description output messages.
+3. **Who filtering (include)** — inline the who value:
+   ```edn
+   [:find [(pull ?e [:output/line :output/text :output/who]) ...]
+    :where [?e :output/who "smoke-tester"]
+           [?e :output/category "evaluationResults"]]
+   ```
+   Verify only entries from that evaluator are returned.
+
+4. **Who filtering (exclude)** — use a predicate:
+   ```edn
+   [:find [(pull ?e [:output/line :output/text :output/who]) ...]
+    :where [?e :output/category "evaluationResults"]
+           [?e :output/who ?w] [(not= ?w "smoke-tester")]]
+   ```
+   Verify the excluded evaluator is absent, others present.
+
+5. **Aggregation** — count entries per evaluator:
+   ```edn
+   [:find ?who (count ?e) :where [?e :output/who ?who]]
+   ```
+   Verify counts match expectations from prior evals.
+
+**Known limitation**: Parameterized `:in` clauses beyond `$` (e.g. `:in $ ?who`) currently fail with "Too few inputs passed". Inline values directly in `:where` clauses instead. See tool-smith notes below.
 
 ### 4. Symbol Info and ClojureDocs
 
@@ -211,7 +242,7 @@ This verifies that BD's conditional skill injection works correctly.
 - All tool IDs resolve correctly
 - `who` parameter accepted and echoed in responses
 - `other-whos-since-last` correctly tracks API-to-API interleaving
-- Output log filtering returns correct subsets
+- Output log Datalog queries return correct results (pull, aggregation, predicates)
 - Structural editing maintains valid Clojure syntax
 - Error messages are clear and actionable
 - Bracket balance validation catches malformed code
