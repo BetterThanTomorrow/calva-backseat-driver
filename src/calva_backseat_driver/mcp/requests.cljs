@@ -288,6 +288,20 @@
                                       (conj append-code-tool-listing))}}]
       response)
 
+    (= method "resources/list")
+    (let [filtered-skills (skills/filter-skills (get-skills)
+                                                {:provide-bd-skill? provide-bd-skill?
+                                                 :provide-edit-skill? provide-edit-skill?})
+          resources (mapv (fn [{:skill/keys [name description uri]}]
+                            {:uri uri
+                             :name name
+                             :description description
+                             :mimeType "text/markdown"})
+                          filtered-skills)]
+      {:jsonrpc "2.0"
+       :id id
+       :result {:resources resources}})
+
     (= method "resources/templates/list")
     (let [response {:jsonrpc "2.0"
                     :id id
@@ -477,10 +491,10 @@
      :id id
      :result {}}
 
-    :else
-    {:jsonrpc "2.0"
-     :id id
-     :error {:code -32601
-             :message "Unknown method"}}))
+    id
+    {:jsonrpc "2.0" :id id :error {:code -32601 :message "Method not found"}}
+
+    :else ;; returning nil so that the response is not sent (JSON-RPC notifications)
+    nil))
 
 
