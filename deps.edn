@@ -2,6 +2,7 @@
  :deps {org.clojure/clojure {:mvn/version "1.12.4"}
         org.clojure/clojurescript {:mvn/version "1.12.134"}
         datascript/datascript {:mvn/version "1.7.8"}
+        com.cognitect/transit-cljs {:mvn/version "0.8.280"}
         org.clojure/core.match {:mvn/version "1.1.1"}
         funcool/promesa {:mvn/version "11.0.678"}
         thheller/shadow-cljs {:mvn/version "3.3.6"}
