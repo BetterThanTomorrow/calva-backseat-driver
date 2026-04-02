@@ -105,6 +105,9 @@ When you need to understand what a value is, **evaluate the expression directly*
 - To check for errors you might have missed
 - To retrieve earlier evaluations that scrolled out of your context
 - Periodically during long tasks
+- To search for evaluations from this and previous sessions
+
+**Log persistence:** Only `evaluatedCode` entries are retained across VS Code restarts and window reloads. Other categories (`evaluationResults`, `evaluationOutput`, `evaluationErrorOutput`, `otherOutput`) exist only for the current session. This means the log serves as a long-term searchable history of what was evaluated — useful when an agent or the human developer needs to find something from a past session.
 
 **Common queries** (use with the `query` parameter, `inputs` is a JSON array for `:in` params):
 
