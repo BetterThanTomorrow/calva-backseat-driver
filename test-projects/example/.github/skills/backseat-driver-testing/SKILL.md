@@ -98,6 +98,24 @@ The `clojure_evaluate_code` tool supports evaluator identity tracking.
 
 3. **Babashka eval** (when bb REPL connected): Evaluate `(+ 1 1)` via `bb` session. Verify result and session key.
 
+#### Basic Who-Tracking (No Joyride)
+
+The simplest who-tracking verification — uses only Backseat Driver's eval tool and subagents, no Joyride needed.
+
+**Step 1 — Baseline**: Evaluate as `"smoke-tester"` via Backseat Driver tool. Note the `other-whos-since-last` (likely empty).
+
+**Step 2 — Parallel subagent evals**: Launch 2+ `bd-tester` subagents in parallel, each with a distinct `who` (e.g., `"who-test-a"`, `"who-test-b"`). Each subagent evaluates a simple expression via the REPL.
+
+**Step 3 — Check cross-tracking**: After subagents complete, evaluate again as `"smoke-tester"`. Verify `other-whos-since-last` contains the subagent `who` handles.
+
+**Step 4 — Output log confirmation**: Query the output log to verify all `who` handles appear with correct attribution:
+```edn
+[:find ?who (count ?e)
+ :where [?e :output/who ?who]
+        [?e :output/category "evaluationResults"]]
+```
+Expect `"smoke-tester"`, `"who-test-a"`, and `"who-test-b"` all present.
+
 #### Who-Tracking Test Protocol
 
 Test pure API-to-API tracking (UI eval tracking is a known Calva limitation):
@@ -193,11 +211,17 @@ Use `pull` to select only the attributes you need — this protects the context 
 
 **Test protocol**:
 
-1. **Overview** — count entries per category:
+1. **Category coverage** — before querying, generate entries for all interesting categories by evaluating:
+   - A normal expression (produces `evaluatedCode` + `evaluationResults`)
+   - A `println` call (produces `evaluationOutput`)
+   - An expression that errors, e.g. `(/ 1 0)` (produces `evaluationErrorOutput`)
+   - An evaluation with a `description` (produces `otherOutput`)
+
+   Then count entries per category:
    ```edn
    [:find ?cat (count ?e) :where [?e :output/category ?cat]]
    ```
-   Verify multiple categories present.
+   Verify at least these categories are present: `evaluatedCode`, `evaluationResults`, `evaluationOutput`, `evaluationErrorOutput`, `otherOutput`. The `otherErrorOutput` category may not appear in a clean session — that's fine.
 
 2. **Recent entries** — find the max line, then fetch entries after a threshold:
    ```edn
@@ -231,7 +255,26 @@ Use `pull` to select only the attributes you need — this protects the context 
    ```
    Verify counts match expectations from prior evals.
 
-6. **Parameterized queries** — use the `inputs` parameter with `:in` clauses:
+6. **Namespace and session key** — evaluate across different sessions and namespaces, then verify the output log records them correctly.
+
+   **Setup** — evaluate in at least two distinct combinations:
+   - Evaluate `(+ 1 1)` in `user` namespace via `clj` session
+   - Evaluate `(+ 2 2)` in `user` namespace via `bb` session (when connected)
+   - Evaluate `(ns mini.playground) :ok` in `mini.playground` namespace via `clj` session
+
+   **Query** — pull `:output/ns` and `:output/repl-session-key` from `evaluatedCode` entries:
+   ```edn
+   [:find [(pull ?e [:output/line :output/ns :output/repl-session-key :output/text]) ...]
+    :where [?e :output/category "evaluatedCode"]]
+   ```
+
+   **Verify**:
+   - Each entry's `:output/ns` matches the namespace that evaluation was performed in
+   - Each entry's `:output/repl-session-key` matches the session key used (`"clj"` or `"bb"`)
+   - Entries from different sessions have different `:output/repl-session-key` values
+   - Entries from different namespaces have different `:output/ns` values
+
+7. **Parameterized queries** — use the `inputs` parameter with `:in` clauses:
    ```edn
    [:find [(pull ?e [:output/line :output/category :output/text]) ...]
     :in $ ?who ?cat
