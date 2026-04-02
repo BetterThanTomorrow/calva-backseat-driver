@@ -13,8 +13,10 @@ Each message has these attributes:
 | `:output/text` | string | Message content |
 | `:output/who` | string | Evaluator slug — absent on some system messages |
 | `:output/timestamp` | integer | Epoch milliseconds |
+| `:output/ns` | string | Namespace — present on `evaluatedCode` messages |
+| `:output/repl-session-key` | string | REPL session key — present on `evaluatedCode` messages |
 
-**Categories:** `"evaluationResults"`, `"clojureCode"`, `"evaluationOutput"`, `"evaluationErrorOutput"`, `"otherOutput"`, `"otherErrorOutput"`
+**Categories:** `"evaluationResults"`, `"evaluatedCode"`, `"evaluationOutput"`, `"evaluationErrorOutput"`, `"otherOutput"`, `"otherErrorOutput"`
 
 ## Tool Interface
 

@@ -20,6 +20,7 @@
               [:app/ax.register-command "calva-backseat-driver.openLogFile"
                [[:mcp/ax.open-server-log]]]
               [:app/ax.register-language-model-tools]
+              [:calva/ax.init-history]
               [:calva/ax.when-activated [[:app/ax.init-output-listener]]]
               [:app/ax.set-when-context :calva-mcp-extension/activated?
                true]

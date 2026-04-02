@@ -14,7 +14,7 @@
 (defonce !history-conn (d/create-conn {:output/line {:db/unique :db.unique/identity}}))
 
 (defn serialize-history [conn]
-  (let [entities (d/q '[:find [(pull ?e [:output/line :output/category :output/text :output/who :output/timestamp]) ...]
+  (let [entities (d/q '[:find [(pull ?e [:output/line :output/category :output/text :output/who :output/timestamp :output/ns :output/repl-session-key]) ...]
                         :where [?e :output/line]]
                        @conn)
         data {:format-version 1 :entities (vec entities)}

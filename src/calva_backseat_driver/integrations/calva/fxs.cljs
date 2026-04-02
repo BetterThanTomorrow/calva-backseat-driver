@@ -57,7 +57,7 @@
     (do
       (d/transact! db/!output-conn [entity])
       (cap-conn! db/!output-conn 1000)
-      (when (= "clojureCode" (:output/category entity))
+      (when (= "evaluatedCode" (:output/category entity))
         (d/transact! db/!history-conn [entity])
         (cap-conn! db/!history-conn 10000)
         (schedule-persist!)))

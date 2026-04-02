@@ -182,10 +182,12 @@ The `clojure_repl_output_log` tool takes a `query` parameter (a Datalog query as
 The output log is a DataScript database where each message is an entity with these attributes:
 
 - `:output/line` — monotonic integer (message sequence number, useful as a cursor)
-- `:output/category` — `"evaluationResults"`, `"clojureCode"`, `"evaluationOutput"`, `"evaluationErrorOutput"`, `"otherOutput"`, or `"otherErrorOutput"`
+- `:output/category` — `"evaluationResults"`, `"evaluatedCode"`, `"evaluationOutput"`, `"evaluationErrorOutput"`, `"otherOutput"`, or `"otherErrorOutput"`
 - `:output/text` — the message content
 - `:output/who` — evaluator slug (e.g. `"smoke-tester"`, `"joyride-test"`, `"ui"`) or absent
 - `:output/timestamp` — milliseconds since epoch
+- `:output/ns` — namespace (present on `evaluatedCode` messages)
+- `:output/repl-session-key` — REPL session key (present on `evaluatedCode` messages)
 
 Use `pull` to select only the attributes you need — this protects the context window.
 

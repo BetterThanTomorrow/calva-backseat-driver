@@ -14,12 +14,14 @@
 (deftest serialize-deserialize-round-trip
   (testing "Round-trip with entities"
     (let [entities [{:output/line 1
-                     :output/category "clojureCode"
+                     :output/category "evaluatedCode"
                      :output/text "(+ 1 2)"
                      :output/who "tester"
+                     :output/ns "user"
+                     :output/repl-session-key "cljs"
                      :output/timestamp 1000}
                     {:output/line 2
-                     :output/category "clojureCode"
+                     :output/category "evaluatedCode"
                      :output/text "(+ 3 4)"
                      :output/timestamp 2000}]]
       (d/transact! db/!history-conn entities)

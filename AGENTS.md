@@ -29,7 +29,7 @@ The `app-db` atom contains:
 
 ### Datascript Connections
 - `!output-conn` — Session-scoped, schemaless. All REPL output categories. Cap: 1000 entities.
-- `!history-conn` — Persistent, `:output/line` unique identity schema. `clojureCode` only. Cap: 10000 entities. Persisted to `eval-history.transit.json` under `context.storageUri`.
+- `!history-conn` — Persistent, `:output/line` unique identity schema. `evaluatedCode` only. Cap: 10000 entities. Persisted to `eval-history.transit.json` under `context.storageUri`.
 
 ### Calva API Integration
 Available at `calva-backseat-driver.integrations.calva.api/calva-api`:
