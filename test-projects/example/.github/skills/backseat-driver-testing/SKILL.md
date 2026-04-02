@@ -138,7 +138,6 @@ Use `pull` to select only the attributes you need — this protects the context 
    ```
    Verify counts match expectations from prior evals.
 
-**Known limitation**: Parameterized `:in` clauses beyond `$` (e.g. `:in $ ?who`) currently fail with "Too few inputs passed". Inline values directly in `:where` clauses instead. See tool-smith notes below.
 
 ### 4. Symbol Info and ClojureDocs
 
@@ -164,12 +163,6 @@ All structural editing tools also validate bracket balance before applying chang
 **List Sessions**: Verify available REPL sessions.
 - Expect at least one session with key `"clj"` for JVM Clojure
 - Response includes session type and connection info
-
-### 7. Human Intelligence
-
-**Human Intelligence tool**: Request human input via VS Code input box.
-- Verify bidirectional communication works
-- Verify the response contains the human's input
 
 ## Diagnosing Calva vs Backseat Driver Issues
 

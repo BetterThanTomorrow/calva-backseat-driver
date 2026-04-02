@@ -100,7 +100,9 @@
      :description (tool-description tool-name)
      :inputSchema {:type "object"
                    :properties {"query" {:type "string"
-                                         :description (param-description tool-name "query")}}
+                                         :description (param-description tool-name "query")}
+                                "inputs" {:type "string"
+                                          :description (param-description tool-name "inputs")}}
                    :required ["query"]
                    :audience ["user" "assistant"]
                    :priority 10}}))
@@ -358,9 +360,10 @@
                                :text (js/JSON.stringify clojure-docs)}]}})
 
         (= tool "clojure_repl_output_log")
-        (let [{:keys [query]} arguments
+        (let [{:keys [query inputs]} arguments
               output (calva/query-output (merge options
-                                                {:calva/query-edn-str query}))]
+                                                {:calva/query-edn-str query
+                                                 :calva/inputs-edn-str inputs}))]
           {:jsonrpc "2.0"
            :id id
            :result {:content [{:type "text"

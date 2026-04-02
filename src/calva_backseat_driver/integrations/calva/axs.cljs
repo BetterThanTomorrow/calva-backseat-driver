@@ -22,9 +22,10 @@
       {:ex/db (assoc state :calva/output-line-counter line)
        :ex/fxs [[:calva/fx.transact-output entity]]})
 
-    [:calva/ax.query-output query-edn-str]
+    [:calva/ax.query-output query-edn-str inputs-edn-str]
     (let [query (reader/read-string query-edn-str)
-          result (d/q query @db/!output-conn)]
+          inputs (when inputs-edn-str (reader/read-string inputs-edn-str))
+          result (apply d/q query @db/!output-conn inputs)]
       {:ex/fxs [[:app/fx.return result]]})
 
     :else

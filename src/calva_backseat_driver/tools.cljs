@@ -84,8 +84,10 @@
 
        :invoke (fn invoke [^js options _token]
                  (let [query (-> options .-input .-query)
+                       inputs (-> options .-input .-inputs)
                        result (calva/query-output {:ex/dispatch! dispatch!
-                                                   :calva/query-edn-str query})]
+                                                   :calva/query-edn-str query
+                                                   :calva/inputs-edn-str inputs})]
                    (vscode/LanguageModelToolResult.
                     #js [(vscode/LanguageModelTextPart.
                           (js/JSON.stringify (clj->js result)))])))})
