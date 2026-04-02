@@ -210,10 +210,10 @@
      (dispatch! (conj on-output (js->clj message :keywordize-keys true))))))
 
 (defn query-output [{:ex/keys [dispatch!]
-                     :calva/keys [query-edn-str inputs-edn-str]}]
+                     :calva/keys [query-edn-str inputs]}]
   (clj->js
    (dispatch! [[:app/ax.log :debug "[Server] Querying output log with:" query-edn-str]
-               [:calva/ax.query-output query-edn-str inputs-edn-str]])))
+               [:calva/ax.query-output query-edn-str inputs]])))
 
 (defn exists-on-output? [] (boolean (get-in calva/calva-api [:repl :onOutputLogged])))
 

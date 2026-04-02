@@ -363,7 +363,7 @@
         (let [{:keys [query inputs]} arguments
               output (calva/query-output (merge options
                                                 {:calva/query-edn-str query
-                                                 :calva/inputs-edn-str inputs}))]
+                                                 :calva/inputs inputs}))]
           {:jsonrpc "2.0"
            :id id
            :result {:content [{:type "text"
