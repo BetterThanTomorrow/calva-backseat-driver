@@ -57,7 +57,8 @@
     {:ex/fxs [[:app/fx.register-language-model-tools]]}
 
     [:app/ax.deactivate]
-    {:ex/dxs [[:mcp/ax.stop-server]
+    {:ex/fxs [[:calva/fx.flush-history]]
+     :ex/dxs [[:mcp/ax.stop-server]
               [:app/ax.cleanup]]}
 
     :else nil))

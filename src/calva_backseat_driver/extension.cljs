@@ -14,7 +14,9 @@
    (vscode/Uri.joinPath
     (.-logUri context) "mcp-server.log")
    :app/min-log-level :debug
-   :mcp/wrapper-config-path (path/join (os/homedir) ".config" "calva" "backseat-driver")})
+   :mcp/wrapper-config-path (path/join (os/homedir) ".config" "calva" "backseat-driver")
+   :calva/history-storage-uri (some-> (.-storageUri context)
+                                      (vscode/Uri.joinPath "eval-history.transit.json"))})
 
 (defn ^:export activate [^js context]
   (js/console.time "activation")

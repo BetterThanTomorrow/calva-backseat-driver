@@ -4,6 +4,9 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- Use Datascript, including datalog for the REPL Output Log tool
+- Persist evaluations from the REPL Output Log across Extension Host restarts
+
 ## [v0.0.27] - 2026-03-30
 
 - Provide Backseat Driver instructions for the AI

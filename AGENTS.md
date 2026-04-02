@@ -21,11 +21,15 @@ The `app-db` atom contains:
  :app/log-file-uri            ; Logging location
  :app/min-log-level           ; :debug/:info/:warn/:error
  :mcp/wrapper-config-path     ; ~/.config/calva/backseat-driver
- :calva/output-buffer         ; REPL output messages (ring buffer)
- :calva/output-message-count  ; For tracking output
+ :calva/output-line-counter   ; Monotonic line counter for output entities
+ :calva/history-storage-uri   ; Workspace-scoped Transit file for persistent history
  :extension/disposables       ; VS Code subscriptions
  :extension/when-contexts}    ; Context keys for enablement
 ```
+
+### Datascript Connections
+- `!output-conn` — Session-scoped, schemaless. All REPL output categories. Cap: 1000 entities.
+- `!history-conn` — Persistent, `:output/line` unique identity schema. `clojureCode` only. Cap: 10000 entities. Persisted to `eval-history.transit.json` under `context.storageUri`.
 
 ### Calva API Integration
 Available at `calva-backseat-driver.integrations.calva.api/calva-api`:

@@ -27,5 +27,11 @@
           result (apply d/q query @db/!output-conn inputs)]
       {:ex/fxs [[:app/fx.return result]]})
 
+    [:calva/ax.init-history]
+    {:ex/fxs [[:calva/fx.load-history-from-disk (:calva/history-storage-uri state)]]}
+
+    [:calva/ax.history-loaded max-line]
+    {:ex/db (assoc state :calva/output-line-counter max-line)}
+
     :else
     {:ex/fxs [[:node/fx.log-error "Unknown action:" (pr-str action)]]}))
