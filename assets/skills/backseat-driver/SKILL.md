@@ -97,13 +97,46 @@ When you need to understand what a value is, **evaluate the expression directly*
 
 ### Check the output log
 
-Call `clojure_repl_output_log` to see what's happened in the REPL — evaluations, stdout, stderr, errors. Use it:
+`clojure_repl_output_log` queries the REPL output log via Datascript Datalog. Use it to stay aware of what's happening in the REPL without pulling the entire log into your context.
+
+**When to query:**
 - After evaluating code with side effects
 - When something unexpected happens
-- To see if other evaluators have been active (`otherWhosSinceLast`)
+- To check for errors you might have missed
+- To retrieve earlier evaluations that scrolled out of your context
 - Periodically during long tasks
 
-Filter with `includeWho`/`excludeWho` when needed. Use `sinceLine` for incremental reads.
+**Common queries** (use with the `query` parameter, `inputs` is a JSON array for `:in` params):
+
+Check for errors since a line you've already seen:
+```
+query:   [:find [(pull ?e [:output/line :output/text :output/who]) ...]
+          :in $ ?since
+          :where [?e :output/category "evaluationErrorOutput"]
+                 [?e :output/line ?l]
+                 [(> ?l ?since)]]
+inputs:  [42]
+```
+
+Retrieve your own evaluations since a checkpoint:
+```
+query:   [:find [(pull ?e [:output/line :output/category :output/text]) ...]
+          :in $ ?who ?since
+          :where [?e :output/who ?who]
+                 [?e :output/line ?l]
+                 [(> ?l ?since)]]
+inputs:  ["coder", 100]
+```
+
+See what another agent has been doing:
+```
+query:   [:find [(pull ?e [:output/line :output/category :output/text :output/who]) ...]
+          :in $ ?who
+          :where [?e :output/who ?who]]
+inputs:  ["reviewer"]
+```
+
+More use cases — time-windowed queries, aggregation by category, overview scans — are covered in the [output log query reference](references/output-log-queries.md).
 
 ### JSON Escaping in Tool Calls
 
