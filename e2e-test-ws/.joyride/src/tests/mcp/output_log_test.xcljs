@@ -1,0 +1,179 @@
+(ns tests.mcp.output-log-testx
+  (:require
+   ["fs" :as fs]
+   ["net" :as net]
+   ["path" :as path]
+   ["vscode" :as vscode]
+   [cljs.test :refer [deftest is testing]]
+   [e2e.macros :refer [deftest-async]]
+   [e2e.utils :refer [wait-for+]]
+   [promesa.core :as p]))
+
+(def workspace-uri (.-uri (first vscode/workspace.workspaceFolders)))
+(def settings-path (.-fsPath (vscode/Uri.joinPath workspace-uri ".vscode" "settings.json")))
+(def settings-backup-path (path/join (path/dirname settings-path) "output-log-test-backup-settings.json"))
+
+(defn- connect-to-mcp-server [port]
+  (p/create
+   (fn [resolve reject]
+     (let [socket (.connect net #js {:port port})]
+       (.on socket "error" (fn [err]
+                            (js/console.error "[output-log] Socket error:" err)
+                            (reject err)))
+       (.on socket "connect" (fn []
+                              (js/console.log "[output-log] Connected to server port:" port)
+                              (resolve socket)))))))
+
+(defn- send-request [socket request-obj]
+  (p/create
+   (fn [resolve reject]
+     (let [buffer (atom "")
+           request-str (str (.stringify js/JSON (clj->js request-obj)) "\n")]
+       (.once socket "data" (fn [data]
+                            (swap! buffer str data)
+                            (try
+                              (resolve (.parse js/JSON @buffer))
+                              (catch :default e
+                                (reject e)))))
+       (.write socket request-str)))))
+
+(defn- call-tool
+  "Send a tools/call request and return the parsed text content."
+  [socket id tool-name arguments]
+  (p/let [resp (send-request socket {:jsonrpc "2.0"
+                                     :id id
+                                     :method "tools/call"
+                                     :params {:name tool-name
+                                              :arguments arguments}})
+          outer (js->clj resp :keywordize-keys true)
+          text (get-in outer [:result :content 0 :text])]
+    (when text
+      (js->clj (.parse js/JSON text) :keywordize-keys true))))
+
+(defn- query-output-log
+  "Query the output log tool and return parsed result."
+  [socket id query & [inputs]]
+  (call-tool socket id "clojure_repl_output_log"
+             (cond-> {:query query}
+               inputs (assoc :inputs inputs))))
+
+(defn- get-max-line
+  "Get the current max output line number (checkpoint)."
+  [socket]
+  (p/let [result (query-output-log socket 99
+                   "[:find (max ?l) . :where [?e :output/line ?l]]")]
+    (or result 0)))
+
+(defn- evaluate-code
+  "Evaluate code via the MCP evaluate tool."
+  [socket id {:keys [code namespace session-key who description]}]
+  (call-tool socket id "clojure_evaluate_code"
+             (cond-> {:code code
+                      :namespace namespace
+                      :replSessionKey session-key
+                      :who who}
+               description (assoc :description description))))
+
+(defn- wait-for-output
+  "Poll the output log until pred returns truthy for the query result."
+  [socket query inputs pred & {:keys [timeout] :or {timeout 5000}}]
+  (let [start (.now js/Date)]
+    (p/loop []
+      (p/let [result (query-output-log socket 98 query inputs)]
+        (if (pred result)
+          result
+          (if (> (- (.now js/Date) start) timeout)
+            (throw (js/Error. (str "wait-for-output timed out after " timeout "ms")))
+            (p/do (p/delay 100)
+                  (p/recur))))))))
+
+;; --- Setup helpers ---
+
+(defn- ensure-repl-and-eval-enabled!
+  "Connect REPL and enable eval setting. Returns nil."
+  []
+  (p/let [_ (vscode/commands.executeCommand "calva.startJoyrideReplAndConnect")
+          _ (wait-for+ #(some? (.currentSessionKey (.-repl (.-v1 (.-exports (vscode/extensions.getExtension "betterthantomorrow.calva"))))))
+                       :timeout 15000
+                       :message "[output-log] REPL session not available within 15s")
+          config (vscode/workspace.getConfiguration "calva-backseat-driver")
+          _ (.update config "enableMcpReplEvaluation" true vscode/ConfigurationTarget.Workspace)
+          _ (wait-for+ #(true? (.get (vscode/workspace.getConfiguration "calva-backseat-driver")
+                                     "enableMcpReplEvaluation"))
+                       :timeout 5000
+                       :message "[output-log] Config not propagated within 5s")]
+    nil))
+
+(defn- start-mcp-session!
+  "Start MCP server, connect, initialize. Returns {:keys [socket port]}."
+  []
+  (p/let [_ (wait-for+ #(.-isActive (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver"))
+                       :timeout 15000
+                       :message "[output-log] Extension not active within 15s")
+          server-info+ (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer")
+          server-info (js->clj server-info+ :keywordize-keys true)
+          port (:port server-info)
+          socket (connect-to-mcp-server port)
+          _ (send-request socket {:jsonrpc "2.0" :id 0 :method "initialize"})]
+    {:socket socket :port port}))
+
+(defn- get-session-key
+  "Discover a REPL session key via MCP list_sessions tool."
+  [socket]
+  (p/let [result (call-tool socket 97 "clojure_list_sessions" {})
+          sessions (:sessions result)]
+    (or (->> sessions
+             (some (fn [s] (when (:isActiveSession s) (:replSessionKey s)))))
+        (:replSessionKey (first sessions)))))
+
+;; --- Tests ---
+;; All output log tests share a single MCP server session to avoid
+;; settings/server lifecycle race conditions between async tests.
+
+(deftest-async output-log-queries
+  (fs/copyFileSync settings-path settings-backup-path)
+  (-> (p/let [_ (js/console.log "[output-log] Setting up REPL and MCP session...")
+              _ (ensure-repl-and-eval-enabled!)
+              {:keys [socket]} (start-mcp-session!)
+              session-key (get-session-key socket)
+
+              ;; === Basic query ===
+              _ (js/console.log "[output-log] Test: basic query")
+              checkpoint (get-max-line socket)
+
+              _ (evaluate-code socket 1
+                  {:code "(+ 21 21)"
+                   :namespace "user"
+                   :session-key session-key
+                   :who "e2e-output-basic"
+                   :description "e2e basic query test"})
+
+              basic-rows (wait-for-output
+                           socket
+                           "[:find [(pull ?e [*]) ...] :in $ ?since ?who :where [?e :output/line ?l] [(> ?l ?since)] [?e :output/who ?who]]"
+                           [checkpoint "e2e-output-basic"]
+                           seq)
+
+              _ (js/console.log "[output-log] basic query got" (count basic-rows) "rows")
+
+              ;; Cleanup
+              _ (js/console.log "[output-log] All queries done, cleaning up")
+              _ (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+              _ (.end socket)]
+
+        ;; --- Assertions ---
+
+        (testing "Basic query: evaluating code produces queryable output"
+          (is (seq basic-rows)
+              "Should have output entries after evaluation")
+          (is (some #(= "evaluatedCode" (:output/category %)) basic-rows)
+              "Should include an evaluatedCode entry")
+          (is (every? #(> (:output/line %) checkpoint) basic-rows)
+              "All entries should be after checkpoint")))
+
+      (p/catch (fn [e]
+                 (js/console.error "[output-log] Error:" (.-message e) e)
+                 (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                 (throw e)))
+      (p/finally (fn []
+                   (fs/renameSync settings-backup-path settings-path)))))
