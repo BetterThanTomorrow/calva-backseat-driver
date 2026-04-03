@@ -64,21 +64,161 @@
                 {:keys [socket]} (mcp/start-mcp-session!)
                 session-key (get-session-key socket)
 
-                ;; === Basic query ===
+                ;; === 1. Basic query (existing) ===
                 checkpoint (get-max-line socket)
 
                 _ (evaluate-code socket 1
-                    {:code "(+ 21 21)"
-                     :namespace "user"
-                     :session-key session-key
-                     :who "e2e-output-basic"
-                     :description "e2e basic query test"})
+                                 {:code "(+ 21 21)"
+                                  :namespace "user"
+                                  :session-key session-key
+                                  :who "e2e-output-basic"
+                                  :description "e2e basic query test"})
 
                 basic-rows (wait-for-output
+                            socket
+                            "[:find [(pull ?e [*]) ...] :in $ ?since ?who :where [?e :output/line ?l] [(> ?l ?since)] [?e :output/who ?who]]"
+                            [checkpoint "e2e-output-basic"]
+                            seq)
+
+                ;; === 2. Who isolation ===
+                iso-checkpoint (get-max-line socket)
+
+                _ (evaluate-code socket 2
+                                 {:code "(+ 1 1)"
+                                  :namespace "user"
+                                  :session-key session-key
+                                  :who "e2e-agent-alpha"
+                                  :description "agent alpha eval"})
+
+                _ (evaluate-code socket 3
+                                 {:code "(+ 2 2)"
+                                  :namespace "user"
+                                  :session-key session-key
+                                  :who "e2e-agent-beta"
+                                  :description "agent beta eval"})
+
+                alpha-rows (wait-for-output
+                            socket
+                            "[:find [(pull ?e [*]) ...] :in $ ?since ?who :where [?e :output/line ?l] [(> ?l ?since)] [?e :output/who ?who]]"
+                            [iso-checkpoint "e2e-agent-alpha"]
+                            seq)
+
+                beta-rows (wait-for-output
+                           socket
+                           "[:find [(pull ?e [*]) ...] :in $ ?since ?who :where [?e :output/line ?l] [(> ?l ?since)] [?e :output/who ?who]]"
+                           [iso-checkpoint "e2e-agent-beta"]
+                           seq)
+
+                ;; === 3. Who validation (reserved values) ===
+                ui-result (evaluate-code socket 4
+                                         {:code "(+ 1 1)"
+                                          :namespace "user"
+                                          :session-key session-key
+                                          :who "ui"})
+
+                api-result (evaluate-code socket 5
+                                          {:code "(+ 1 1)"
+                                           :namespace "user"
+                                           :session-key session-key
+                                           :who "api"})
+
+                ;; === 4. Who validation (blank) ===
+                blank-result (evaluate-code socket 6
+                                            {:code "(+ 1 1)"
+                                             :namespace "user"
+                                             :session-key session-key
+                                             :who ""})
+
+                ;; === 5. Output categories per eval ===
+                cat-checkpoint (get-max-line socket)
+
+                _ (evaluate-code socket 7
+                                 {:code "(* 3 7)"
+                                  :namespace "user"
+                                  :session-key session-key
+                                  :who "e2e-category-test"
+                                  :description "category pair test"})
+
+                cat-rows (wait-for-output
+                          socket
+                          "[:find [(pull ?e [*]) ...] :in $ ?since ?who :where [?e :output/line ?l] [(> ?l ?since)] [?e :output/who ?who]]"
+                          [cat-checkpoint "e2e-category-test"]
+                          seq)
+
+                ;; === 6. Stdout capture (evaluationOutput) ===
+                stdout-checkpoint (get-max-line socket)
+
+                _ (evaluate-code socket 8
+                                 {:code "(println \"e2e-stdout-marker\")"
+                                  :namespace "user"
+                                  :session-key session-key
+                                  :who "e2e-stdout-test"
+                                  :description "stdout capture test"})
+
+                stdout-rows (wait-for-output
                              socket
                              "[:find [(pull ?e [*]) ...] :in $ ?since ?who :where [?e :output/line ?l] [(> ?l ?since)] [?e :output/who ?who]]"
-                             [checkpoint "e2e-output-basic"]
+                             [stdout-checkpoint "e2e-stdout-test"]
                              seq)
+
+                ;; === 7. Stderr capture (evaluationErrorOutput) ===
+                stderr-checkpoint (get-max-line socket)
+
+                _ (evaluate-code socket 9
+                                 {:code "(binding [*out* *err*] (println \"e2e-stderr-marker\"))"
+                                  :namespace "user"
+                                  :session-key session-key
+                                  :who "e2e-stderr-test"
+                                  :description "stderr capture test"})
+
+                stderr-rows (wait-for-output
+                             socket
+                             "[:find [(pull ?e [*]) ...] :in $ ?since ?who :where [?e :output/line ?l] [(> ?l ?since)] [?e :output/who ?who]]"
+                             [stderr-checkpoint "e2e-stderr-test"]
+                             seq)
+
+                ;; === 8. otherWhosSinceLast ===
+                _ (evaluate-code socket 10
+                                 {:code "(+ 10 10)"
+                                  :namespace "user"
+                                  :session-key session-key
+                                  :who "e2e-cross-a"
+                                  :description "cross-who first"})
+
+                _ (evaluate-code socket 11
+                                 {:code "(+ 20 20)"
+                                  :namespace "user"
+                                  :session-key session-key
+                                  :who "e2e-cross-b"
+                                  :description "cross-who interloper"})
+
+                cross-result (evaluate-code socket 12
+                                            {:code "(+ 30 30)"
+                                             :namespace "user"
+                                             :session-key session-key
+                                             :who "e2e-cross-a"
+                                             :description "cross-who second"})
+
+                ;; === 9. Category filter query ===
+                cat-filter-checkpoint (get-max-line socket)
+
+                _ (evaluate-code socket 13
+                                 {:code "(+ 99 1)"
+                                  :namespace "user"
+                                  :session-key session-key
+                                  :who "e2e-cat-filter"
+                                  :description "category filter test"})
+
+                results-only (wait-for-output
+                              socket
+                              "[:find [(pull ?e [*]) ...] :in $ ?since ?who :where [?e :output/line ?l] [(> ?l ?since)] [?e :output/who ?who] [?e :output/category \"evaluationResults\"]]"
+                              [cat-filter-checkpoint "e2e-cat-filter"]
+                              seq)
+
+                ;; === 10. Aggregate query (count) ===
+                count-result (query-output-log socket 14
+                                               "[:find (count ?e) . :in $ ?who :where [?e :output/who ?who]]"
+                                               ["e2e-cat-filter"])
 
                 _ (mcp/stop-mcp-session! socket)]
 
@@ -90,7 +230,56 @@
             (is (some #(= "evaluationResults" (:category %)) basic-rows)
                 "Should include an evaluationResults entry")
             (is (every? #(> (:line %) checkpoint) basic-rows)
-                "All entries should be after checkpoint")))
+                "All entries should be after checkpoint"))
+
+          (testing "Who isolation: different who slugs return separate results"
+            (is (every? #(= "e2e-agent-alpha" (:who %)) alpha-rows)
+                "Alpha rows should only contain alpha's output")
+            (is (every? #(= "e2e-agent-beta" (:who %)) beta-rows)
+                "Beta rows should only contain beta's output")
+            (is (not= (set (map :line alpha-rows))
+                      (set (map :line beta-rows)))
+                "Alpha and beta should have different line numbers"))
+
+          (testing "Who validation: reserved values rejected"
+            (is (some? (:error ui-result))
+                "who='ui' should return an error")
+            (is (some? (:error api-result))
+                "who='api' should return an error"))
+
+          (testing "Who validation: blank value rejected"
+            (is (some? (:error blank-result))
+                "who='' (blank) should return an error"))
+
+          (testing "Output categories: eval produces evaluationResults with who"
+            (is (some #(= "evaluationResults" (:category %)) cat-rows)
+                "Should have an evaluationResults entry"))
+
+          (testing "Stdout capture: println produces evaluationOutput"
+            (is (some #(= "evaluationOutput" (:category %)) stdout-rows)
+                "Should have an evaluationOutput entry for stdout"))
+
+          (testing "Stderr capture: writing to *err* produces output"
+            (is (some #(or (= "evaluationErrorOutput" (:category %))
+                           (= "evaluationOutput" (:category %)))
+                      stderr-rows)
+                "Should have error output or output entry for stderr"))
+
+          (testing "otherWhosSinceLast: cross-who awareness"
+            (is (some? (:other-whos-since-last cross-result))
+                "Should include other-whos-since-last field")
+            (is (some #(= "e2e-cross-b" %) (:other-whos-since-last cross-result))
+                "Should list the interloping who slug"))
+
+          (testing "Category filter query: can filter by specific category"
+            (is (every? #(= "evaluationResults" (:category %)) results-only)
+                "Results-only query should return only evaluationResults"))
+
+          (testing "Aggregate query: count returns a scalar"
+            (is (number? count-result)
+                "Count query should return a number")
+            (is (pos? count-result)
+                "Count should be positive for a who with output")))
 
         (p/catch (fn [e]
                    (js/console.error "[output-log] Error:" (.-message e) e)

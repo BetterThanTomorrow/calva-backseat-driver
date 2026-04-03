@@ -24,17 +24,26 @@
                                 (js/console.log "[MCP client] Connected to server port:" port)
                                 (resolve socket)))))))
 
+(defn- try-parse-json [s]
+  (try (.parse js/JSON s) (catch :default _ nil)))
+
 (defn send-request [socket request-obj]
   (p/create
-   (fn [resolve reject]
+   (fn [resolve _reject]
      (let [buffer (atom "")
-           request-str (str (.stringify js/JSON (clj->js request-obj)) "\n")]
-       (.once socket "data" (fn [data]
-                               (swap! buffer str data)
-                               (try
-                                 (resolve (.parse js/JSON @buffer))
-                                 (catch :default e
-                                   (reject e)))))
+           request-id (.-id (clj->js request-obj))
+           request-str (str (.stringify js/JSON (clj->js request-obj)) "\n")
+           on-data (fn on-data [data]
+                     (swap! buffer str data)
+                     (let [lines (.split @buffer "\n")
+                           match (->> lines
+                                      (keep try-parse-json)
+                                      (filter #(= request-id (.-id %)))
+                                      first)]
+                       (when match
+                         (.removeListener socket "data" on-data)
+                         (resolve match))))]
+       (.on socket "data" on-data)
        (.write socket request-str)))))
 
 (defn call-tool
