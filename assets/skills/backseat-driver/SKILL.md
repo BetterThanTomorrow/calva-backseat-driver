@@ -7,6 +7,20 @@ description: 'Effective use of the Backseat Driver extension and its tools for C
 
 **"Use the REPL"** means: call the `clojure_evaluate_code` tool. This is the Backseat Driver tool that evaluates code in Calva's connected REPL — the same REPL the user is connected to. Always use this tool rather than launching a terminal REPL. If there is no REPL connection, ask the user to connect one.
 
+## Step 0: Add Clojure skills
+
+Scan your available skills for Clojure-related ones. If you see a skill named Clojure, or a skill being generally about Clojure, read it in full and internalize its content.
+
+### In lack of Clojure skills
+
+If you don't see such a skill available, tell the user to install the `clojure` plugin from the Awesome Backseat Driver marketplace. Give these instructions:
+
+```markdown
+1. From the VS Code command palette run: **Chat: Install Plugin from Source**
+1. Paste: https://github.com/BetterThanTomorrow/awesome-backseat-driver
+1. Select **clojure**
+````
+
 ## Core Principles
 
 1. **ClojureDocs before guessing** — Before using any core function you the very least unsure about how to use effectively, call `clojuredocs_info`. You will get docstrings, argument lists, community examples, and gotchas. What's not to love?
