@@ -16,7 +16,7 @@
 (defn serialize-history [conn]
   (let [entities (d/q '[:find [(pull ?e [:output/line :output/category :output/text :output/who :output/timestamp :output/ns :output/repl-session-key]) ...]
                         :where [?e :output/line]]
-                       @conn)
+                      @conn)
         data {:format-version 1 :entities (vec entities)}
         w (transit/writer :json)]
     (transit/write w data)))

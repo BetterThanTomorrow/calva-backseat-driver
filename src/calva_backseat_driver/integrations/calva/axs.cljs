@@ -18,9 +18,9 @@
                           :output/category (:category message)
                           :output/text (:text message)
                           :output/timestamp (js/Date.now)}
-           (:who message) (assoc :output/who (:who message))
-           (:ns message) (assoc :output/ns (:ns message))
-           (:replSessionKey message) (assoc :output/repl-session-key (:replSessionKey message)))]
+                   (:who message) (assoc :output/who (:who message))
+                   (:ns message) (assoc :output/ns (:ns message))
+                   (:replSessionKey message) (assoc :output/repl-session-key (:replSessionKey message)))]
       {:ex/db (assoc state :calva/output-line-counter line)
        :ex/fxs [[:calva/fx.transact-output entity]]})
 
