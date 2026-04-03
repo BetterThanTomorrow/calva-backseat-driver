@@ -43,7 +43,7 @@
                         (< 0 (+ fail error)) "FAILURE: Some tests failed or errored"
                         (< pass passed-minimum-threshold) (str "FAILURE: Less than " passed-minimum-threshold " assertions passed")
                         :else nil)]
-
+      (writeln (str "Runner: tests run, results: {:pass " pass ", :fail " fail ", :error " error "}"))
       (if fail-reason
         (p/reject! running fail-reason)
         (p/resolve! running true)))))
@@ -85,7 +85,6 @@
     (p/let [nss-syms (find-test-nss+ src-path)
             p (run-when-ws-activated nss-syms 1)]
       (workspace-activate/clean-up!+)
-      (println "Runner: tests run, results:" (select-keys  @db/!state [:pass :fail :error]))
       (swap! db/!state merge db/default-db)
       p)
     running))

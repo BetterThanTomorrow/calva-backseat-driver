@@ -65,13 +65,14 @@
         (flush)))))
 
 (defn- parse-test-counts
-  "Parse test output log for pass/fail markers."
+  "Parse structured test results from the Runner summary line."
   [log-file]
-  (let [content (slurp log-file)
-        passed (count (re-seq #"✓" content))
-        failed (count (re-seq #"✗" content))
-        total (+ passed failed)]
-    {:passed passed :failed failed :total total}))
+  (let [content (slurp log-file)]
+    (if-let [[_ pass fail error] (re-find #"Runner: tests run, results: \{:pass (\d+),?\s*:fail (\d+),?\s*:error (\d+)\}" content)]
+      (let [passed (parse-long pass)
+            failed (+ (parse-long fail) (parse-long error))]
+        {:passed passed :failed failed :total (+ passed failed)})
+      {:passed 0 :failed 0 :total 0 :warning "Could not find Runner summary in log"})))
 
 (defn- run-e2e-launch!
   "Run e2e tests via launch.js with output redirected to log file.
@@ -79,18 +80,19 @@
   [& args]
   (fs/create-dirs (fs/parent e2e-output-log))
   (println "Output:" e2e-output-log)
-  (with-open [writer (io/writer (io/file e2e-output-log))]
-    (let [exit-code (with-spinner "Running e2e tests..."
+  (let [exit-code (with-open [writer (io/writer (io/file e2e-output-log))]
+                    (with-spinner "Running e2e tests..."
                       #(:exit @(p/process (into ["node" "./e2e-test-ws/launch.js"] args)
-                                          {:out writer :err writer})))
-          {:keys [passed failed total]} (parse-test-counts e2e-output-log)]
-      (println)
-      (println (format "Tests: %d/%d passed" passed total))
-      (if (zero? exit-code)
-        (println "Status: ALL TESTS PASSED")
-        (do
-          (println (format "Status: TESTS FAILED (%d failed, exit code %d)" failed exit-code))
-          (throw (ex-info "E2E tests failed" {:babashka/exit exit-code})))))))
+                                          {:out writer :err writer}))))
+        {:keys [passed failed total warning]} (parse-test-counts e2e-output-log)]
+    (println)
+    (when warning (println (str "WARNING: " warning)))
+    (println (format "Tests: %d/%d passed" passed total))
+    (if (zero? exit-code)
+      (println "Status: ALL TESTS PASSED")
+      (do
+        (println (format "Status: TESTS FAILED (%d failed, exit code %d)" failed exit-code))
+        (throw (ex-info "E2E tests failed" {:babashka/exit exit-code}))))))
 
 #_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
 (defn run-e2e-tests-with-vsix! [{:keys [vsix]}]
