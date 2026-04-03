@@ -60,15 +60,12 @@
 
 (deftest-async output-log-queries
   (let [backup-path (mcp/backup-settings! "output-log-test-backup.json")]
-    (-> (p/let [_ (js/console.log "[output-log] Setting up REPL and MCP session...")
-                _ (mcp/ensure-repl-and-eval-enabled!)
+    (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
                 {:keys [socket]} (mcp/start-mcp-session!)
                 session-key (get-session-key socket)
 
                 ;; === Basic query ===
-                _ (js/console.log "[output-log] Test: basic query")
                 checkpoint (get-max-line socket)
-                _ (js/console.log "[output-log] checkpoint:" checkpoint)
 
                 _ (evaluate-code socket 1
                     {:code "(+ 21 21)"
@@ -83,11 +80,6 @@
                              [checkpoint "e2e-output-basic"]
                              seq)
 
-                _ (js/console.log "[output-log] basic query got" (count basic-rows) "rows")
-                _ (js/console.log "[output-log] basic-rows:" (pr-str basic-rows))
-
-                ;; Cleanup
-                _ (js/console.log "[output-log] All queries done, cleaning up")
                 _ (mcp/stop-mcp-session! socket)]
 
           ;; --- Assertions ---
