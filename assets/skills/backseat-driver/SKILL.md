@@ -9,7 +9,7 @@ description: 'Effective use of the Backseat Driver extension and its tools for C
 
 ## Step 0: Add Clojure skills
 
-Scan your available skills for Clojure-related ones. If you see a skill named Clojure, or a skill being generally about Clojure, read it in full and internalize its content.
+Scan your available skills for Clojure-related ones. If you see a skill named Clojure, or a skill being about Clojure, read it in full and internalize its content.
 
 ### In lack of Clojure skills
 
@@ -185,15 +185,6 @@ Use Backseat Driver's structural editing tools for all Clojure file modification
 
 When working in a Joyride context **"use the REPL" means `joyride_evaluate_code`**, not Backseat Driver's `clojure_evaluate_code`. Joyride's REPL runs in the VS Code Extension Host and is promise-aware in ways that Backseat Driver's REPL is not — using Backseat Driver's eval for Joyride code leads to async problems. Other tools of Backseat Driver (ClojureDocs, symbol info, structural editing, output log) remain useful.
 
-### Workflow preferences
-
-This skill teaches effective tool usage. It does not prescribe workflow preferences — those belong to the developer's own instructions and skills, and agents. Make sure to orient what is available from the user and workspace level in terms of instructions, skill, agents, and preferences.
-
-## Extend with Your Own Skills
-
-This skill provides the shared baseline for Backseat Driver tool usage. Your user-level and workspace-level skills can extend it with workflow preferences, coding conventions, and project-specific patterns.
-
-When this skill is loaded, also load any corresponding Clojure coding/planning/reviewing/etcetera skills from your user profile or workspace — they carry user and workflow preferences that complement this tool-usage baseline.
 
 ## Invariants
 
