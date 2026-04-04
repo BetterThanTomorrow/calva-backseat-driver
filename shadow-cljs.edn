@@ -22,5 +22,8 @@
 
   :test-compile
   {:target    :node-test
+   :compiler-options {:infer-externs :auto
+                                    :externs ["externs/mcp_server.js"
+                                              "datascript/externs.js"]}
    :output-to "out/extension-tests.js"
    :ns-regexp "-test$"}}}
