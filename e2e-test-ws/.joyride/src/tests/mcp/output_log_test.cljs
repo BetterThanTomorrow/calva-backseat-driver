@@ -1,7 +1,7 @@
 (ns tests.mcp.output-log-test
   (:require
    ["vscode" :as vscode]
-   [cljs.test :refer [deftest is testing]]
+   [cljs.test :refer [is testing]]
    [e2e.macros :refer [deftest-async]]
    [e2e.mcp-helpers :as mcp]
    [promesa.core :as p]))
@@ -226,11 +226,11 @@
 
           (testing "Basic query: evaluating code produces queryable output"
             (is (seq basic-rows)
-                "Should have output entries after evaluation")
+                "Should return at least one output row for the evaluation")
             (is (some #(= "evaluationResults" (:category %)) basic-rows)
                 "Should include an evaluationResults entry")
             (is (every? #(> (:line %) checkpoint) basic-rows)
-                "All entries should be after checkpoint"))
+                "All returned rows should be after the checkpoint"))
 
           (testing "Who isolation: different who slugs return separate results"
             (is (every? #(= "e2e-agent-alpha" (:who %)) alpha-rows)

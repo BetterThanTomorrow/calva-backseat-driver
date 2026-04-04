@@ -53,3 +53,36 @@
     (let [state {:calva/output-line-counter 5}
           result (calva-axs/handle-action state nil [:calva/ax.history-loaded 0])]
       (is (= 0 (:calva/output-line-counter (:ex/db result)))))))
+
+(deftest query-output-returns-pulled-rows-filtered-by-since-and-who
+  (testing "Supported output-log query via :calva/ax.query-output"
+    (let [local-conn (d/create-conn {:output/line {:db/unique :db.unique/identity}})
+          query '[:find [(pull ?e [*]) ...]
+                  :in $ ?since ?who
+                  :where [?e :output/line ?l]
+                  [(> ?l ?since)]
+                  [?e :output/who ?who]]
+          entities [{:output/line 1
+                     :output/text "first"
+                     :output/who "tester"}
+                    {:output/line 2
+                     :output/text "skip"
+                     :output/who "other"}
+                    {:output/line 3
+                     :output/text "third"
+                     :output/who "tester"}]]
+      (d/transact! local-conn entities)
+      (with-redefs [db/!output-conn local-conn]
+        (let [returned-rows (-> (calva-axs/handle-action
+                                 {}
+                                 nil
+                                 [:calva/ax.query-output (pr-str query) [1 "tester"]])
+                                :ex/fxs
+                                first
+                                second)]
+          (is (= [{:output/line 3
+                   :output/text "third"
+                   :output/who "tester"}]
+                 (mapv #(select-keys % [:output/line :output/text :output/who]) returned-rows)))
+          (is (every? #(> (:output/line %) 1) returned-rows))
+          (is (every? #(= "tester" (:output/who %)) returned-rows)))))))
