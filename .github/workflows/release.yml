@@ -27,7 +27,7 @@ jobs:
           merge-multiple: true
 
       - name: Install clojure tools
-        uses: DeLaGuardo/setup-clojure@13.4
+        uses: DeLaGuardo/setup-clojure@13.6.0
         with:
           cli: latest
           bb: latest
@@ -139,7 +139,7 @@ jobs:
         run: echo "BUMP_BRANCH=$(git symbolic-ref --short HEAD || echo 'master')" >> $GITHUB_ENV
 
       - name: Setup Babashka
-        uses: DeLaGuardo/setup-clojure@13.4
+        uses: DeLaGuardo/setup-clojure@13.6.0
         with:
           bb: latest
 
