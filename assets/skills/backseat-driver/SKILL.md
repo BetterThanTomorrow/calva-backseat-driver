@@ -109,6 +109,10 @@ In chat, show direct REPL evaluation the user can run. In files, document valida
 
 When you need to understand what a value is, **evaluate the expression directly**. Do not wrap it in `println`. Direct evaluation gives you the actual data; println gives you a string representation that's harder to work with.
 
+### Visual results
+
+Any `data:image/...` URLs found anywhere in a result — whether the result is a plain string, a map, a vector, or deeply nested data — are automatically extracted and returned as viewable images alongside the text. This applies to both evaluation results and output log queries. You can visually inspect rendered output through the REPL.
+
 ### Check the output log
 
 `clojure_repl_output_log` queries the REPL output log via Datascript Datalog. Use it to stay aware of what's happening in the REPL without pulling the entire log into your context.
