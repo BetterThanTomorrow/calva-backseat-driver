@@ -346,3 +346,54 @@
             nil)
           (p/finally (fn []
                        (mcp/restore-settings! backup-path)))))))
+
+(deftest-async image-content-in-eval-result
+  (testing "Evaluation returning data URL produces image content in response"
+    (let [backup-path (mcp/backup-settings! "image-content-test-backup.json")]
+      (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
+                  {:keys [socket]} (mcp/start-mcp-session!)
+
+                  ;; Get a session key for evaluation
+                  sessions-resp (mcp/send-request socket
+                                  {:jsonrpc "2.0"
+                                   :id 1
+                                   :method "tools/call"
+                                   :params {:name "clojure_list_sessions"
+                                            :arguments {}}})
+                  session-key (let [outer (js->clj sessions-resp :keywordize-keys true)
+                                    text (get-in outer [:result :content 0 :text])
+                                    parsed (js->clj (.parse js/JSON text) :keywordize-keys true)]
+                                (or (->> (:sessions parsed)
+                                         (some (fn [s] (when (:isActiveSession s) (:replSessionKey s)))))
+                                    (:replSessionKey (first (:sessions parsed)))))
+
+                  ;; Evaluate code that returns a data URL string
+                  eval-resp (mcp/send-request socket
+                              {:jsonrpc "2.0"
+                               :id 2
+                               :method "tools/call"
+                               :params {:name "clojure_evaluate_code"
+                                        :arguments {:code "\"data:image/png;base64,iVBORw0KGgo=\""
+                                                    :namespace "user"
+                                                    :replSessionKey session-key
+                                                    :who "e2e-image-test"}}})
+                  content (let [outer (js->clj eval-resp :keywordize-keys true)]
+                            (get-in outer [:result :content]))
+
+                  _ (mcp/stop-mcp-session! socket)]
+            (is (= 2 (count content))
+                "Should have text + image content items")
+            (is (= "text" (:type (first content)))
+                "First content item should be text")
+            (is (= "image" (:type (second content)))
+                "Second content item should be image")
+            (is (= "image/png" (:mimeType (second content)))
+                "Image content should have correct MIME type")
+            (is (string? (:data (second content)))
+                "Image content should have base64 data string"))
+          (p/catch (fn [e]
+                     (js/console.error "[image-content] Error:" (.-message e) e)
+                     (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                     (throw e)))
+          (p/finally (fn []
+                       (mcp/restore-settings! backup-path)))))))
