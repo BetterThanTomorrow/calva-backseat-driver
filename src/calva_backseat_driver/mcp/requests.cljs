@@ -4,7 +4,7 @@
    ["path" :as path]
    ["vscode" :as vscode]
    [calva-backseat-driver.bracket-balance :as bracket-balance]
-  [calva-backseat-driver.tools :as tools]
+   [calva-backseat-driver.tools :as tools]
    [calva-backseat-driver.integrations.calva.features :as calva]
    [calva-backseat-driver.mcp.skills :as skills]
    [clojure.string :as string]
@@ -342,8 +342,8 @@
                                                         (when ns
                                                           {:calva/ns ns})))]
               {:jsonrpc "2.0"
-              :id id
-              :result {:content (tools/mcp-content-with-images result)}})))
+               :id id
+               :result {:content (tools/mcp-content-with-images result)}})))
 
         (= tool "clojure_list_sessions")
         (p/let [result (calva/list-sessions+ options)]
@@ -380,7 +380,7 @@
                                                  :calva/inputs inputs}))]
           {:jsonrpc "2.0"
            :id id
-             :result {:content (tools/mcp-content-with-images output)}})
+           :result {:content (tools/mcp-content-with-images output)}})
 
         (= tool "clojure_balance_brackets")
         (let [{:keys [text]} arguments

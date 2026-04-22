@@ -88,7 +88,7 @@
                                                            :calva/repl-session-key session-key
                                                            :calva/who who
                                                            :calva/description description})]
-                                   (tool-result-with-images result)))))})
+                       (tool-result-with-images result)))))})
 
 
 (defn GetSymbolInfoTool [dispatch!]
@@ -141,7 +141,7 @@
                        result (calva/query-output {:ex/dispatch! dispatch!
                                                    :calva/query-edn-str query
                                                    :calva/inputs inputs})]
-           (tool-result-with-images result)))})
+                   (tool-result-with-images result)))})
 
 
 (defn InferBracketsTool [dispatch!]
