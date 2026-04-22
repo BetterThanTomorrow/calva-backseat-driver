@@ -287,3 +287,56 @@
                    (throw e)))
         (p/finally (fn []
                      (mcp/restore-settings! backup-path))))))
+
+(deftest-async image-content-in-output-log
+  (testing "Output log query with image data returns image content items"
+    (let [backup-path (mcp/backup-settings! "output-log-image-test-backup.json")]
+      (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
+                  {:keys [socket]} (mcp/start-mcp-session!)
+                  session-key (get-session-key socket)
+                  checkpoint (get-max-line socket)
+
+                  ;; Evaluate code that returns a data URL
+                  _ (evaluate-code socket 20
+                                   {:code "\"data:image/png;base64,iVBORw0KGgo=\""
+                                    :namespace "user"
+                                    :session-key session-key
+                                    :who "e2e-output-image"
+                                    :description "output log image test"})
+
+                  ;; Wait for the eval result to appear in the log
+                  _ (wait-for-output
+                     socket
+                     "[:find [(pull ?e [*]) ...] :in $ ?since ?who :where [?e :output/line ?l] [(> ?l ?since)] [?e :output/who ?who] [?e :output/category \"evaluationResults\"]]"
+                     [checkpoint "e2e-output-image"]
+                     seq)
+
+                  ;; Query via send-request to see all content items (including images)
+                  log-resp (mcp/send-request socket
+                             {:jsonrpc "2.0"
+                              :id 21
+                              :method "tools/call"
+                              :params {:name "clojure_repl_output_log"
+                                       :arguments {:query "[:find [(pull ?e [*]) ...] :in $ ?since ?who :where [?e :output/line ?l] [(> ?l ?since)] [?e :output/who ?who] [?e :output/category \"evaluationResults\"]]"
+                                                   :inputs [checkpoint "e2e-output-image"]}}})
+                  content (get-in (js->clj log-resp :keywordize-keys true)
+                                  [:result :content])
+
+                  _ (mcp/stop-mcp-session! socket)]
+
+            (is (= 2 (count content))
+                "Should have text + image content items")
+            (is (= "text" (:type (first content)))
+                "First content item should be text")
+            (is (= "image" (:type (second content)))
+                "Second content item should be image")
+            (is (= "image/png" (:mimeType (second content)))
+                "Image content should have correct MIME type")
+            (is (string? (:data (second content)))
+                "Image content should have base64 data string"))
+          (p/catch (fn [e]
+                     (js/console.error "[output-log-image] Error:" (.-message e) e)
+                     (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                     (throw e)))
+          (p/finally (fn []
+                       (mcp/restore-settings! backup-path)))))))
