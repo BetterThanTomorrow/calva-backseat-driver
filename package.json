@@ -150,7 +150,7 @@
         ],
         "toolReferenceName": "clojure-eval",
         "displayName": "Evaluate Clojure Code",
-        "modelDescription": "**Evaluate Clojure Code** using Calva's REPL connection. \"Use the REPL\" means this tool. In a Joyride context use `joyride_evaluate_code` instead of this tool.\n\nResult may include `otherWhosSinceLast` — other evaluators active since your last call. Use `description` instead of line comments in the code you are evaluating, for explaining the purpose of the evaluation, or to help yourself think.\n\nIndent code properly before evaluation (agents often get maps misaligned).\n\nAlways load the `backseat-driver` skill when using this tool.",
+        "modelDescription": "**Evaluate Clojure Code** using Calva's REPL connection. \"Use the REPL\" means this tool. In a Joyride context use `joyride_evaluate_code` instead of this tool.\n\nResult may include `otherWhosSinceLast` — other evaluators active since your last call. If evaluation results contain image data, it will be automatically extracted and returned as viewable images.\n\nUse `description` instead of line comments in the code you are evaluating, for explaining the purpose of the evaluation, or to help yourself think.\n\nIndent code properly before evaluation (agents often get maps misaligned).\n\nAlways load the `backseat-driver` skill when using this tool.",
         "userDescription": "Evaluate Clojure or ClojureScript code in the connected REPL.",
         "canBeReferencedInPrompt": true,
         "icon": "$(terminal-bash)",
