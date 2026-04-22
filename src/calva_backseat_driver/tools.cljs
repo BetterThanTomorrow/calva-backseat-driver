@@ -3,7 +3,48 @@
    ["vscode" :as vscode]
    [calva-backseat-driver.bracket-balance :as balance]
    [calva-backseat-driver.integrations.calva.features :as calva]
-   [promesa.core :as p]))
+   [promesa.core :as p]
+   [clojure.string :as string]))
+
+(defn extract-images
+  "Extracts all data:image/ URLs from a result string.
+   Returns {:text <modified-text> :images [{:mime :data :base64} ...]} or nil.
+   Each data URL is replaced with <<image-N>> in the text.
+   :data is a Uint8Array (for LM Tool), :base64 is the raw string (for MCP)."
+  [result-str]
+  (let [matches (re-seq #"data:(image/[^;]+);base64,([A-Za-z0-9+/=\s]+)" result-str)]
+    (when (seq matches)
+      (loop [text result-str
+             remaining matches
+             images []
+             idx 1]
+        (if-let [[full-match mime base64] (first remaining)]
+          (let [clean-base64 (string/replace base64 #"\s" "")
+                buffer (js/Buffer.from clean-base64 "base64")]
+            (recur (string/replace-first text full-match (str "<<image-" idx ">>"))
+                   (rest remaining)
+                   (conj images {:mime mime
+                                 :data (js/Uint8Array. buffer)
+                                 :base64 clean-base64})
+                   (inc idx)))
+          {:text text
+           :images images})))))
+
+(defn- eval-tool-result
+  "Builds a LanguageModelToolResult from an evaluation result (JS object).
+   Extracts embedded images and returns them as separate content parts."
+  [result]
+  (if-let [{:keys [text images]} (extract-images (.-result result))]
+    (let [modified (js/Object.assign #js {} result #js {:result text})
+          text-part (vscode/LanguageModelTextPart. (js/JSON.stringify modified))
+          image-parts (mapv (fn [{:keys [mime data]}]
+                              (vscode/LanguageModelDataPart.image data mime))
+                            images)]
+      (vscode/LanguageModelToolResult.
+       (into-array (cons text-part image-parts))))
+    (vscode/LanguageModelToolResult.
+     #js [(vscode/LanguageModelTextPart.
+           (js/JSON.stringify result))])))
 
 (defn EvaluateClojureCodeTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
@@ -33,9 +74,7 @@
                                                            :calva/repl-session-key session-key
                                                            :calva/who who
                                                            :calva/description description})]
-                       (vscode/LanguageModelToolResult.
-                        #js [(vscode/LanguageModelTextPart.
-                              (js/JSON.stringify (clj->js result)))])))))})
+                       (eval-tool-result result)))))})
 
 
 (defn GetSymbolInfoTool [dispatch!]

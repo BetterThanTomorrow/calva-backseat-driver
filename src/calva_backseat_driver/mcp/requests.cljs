@@ -4,6 +4,7 @@
    ["path" :as path]
    ["vscode" :as vscode]
    [calva-backseat-driver.bracket-balance :as bracket-balance]
+  [calva-backseat-driver.tools :as tools]
    [calva-backseat-driver.integrations.calva.features :as calva]
    [calva-backseat-driver.mcp.skills :as skills]
    [clojure.string :as string]
@@ -340,10 +341,22 @@
                                                          :calva/description description}
                                                         (when ns
                                                           {:calva/ns ns})))]
-              {:jsonrpc "2.0"
-               :id id
-               :result {:content [{:type "text"
-                                   :text (js/JSON.stringify result)}]}})))
+              (if-let [{:keys [text images]} (tools/extract-images (.-result result))]
+                (let [modified (js/Object.assign #js {} result #js {:result text})
+                      text-content {:type "text"
+                                    :text (js/JSON.stringify modified)}
+                      image-contents (mapv (fn [{:keys [mime base64]}]
+                                             {:type "image"
+                                              :mimeType mime
+                                              :data base64})
+                                           images)]
+                  {:jsonrpc "2.0"
+                   :id id
+                   :result {:content (into [text-content] image-contents)}})
+                {:jsonrpc "2.0"
+                 :id id
+                 :result {:content [{:type "text"
+                                     :text (js/JSON.stringify result)}]}}))))
 
         (= tool "clojure_list_sessions")
         (p/let [result (calva/list-sessions+ options)]
