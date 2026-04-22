@@ -1,8 +1,8 @@
 {
   "name": "calva-backseat-driver",
   "displayName": "Calva Backseat Driver",
-  "description": "Make CoPilot an Interactive Programmer, tools for VS Code CoPilot. Can also be run as an MCP server",
-  "version": "0.0.26",
+  "description": "Make Copilot an Interactive Programmer, tools for VS Code Copilot. Can also be run as an MCP server",
+  "version": "0.0.29",
   "publisher": "betterthantomorrow",
   "author": {
     "name": "Better Than Tomorrow",
@@ -43,7 +43,7 @@
         "calva-backseat-driver.enableMcpReplEvaluation": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Enable the REPL evaluation tool through MCP.\n\n **⚠️ SECURITY WARNING**: _When enabled and you have also started the MCP server, any network client with access to the MCP server can execute arbitrary code in your REPL environment._ That said, CoPilot and other compliant MCP clients will default to a low-trust mode with confirmation before any evaluation.",
+          "markdownDescription": "Enable the REPL evaluation tool through MCP.\n\n **⚠️ SECURITY WARNING**: _When enabled and you have also started the MCP server, any network client with access to the MCP server can execute arbitrary code in your REPL environment._ That said, Copilot and other compliant MCP clients will default to a low-trust mode with confirmation before any evaluation.",
           "scope": "resource"
         },
         "calva-backseat-driver.autoStartMCPServer": {
@@ -69,7 +69,7 @@
           "type": "number",
           "default": 10,
           "minimum": 0,
-          "markdownDescription": "Number of lines above and below the target line to show the agent in error responses when an edit operation fails. **Trade-offs**: Larger values provide more context for the agent's retry but may consume more tokens. Or it may not, depending on how the agent uses the information (e.g. if the context contains what it needs, if may be able to avoif a full file reread).",
+          "markdownDescription": "Number of lines above and below the target line to show the agent in error responses when an edit operation fails. **Trade-offs**: Larger values provide more context for the agent's retry but may consume more tokens. Or it may not, depending on how the agent uses the information (e.g. if the context contains what it needs, it may be able to avoid a full file reread).",
           "scope": "resource"
         },
         "calva-backseat-driver.evaluation.maxLength": {
@@ -84,6 +84,18 @@
           "default": 7,
           "minimum": 0,
           "markdownDescription": "Maximum nesting depth when pretty-printing REPL evaluation results. Deeper structures are replaced with `##`. Use `0` to disable depth limiting. **Purpose**: Prevents deeply nested structures from overwhelming the agent's context window.",
+          "scope": "resource"
+        },
+        "calva-backseat-driver.provideBdSkill": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Provide the Backseat Driver skill to agents",
+          "scope": "resource"
+        },
+        "calva-backseat-driver.provideEditSkill": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Provide the Clojure structural editing skill to agents",
           "scope": "resource"
         }
       }
@@ -108,6 +120,24 @@
       }
     ],
     "keybindings": [],
+    "chatSkills": [
+      {
+        "path": "./assets/skills/backseat-driver/SKILL.md",
+        "when": "config.calva-backseat-driver.provideBdSkill"
+      },
+      {
+        "path": "./assets/skills/editing-clojure-files/SKILL.md",
+        "when": "config.calva-backseat-driver.provideEditSkill"
+      }
+    ],
+    "chatInstructions": [
+      {
+        "path": "./assets/instructions/editing-clojure-files.instructions.md"
+      },
+      {
+        "path": "./assets/instructions/backseat-driver.instructions.md"
+      }
+    ],
     "languageModelTools": [
       {
         "name": "clojure_evaluate_code",
@@ -120,7 +150,7 @@
         ],
         "toolReferenceName": "clojure-eval",
         "displayName": "Evaluate Clojure Code",
-        "modelDescription": "**Evaluate Clojure Code** using Calva's REPL connection. Enables AI Interactive Programming. Use this to make sure your edits work as you advertise, before applying them. The REPL holds the truth!\n\n## Code Indentation Before REPL Evaluation\n\n**Always ensure Clojure code is properly indented before evaluating it in the REPL.** Proper indentation is essential for the bracket balancer and other tooling to work correctly.\n\n### Essential Rule:\n- **Indent code properly** - Align nested forms with consistent indentation before evaluation\n\n### Pattern:\n```clojure\n;; ❌ Poor indentation - will cause issues\n(defn my-function [x]\n  {:foo 1\n  :bar 2}) ; `:bar` is not properly “inside” the enclosing map\n\n;; ✅ Proper indentation - ready for evaluation\n(defn my-function [x]\n  {:foo 1\n   :bar 2}) ; `:bar` is properly “inside” the enclosing map\n```\n\n## Evaluating ClojureScript code?\n* remember to use the `\"cljs\"` `replSessionKey`\n* The user namespace is probably/often `cljs.user`\n* `js-keys` is a handy function to explore JS objects with\n",
+        "modelDescription": "**Evaluate Clojure Code** using Calva's REPL connection. \"Use the REPL\" means this tool. In a Joyride context use `joyride_evaluate_code` instead of this tool.\n\nResult may include `otherWhosSinceLast` — other evaluators active since your last call. Use `description` instead of line comments in the code you are evaluating, for explaining the purpose of the evaluation, or to help yourself think.\n\nIndent code properly before evaluation (agents often get maps misaligned).\n\nAlways load the `backseat-driver` skill when using this tool.",
         "userDescription": "Evaluate Clojure or ClojureScript code in the connected REPL.",
         "canBeReferencedInPrompt": true,
         "icon": "$(terminal-bash)",
@@ -137,13 +167,22 @@
             },
             "replSessionKey": {
               "type": "string",
-              "description": "The Calva REPL session to evaluate the code via. If there is a `list_sessions` tool, use it to discover available sessions, lin lieu of that tool use the most appropriate of `clj` or `cljs`."
+              "description": "The Calva REPL session to evaluate the code via. Use the `list_sessions` tool to discover available sessions."
+            },
+            "who": {
+              "type": "string",
+              "description": "A short, stable kebab-case slug identifying you as an evaluator. Think about what the session is about and what your role is in it, then sluggify that role and use it for `who`. Reuse the same slug across all evaluations in a session."
+            },
+            "description": {
+              "type": "string",
+              "description": "Succinct human-readable note explaining what you are evaluating and why. Shows up in the repl output tool's log, and is also in the human's output view. Use this *instead* of line comments in the code you are evaluating."
             }
           },
           "required": [
             "code",
             "namespace",
-            "replSessionKey"
+            "replSessionKey",
+            "who"
           ]
         }
       },
@@ -180,7 +219,7 @@
         ],
         "toolReferenceName": "clojure-symbol",
         "displayName": "Clojure Symbol Info",
-        "modelDescription": "**Clojure Symbol Info** gets you detailed information about a Clojure symbol from the connected REPL.",
+        "modelDescription": "**Clojure Symbol Info** gets you detailed information about a Clojure symbol from the connected REPL. For ClojureDocs examples and see-alsos, use `clojuredocs_info` instead.",
         "userDescription": "**Clojure Symbol Info** looks up documentation for a Clojure symbol.",
         "canBeReferencedInPrompt": true,
         "icon": "$(tag)",
@@ -219,7 +258,7 @@
         ],
         "toolReferenceName": "clojuredocs",
         "displayName": "clojuredocs.org Lookup",
-        "modelDescription": "**clojuredocs Lookup** looks up information, examples, see alsos, and more about a Clojure Core symbol from clojuredocs.org.",
+        "modelDescription": "**clojuredocs Lookup** looks up information, examples, see alsos, and more about a Clojure Core symbol from clojuredocs.org. For runtime symbol info from a connected REPL, use `clojure_symbol_info` instead.",
         "userDescription": "Get examples and usage from clojuredocs.org",
         "canBeReferencedInPrompt": true,
         "icon": "$(globe)",
@@ -247,20 +286,25 @@
         ],
         "toolReferenceName": "calva-output",
         "displayName": "Calva REPL Output Log",
-        "modelDescription": "**Calva REPL Output** gets you REPL output messages from the Calva output window. Returns REPL output since `since-line`. Start with since-line=0 and use the last line number from previous output for subsequent calls. This is a window into the running application. Invoke it often as files are edited and/or you evaluate code.",
-        "userDescription": "Read Calva's REPL output log",
+        "modelDescription": "**Calva REPL Output** queries the REPL output log backed by Datascript. Each message is an entity with attributes: `:output/line` (monotonic integer), `:output/category` (`\"evaluationResults\"`, `\"evaluatedCode\"`, `\"evaluationOutput\"`, `\"evaluationErrorOutput\"`, `\"otherOutput\"`, `\"otherErrorOutput\"`), `:output/text`, `:output/who`, `:output/timestamp` (epoch ms), `:output/ns`, `:output/repl-session-key`.\n\n`query`: a Datalog query as EDN string. `inputs` (optional): a JSON array of values for `:in` clause parameters (after `$`, which is supplied automatically). Use `(pull ?e [*])` for all attributes, or `(pull ?e [:output/line :output/text])` for specific ones.\n\nAll messages since line 42: `query: [:find [(pull ?e [*]) ...] :in $ ?since :where [?e :output/line ?l] [(> ?l ?since)]]`, `inputs: [42]`\n\nAlways load the `backseat-driver` skill when using this tool — it has more query examples and usage guidance.",
+        "userDescription": "Query Calva's REPL output log with Datalog",
         "canBeReferencedInPrompt": true,
         "icon": "$(list-ordered)",
         "inputSchema": {
           "type": "object",
           "properties": {
-            "sinceLine": {
-              "type": "integer",
-              "description": "Output line-number after which you want output. Use `0` for your first request of output."
+            "query": {
+              "type": "string",
+              "description": "A Datalog query as an EDN string to run against the REPL output log. The database is passed automatically as the first `:in` argument. Prefer `pull` expressions to select only needed attributes."
+            },
+            "inputs": {
+              "type": "array",
+              "items": {},
+              "description": "A JSON array of values for parameterized queries. These are passed as additional `:in` arguments after `$`. Example: for `:in $ ?who ?since`, pass `[\"copilot\", 42]`."
             }
           },
           "required": [
-            "sinceLine"
+            "query"
           ]
         }
       },
@@ -275,7 +319,7 @@
         ],
         "toolReferenceName": "balance-brackets",
         "displayName": "Bracket Balancer",
-        "modelDescription": "The **Bracket Balancer** AUTHORITATIVELY balances brackets in Clojure code. Always follow these steps when using it:\n\n1. Pass the COMPLETE content of the file or would-be file without any modifications\n2. Use the EXACT output from this tool to replace the ENTIRE file content\n3. NEVER modify the tool's output or analyze its changes",
+        "modelDescription": "The **Bracket Balancer** AUTHORITATIVELY balances brackets in Clojure code. Always follow these steps when using it:\n\n1. Pass the COMPLETE text you want to balance without any modifications\n2. Use the EXACT output from this tool to replace the ENTIRE text you provided.\n\nAlways load the `editing-clojure-files` skill when using this tool.",
         "userDescription": "Balance brackets in Clojure code",
         "canBeReferencedInPrompt": true,
         "icon": "$(bracket-error)",
@@ -302,7 +346,7 @@
         ],
         "toolReferenceName": "replace-top-level-form",
         "displayName": "Edit: Replace Top Level Form",
-        "modelDescription": "This is the **Replace Top Level Form** tool. Use it to modify an existing top level form. To delete a top level form, replace it with an empty string.\n\n**Important**: This tool is **only** for replacing Clojure forms/s-expressions, **one at a time**\n* For editing line comments (`; ...` which are not structural), use the built in edit tool\n\nProcess:\n\n1. Find the top level form you want to replace.\n2. Read the first line of the form and use the text for the `targetLineText` param\n3. Use the 1-based line number for the `line` param\n\n# Editing Clojure files\n\nWe refer to all files of reasonably Clojure-ish type as **Clojure files**, be it Clojure, ClojureScript, Babashka, nbb, Joyride, Jank, you-name-it.\n\nEven as an interactive programmer, now and then you do edit files.\n\n* The structural editing tools attempt to automatically balance brackets before applying edits.\n* The tools return post-edit diagnostics/linting info. Make use of it!\n\nThe specific processes look different depending on if you are creating files, appending forms, inserting forms, or editing existing forms.\n\n## Code Indentation Before REPL Evaluation\n\n**Always ensure that Clojure code is properly indented.** Proper indentation is essential for the structural editing tools to work correctly.\n\n### Essential Rule:\n- **Indent code properly** - Align nested forms with consistent indentation before evaluation\n\n### Pattern:\n```clojure\n;; ❌ Poor indentation - will cause issues\n(defn my-function [x]\n  {:foo 1\n  :bar 2}) ; `:bar` is not properly “inside” the enclosing map\n\n;; ✅ Proper indentation - ready for use with the structural editing tools\n(defn my-function [x]\n  {:foo 1\n   :bar 2}) ; `:bar` is properly “inside” the enclosing map\n```\n\n## When the bracket balance is off\n\nWhen you have a situation where e.g. the problem tool or Clojure compiler complains about missing brackets or anything suggesting the bracket balance is off (probably because you have used non-structural editing tools):\n* Instead of going ahead trying to fix it, **use the tool for requesting human input to ask for guidance/help.**\n\n## About top level forms\n\nThe structural editing tools appends/inserts/replaces top level forms/s-expressions, such as the `ns` form, `def`, `defn`, `def...` forms, and many Rich Comment Forms. Top level form is Calva nomenclature for referring to forms at the root/top level of the Clojure code structure.\n\n**Rich Comment Forms/RCF**: Calva treats forms immediately enclosed within `(comment <like this>)` as top level forms, making them valid targets for the top_level_form editing tools. (The `(comment ... )` form itself is also a top level form, as far as Calva and the tools are concerned.)\n\n## Structural editing process\n\nFollow this process for making safe and working updates:\n\n1. **Always edit whole top level forms** (typically `ns`, `def` and `defn` and such) using the structural editing tools (**Replace Top Level Form** or **Insert Top Level Form** )\n2. Always check with the problem tool what the current linting state is\n3. If you are doing multiple edits to a file: **Plan your edits**, breaking it up in one edit per complete top level form you are editing or inserting. Use the todo list.\n   - **Work from bottom to top of the file** - Because editing tools use line numbers, and edits can shift line numbers of content below them, always apply your edits starting from the lowest line number (bottom of file) and work upward. This keeps your planned line numbers accurate.\n\n     Example: If you plan to edit lines 10, 20, and 30, edit them in this order: line 30 → line 20 → line 10.\n\n     1. For each top level form in your edit plan (starting at the bottom of the file):\n        * Edit the file using the appropriate structural editing tool\n\n    Remember that in Clojure, functions need to be defined before they are called, so during the edits this way, linter complaints about symbols not found are to be expected. When the edit plan is carried out, you should have no new such warnings.\n\n",
+        "modelDescription": "**Replace Top Level Form** — modify or delete (pass empty string) an existing top-level form. One form at a time. For line comments, use the built-in edit tool.\n\nProcess: 1) Read the first line of the target form → `targetLineText`. 2) Use its 1-based line number → `line`. 3) Provide the complete replacement → `newForm`.\n\nYou can replace a top level form with any valid Clojure text, including more than one form.\n\nReturns post-edit diagnostics.\n\nAlways load the `editing-clojure-files` skill when using this tool.",
         "userDescription": "Edit Clojure files by replacing top level forms",
         "canBeReferencedInPrompt": true,
         "icon": "$(edit)",
@@ -344,8 +388,8 @@
         ],
         "toolReferenceName": "insert-top-level-form",
         "displayName": "Edit: Insert Top Level Form",
-        "modelDescription": "This is the **Insert Top Level Form** tool. Use it to insert new forms to a file, the forms will be inserted before an existing, targeted, top level form.\n\n**Important**: This tool is **only** for inserting Clojure forms/s-expressions\n* For inserting line comments (`; ...` which are not structural), use your built in edit tool\n\nProcess:\n\n1. Find the top level form you want to insert code before.\n2. Read the first line of the form and use the text for the `targetLineText` param\n3. Use the 1-based line number for the `line` param\n\n# Editing Clojure files\n\nWe refer to all files of reasonably Clojure-ish type as **Clojure files**, be it Clojure, ClojureScript, Babashka, nbb, Joyride, Jank, you-name-it.\n\nEven as an interactive programmer, now and then you do edit files.\n\n* The structural editing tools attempt to automatically balance brackets before applying edits.\n* The tools return post-edit diagnostics/linting info. Make use of it!\n\nThe specific processes look different depending on if you are creating files, appending forms, inserting forms, or editing existing forms.\n\n## Code Indentation Before REPL Evaluation\n\n**Always ensure that Clojure code is properly indented.** Proper indentation is essential for the structural editing tools to work correctly.\n\n### Essential Rule:\n- **Indent code properly** - Align nested forms with consistent indentation before evaluation\n\n### Pattern:\n```clojure\n;; ❌ Poor indentation - will cause issues\n(defn my-function [x]\n  {:foo 1\n  :bar 2}) ; `:bar` is not properly “inside” the enclosing map\n\n;; ✅ Proper indentation - ready for use with the structural editing tools\n(defn my-function [x]\n  {:foo 1\n   :bar 2}) ; `:bar` is properly “inside” the enclosing map\n```\n\n## When the bracket balance is off\n\nWhen you have a situation where e.g. the problem tool or Clojure compiler complains about missing brackets or anything suggesting the bracket balance is off (probably because you have used non-structural editing tools):\n* Instead of going ahead trying to fix it, **use the tool for requesting human input to ask for guidance/help.**\n\n## About top level forms\n\nThe structural editing tools appends/inserts/replaces top level forms/s-expressions, such as the `ns` form, `def`, `defn`, `def...` forms, and many Rich Comment Forms. Top level form is Calva nomenclature for referring to forms at the root/top level of the Clojure code structure.\n\n**Rich Comment Forms/RCF**: Calva treats forms immediately enclosed within `(comment <like this>)` as top level forms, making them valid targets for the top_level_form editing tools. (The `(comment ... )` form itself is also a top level form, as far as Calva and the tools are concerned.)\n\n## Structural editing process\n\nFollow this process for making safe and working updates:\n\n1. **Always edit whole top level forms** (typically `ns`, `def` and `defn` and such) using the structural editing tools (**Replace Top Level Form** or **Insert Top Level Form** )\n2. Always check with the problem tool what the current linting state is\n3. If you are doing multiple edits to a file: **Plan your edits**, breaking it up in one edit per complete top level form you are editing or inserting. Use the todo list.\n   - **Work from bottom to top of the file** - Because editing tools use line numbers, and edits can shift line numbers of content below them, always apply your edits starting from the lowest line number (bottom of file) and work upward. This keeps your planned line numbers accurate.\n\n     Example: If you plan to edit lines 10, 20, and 30, edit them in this order: line 30 → line 20 → line 10.\n\n     1. For each top level form in your edit plan (starting at the bottom of the file):\n        * Edit the file using the appropriate structural editing tool\n\n    Remember that in Clojure, functions need to be defined before they are called, so during the edits this way, linter complaints about symbols not found are to be expected. When the edit plan is carried out, you should have no new such warnings.\n\n",
-        "userDescription": "Edit Clojure files by replacing top level forms",
+        "modelDescription": "**Insert Top Level Form** — insert new forms before an existing top-level form. For line comments, use the built-in edit tool.\n\nProcess: 1) Find the target form to insert before. 2) Read its first line → `targetLineText`. 3) Use its 1-based line number → `line`. 4) Provide the new form → `newForm`.\n\nYou can insert any valid Clojure code with this tool, including multiple forms.\n\nReturns post-edit diagnostics.\n\nAlways load the `editing-clojure-files` skill when using this tool.",
+        "userDescription": "Edit Clojure files by inserting top level forms",
         "canBeReferencedInPrompt": true,
         "icon": "$(edit)",
         "inputSchema": {
@@ -385,7 +429,7 @@
         ],
         "toolReferenceName": "clojure-create-file",
         "displayName": "Create Clojure File",
-        "modelDescription": "This is the **Create Clojure File** tool. Use it to create a Clojure file. Create the file with all the content you know should go there at the time of creation.\n\n## Clojure Namespace and Filename Convention:\n\n**Important**: In Clojure, namespace names use kebab-case while filenames use snake_case. For example:\n- Namespace: `my.project.multi-word-namespace`\n- Filename: `my/project/multi_word_namespace.clj(s|c)`\n\nAlways convert dashes in namespace names to underscores in the corresponding filename.\n\n## Use structural editing tools\n\nOnce the file is created and you need to append/insert/replace forms in it, use the appropriate structural editing tool for that.\n\n# Editing Clojure files\n\nWe refer to all files of reasonably Clojure-ish type as **Clojure files**, be it Clojure, ClojureScript, Babashka, nbb, Joyride, Jank, you-name-it.\n\nEven as an interactive programmer, now and then you do edit files.\n\n* The structural editing tools attempt to automatically balance brackets before applying edits.\n* The tools return post-edit diagnostics/linting info. Make use of it!\n\nThe specific processes look different depending on if you are creating files, appending forms, inserting forms, or editing existing forms.\n\n## Code Indentation Before REPL Evaluation\n\n**Always ensure that Clojure code is properly indented.** Proper indentation is essential for the structural editing tools to work correctly.\n\n### Essential Rule:\n- **Indent code properly** - Align nested forms with consistent indentation before evaluation\n\n### Pattern:\n```clojure\n;; ❌ Poor indentation - will cause issues\n(defn my-function [x]\n  {:foo 1\n  :bar 2}) ; `:bar` is not properly “inside” the enclosing map\n\n;; ✅ Proper indentation - ready for use with the structural editing tools\n(defn my-function [x]\n  {:foo 1\n   :bar 2}) ; `:bar` is properly “inside” the enclosing map\n```\n",
+        "modelDescription": "**Create Clojure File** — create a new Clojure file with all known content at creation time. Namespace kebab-case → filename snake_case (e.g. `my.multi-word-ns` → `my/multi_word_ns.<extension>`). After creation, use structural editing tools for further changes.\n\nReturns post-edit diagnostics.\n\nAlways load the `editing-clojure-files` skill when using this tool.",
         "userDescription": "Create a new Clojure file",
         "canBeReferencedInPrompt": true,
         "icon": "$(file-add)",
@@ -416,7 +460,7 @@
         ],
         "toolReferenceName": "append-code",
         "displayName": "Append Code",
-        "modelDescription": "This is the **Append Code** tool. Use it to append top level forms at the end of a Clojure file.\n\n# Editing Clojure files\n\nWe refer to all files of reasonably Clojure-ish type as **Clojure files**, be it Clojure, ClojureScript, Babashka, nbb, Joyride, Jank, you-name-it.\n\nEven as an interactive programmer, now and then you do edit files.\n\n* The structural editing tools attempt to automatically balance brackets before applying edits.\n* The tools return post-edit diagnostics/linting info. Make use of it!\n\nThe specific processes look different depending on if you are creating files, appending forms, inserting forms, or editing existing forms.\n\n## Code Indentation Before REPL Evaluation\n\n**Always ensure that Clojure code is properly indented.** Proper indentation is essential for the structural editing tools to work correctly.\n\n### Essential Rule:\n- **Indent code properly** - Align nested forms with consistent indentation before evaluation\n\n### Pattern:\n```clojure\n;; ❌ Poor indentation - will cause issues\n(defn my-function [x]\n  {:foo 1\n  :bar 2}) ; `:bar` is not properly “inside” the enclosing map\n\n;; ✅ Proper indentation - ready for use with the structural editing tools\n(defn my-function [x]\n  {:foo 1\n   :bar 2}) ; `:bar` is properly “inside” the enclosing map\n```\n",
+        "modelDescription": "**Append Code** — append top-level forms at the end of a Clojure file. Returns post-edit diagnostics.\n\nAlways load the `editing-clojure-files` skill when using this tool.",
         "userDescription": "Append code to the end of a Clojure file",
         "canBeReferencedInPrompt": true,
         "icon": "$(add)",
@@ -443,7 +487,7 @@
   "scripts": {
     "clean": "rimraf .cpcache .shadow-cljs/ out/ dist/",
     "preclean": "npm install",
-    "watch": "clojure -Sdeps '{:deps {nrepl/nrepl {:mvn/version,\"1.3.1\"},cider/cider-nrepl {:mvn/version,\"0.52.1\"}}}' -M -m nrepl.cmdline --middleware \"[cider.nrepl/cider-middleware shadow.cljs.devtools.server.nrepl/middleware]\"",
+    "watch": "clojure -Sdeps '{:deps {nrepl/nrepl {:mvn/version,\"1.5.1\"},cider/cider-nrepl {:mvn/version,\"0.58.0\"}}}' -M -m nrepl.cmdline --middleware \"[cider.nrepl/cider-middleware shadow.cljs.devtools.server.nrepl/middleware]\"",
     "test": "node out/extension-tests.js",
     "pretest": "npm run compile",
     "prewatch": "npm run clean",
