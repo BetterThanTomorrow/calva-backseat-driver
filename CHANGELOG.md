@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.29] - 2026-04-22
+
 - Return image data as images to the agent, both from the evaluation and output log tool
 
 ## [v0.0.28] - 2026-04-04
