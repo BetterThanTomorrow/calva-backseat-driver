@@ -341,22 +341,9 @@
                                                          :calva/description description}
                                                         (when ns
                                                           {:calva/ns ns})))]
-              (if-let [{:keys [text images]} (tools/extract-images (.-result result))]
-                (let [modified (js/Object.assign #js {} result #js {:result text})
-                      text-content {:type "text"
-                                    :text (js/JSON.stringify modified)}
-                      image-contents (mapv (fn [{:keys [mime base64]}]
-                                             {:type "image"
-                                              :mimeType mime
-                                              :data base64})
-                                           images)]
-                  {:jsonrpc "2.0"
-                   :id id
-                   :result {:content (into [text-content] image-contents)}})
-                {:jsonrpc "2.0"
-                 :id id
-                 :result {:content [{:type "text"
-                                     :text (js/JSON.stringify result)}]}}))))
+              {:jsonrpc "2.0"
+              :id id
+              :result {:content (tools/mcp-content-with-images result)}})))
 
         (= tool "clojure_list_sessions")
         (p/let [result (calva/list-sessions+ options)]
@@ -393,8 +380,7 @@
                                                  :calva/inputs inputs}))]
           {:jsonrpc "2.0"
            :id id
-           :result {:content [{:type "text"
-                               :text (js/JSON.stringify output)}]}})
+             :result {:content (tools/mcp-content-with-images output)}})
 
         (= tool "clojure_balance_brackets")
         (let [{:keys [text]} arguments

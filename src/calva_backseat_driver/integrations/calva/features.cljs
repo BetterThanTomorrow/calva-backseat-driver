@@ -96,10 +96,10 @@
     (when-not valid?
       (dispatch! [[:app/ax.log :debug "[Server] Code was unbalanced:" code "balanced-code:" balanced-code]]))
     (if-not valid?
-      (p/resolved (clj->js validation))
+      (p/resolved validation)
       (p/let [session-validation (validate-session-key+ repl-session-key)]
         (if-not (:valid? session-validation)
-          (clj->js session-validation)
+          session-validation
           (let [evaluate-new (get-in calva/calva-api [:repl :evaluate])
                 evaluate-old (get-in calva/calva-api [:repl :evaluateCode])]
             (p/let [{:keys [max-length max-depth]} (get-eval-config)
@@ -186,7 +186,7 @@
                                             {:result "nil"
                                              :stderr (pr-str err)
                                              :notes [error-result-note]}))))]
-              (clj->js result))))))))
+              result)))))))
 
 
 (defn get-clojuredocs+ [{:ex/keys [dispatch!]
@@ -211,9 +211,8 @@
 
 (defn query-output [{:ex/keys [dispatch!]
                      :calva/keys [query-edn-str inputs]}]
-  (clj->js
-   (dispatch! [[:app/ax.log :debug "[Server] Querying output log with:" query-edn-str]
-               [:calva/ax.query-output query-edn-str inputs]])))
+  (dispatch! [[:app/ax.log :debug "[Server] Querying output log with:" query-edn-str]
+              [:calva/ax.query-output query-edn-str inputs]]))
 
 (defn exists-on-output? [] (boolean (get-in calva/calva-api [:repl :onOutputLogged])))
 

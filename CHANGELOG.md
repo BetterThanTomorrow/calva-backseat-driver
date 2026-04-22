@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- Return image data as images to the agent, both from the evaluation and output log tool
+
 ## [v0.0.28] - 2026-04-04
 
 - Use Datascript, including datalog for the REPL Output Log tool
