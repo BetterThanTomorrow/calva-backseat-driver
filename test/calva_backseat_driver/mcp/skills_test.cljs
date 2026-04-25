@@ -36,6 +36,7 @@
       (let [result (skills/compose-instructions true test-skills)]
         (is (string? result))
         (is (re-find #"clojure_evaluate_code" result) "mentions REPL eval tool")
+        (is (re-find #"clojure_load_file" result) "mentions load file tool")
         (is (re-find #"resources/list" result) "mentions resources/list")
         (is (re-find #"resources/read" result) "mentions resources/read")
         (is (re-find #"backseat-driver" result) "lists first skill")
@@ -44,6 +45,7 @@
     (testing "repl disabled with skills omits REPL text but lists skills"
       (let [result (skills/compose-instructions false test-skills)]
         (is (nil? (re-find #"clojure_evaluate_code" result)) "no REPL eval mention")
+        (is (nil? (re-find #"clojure_load_file" result)) "no load file mention")
         (is (re-find #"resources/list" result) "still mentions resources/list")
         (is (re-find #"backseat-driver" result) "still lists skills")))
 
