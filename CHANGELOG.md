@@ -4,7 +4,7 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
-- Add `clojure_load_file` tool — loads and evaluates entire Clojure files through Calva's connected REPL (requires Calva >= 2.0.576)
+- [Add `clojure_load_file` tool — loads and evaluates entire Clojure files through Calva's connected REPL (requires Calva >= 2.0.576)](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/28)
 
 ## [v0.0.29] - 2026-04-22
 
