@@ -29,11 +29,13 @@ function init() {
   });
 }
 
-async function main(vsixPathOrLabel, testWorkspace) {
+async function main(vsixPathOrLabel, testWorkspace, calvaVsix) {
   try {
     const extensionTestsPath = path.resolve(__dirname, 'runTests');
     const vscodeExecutablePath = await downloadAndUnzipVSCode('insiders');
     const [cliPath, ...args] = resolveCliArgsFromVSCodeExecutablePath(vscodeExecutablePath);
+
+    const calvaExtension = calvaVsix ? calvaVsix : 'betterthantomorrow.calva';
 
     const launchArgs = [
       testWorkspace,
@@ -48,7 +50,7 @@ async function main(vsixPathOrLabel, testWorkspace) {
       'betterthantomorrow.joyride',
       '--force',
       '--install-extension',
-      'betterthantomorrow.calva',
+      calvaExtension,
       '--force',
     ];
     if (vsixPathOrLabel !== 'extension-development') {
@@ -91,13 +93,14 @@ async function main(vsixPathOrLabel, testWorkspace) {
 
 const args = require('minimist')(process.argv.slice(2));
 const vsix = args['vsix'] ? args['vsix'] : 'extension-development';
+const calvaVsix = args['calva-vsix'] ? path.resolve(args['calva-vsix']) : undefined;
 const testWorkspace = args['test-workspace']
   ? path.resolve(args['test-workspace'])
   : path.resolve(__dirname);
-console.info(`Using:\n  ${vsix}\n  Test workspace: ${testWorkspace}`);
+console.info(`Using:\n  ${vsix}\n  Calva: ${calvaVsix || 'marketplace'}\n  Test workspace: ${testWorkspace}`);
 
 void init()
-  .then(() => main(vsix, testWorkspace))
+  .then(() => main(vsix, testWorkspace, calvaVsix))
   .catch((error) => {
     console.error('Failed to initialize test running environment:', error);
     process.exit(1);
