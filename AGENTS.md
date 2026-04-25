@@ -149,7 +149,8 @@ When making multiple edits, work from highest line number to lowest (line number
 - stdio wrapper (`dist/calva-mcp-server.js`) relays stdio ↔ socket
 - One server per workspace folder
 
-### Skills as MCP Resources
+### Skills and Instructions as Bundled Assets
+- `assets/skills/` and `assets/instructions/` are the canonical source for content bundled with the extension. When updating skill or instruction content, edit these files — not the installed extension copies under `~/.vscode*/extensions/`.
 - Skills declared in `package.json` under `contributes.chatSkills` are exposed as MCP resources
 - Discovery: `resources/list` returns skill name, description, and URI
 - Reading: `resources/read` at `/skills/{name}/SKILL.md` returns full skill content
