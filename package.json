@@ -481,6 +481,38 @@
             "code"
           ]
         }
+      },
+      {
+        "name": "clojure_load_file",
+        "tags": [
+          "clojure",
+          "repl",
+          "load-file",
+          "needs-connected-repl"
+        ],
+        "toolReferenceName": "clojure-load-file",
+        "displayName": "Load Clojure File",
+        "modelDescription": "**Load Clojure File** — loads and evaluates an entire Clojure file through Calva's connected REPL. Equivalent to Calva's Load File command. Returns the string result of the last evaluated form. Requires a connected REPL and Calva >= 2.0.576.",
+        "userDescription": "Load and evaluate a Clojure file in the connected REPL.",
+        "canBeReferencedInPrompt": true,
+        "icon": "$(file-code)",
+        "when": ":calva-backseat-driver/loadFileAvailable",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "filePath": {
+              "type": "string",
+              "description": "The absolute or workspace-relative path to the Clojure file to load and evaluate"
+            },
+            "replSessionKey": {
+              "type": "string",
+              "description": "The REPL session to load the file in (e.g. 'clj', 'cljs'). Without this, Calva uses its default session routing."
+            }
+          },
+          "required": [
+            "filePath"
+          ]
+        }
       }
     ]
   },

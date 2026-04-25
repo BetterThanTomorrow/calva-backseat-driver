@@ -248,10 +248,36 @@
                     #js [(vscode/LanguageModelTextPart.
                           (js/JSON.stringify result))])))})
 
+(defn LoadFileTool [dispatch!]
+  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
+                            (let [file-path (-> options .-input .-filePath)
+                                  session-key (-> options .-input .-replSessionKey)
+                                  message (str "Load file: " file-path
+                                               (when session-key (str " in **" session-key "** REPL")))]
+                              #js {:invocationMessage "Loading file"
+                                   :confirmationMessages #js {:title "Load Clojure File"
+                                                              :message message}}))
+
+       :invoke (fn invoke [^js options _token]
+                 (p/let [file-path (-> options .-input .-filePath)
+                         session-key (-> options .-input .-replSessionKey)
+                         result (calva/load-file+ {:ex/dispatch! dispatch!
+                                                   :calva/file-path file-path
+                                                   :calva/repl-session-key session-key})]
+                   (if (:error result)
+                     (vscode/LanguageModelToolResult.
+                      #js [(vscode/LanguageModelTextPart.
+                            (js/JSON.stringify (clj->js {:error (:error result)})))])
+                     (vscode/LanguageModelToolResult.
+                      #js [(vscode/LanguageModelTextPart.
+                            (js/JSON.stringify (clj->js result)))]))))})
+
 (defn register-language-model-tools [dispatch!]
   ;; Set context for conditional tool visibility in UI
   (dispatch! [[:app/ax.set-when-context :calva-backseat-driver/listSessionsAvailable
-               (calva/exists-list-sessions?)]])
+               (calva/exists-list-sessions?)]
+              [:app/ax.set-when-context :calva-backseat-driver/loadFileAvailable
+               (calva/exists-load-file?)]])
   (cond-> []
     :always
     (conj (vscode/lm.registerTool
@@ -301,4 +327,9 @@
     :always
     (conj (vscode/lm.registerTool
            "clojure_append_code"
-           (#'AppendCodeTool dispatch!)))))
+           (#'AppendCodeTool dispatch!)))
+
+    (calva/exists-load-file?)
+    (conj (vscode/lm.registerTool
+           "clojure_load_file"
+           (#'LoadFileTool dispatch!)))))

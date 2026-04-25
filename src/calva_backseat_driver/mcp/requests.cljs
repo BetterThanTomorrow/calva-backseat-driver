@@ -190,6 +190,19 @@
                    :audience ["user" "assistant"]
                    :priority 7}}))
 
+(def load-file-tool-listing
+  (let [tool-name "clojure_load_file"]
+    {:name tool-name
+     :description (tool-description tool-name)
+     :inputSchema {:type "object"
+                   :properties {"filePath" {:type "string"
+                                            :description (param-description tool-name "filePath")}
+                                "replSessionKey" {:type "string"
+                                                  :description (param-description tool-name "replSessionKey")}}
+                   :required ["filePath"]
+                   :audience ["user" "assistant"]
+                   :priority 8}}))
+
 (defn- skill-manifests []
   (try
     (let [extension (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver")]
@@ -286,7 +299,10 @@
                                       (conj structural-create-file-tool-listing)
 
                                       true
-                                      (conj append-code-tool-listing))}}]
+                                      (conj append-code-tool-listing)
+
+                                      (and (= true repl-enabled?) (calva/exists-load-file?))
+                                      (conj load-file-tool-listing))}}]
       response)
 
     (= method "resources/list")
@@ -434,6 +450,21 @@
            :id id
            :result {:content [{:type "text"
                                :text (js/JSON.stringify (clj->js result))}]}})
+
+        (and (= tool "clojure_load_file")
+             (= true repl-enabled?))
+        (p/let [{:keys [filePath replSessionKey]} arguments
+                result (calva/load-file+ (merge options
+                                                {:calva/file-path filePath
+                                                 :calva/repl-session-key replSessionKey}))]
+          {:jsonrpc "2.0"
+           :id id
+           :result (if (:error result)
+                     {:content [{:type "text"
+                                 :text (js/JSON.stringify (clj->js {:error (:error result)}))}]
+                      :isError true}
+                     {:content [{:type "text"
+                                 :text (js/JSON.stringify (clj->js result))}]})})
 
         :else
         {:jsonrpc "2.0"
