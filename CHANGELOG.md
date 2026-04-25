@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- Add `clojure_load_file` tool — loads and evaluates entire Clojure files through Calva's connected REPL (requires Calva >= 2.0.576)
+
 ## [v0.0.29] - 2026-04-22
 
 - Return image data as images to the agent, both from the evaluation and output log tool

@@ -22,6 +22,7 @@ This extension exposes the AI tools both to Copilot directly, using the VS Code 
 * Tool: **Replace Top Level Form** Structural editing, including formatting, bracket balancing and linting
 * Tool: **Insert Top Level Form** Structural editing, including formatting, bracket balancing and linting
 * Tool: **Bracket Balancer** Helps the model get the bracket balance right (powered by [Parinfer](https://github.com/parinfer/parinfer.js))
+* Tool: **Load File** Load/evaluate an entire Clojure file through Calva's connected REPL
 * Tool: **Symbol info lookup**, the AI can look up symbols it is interested in, and will get doc strings, argument info etcetera
 * Tool: **clojuredocs.org lookup**, docs, examples, and *see also* information on Clojure core-ish symbols
 * Resource: **Symbol info lookup**, (a bit experimental) same as the tool

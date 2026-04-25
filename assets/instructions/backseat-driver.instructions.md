@@ -8,9 +8,9 @@ The term Clojure is used to cover all Clojure dialects and runtimes — Clojure,
 
 "Use the REPL" means `clojure_evaluate_code`. This is the primary tool for Clojure Interactive Programming.
 
-Backseat Driver provides 10 tools in two groups:
+Backseat Driver provides 11 tools in two groups:
 
-**REPL Exploration & Understanding**: `clojure_evaluate_code`, `clojure_list_sessions`, `clojure_repl_output_log`, `clojure_symbol_info`, `clojuredocs_info`
+**REPL Exploration & Understanding**: `clojure_evaluate_code`, `clojure_load_file`, `clojure_list_sessions`, `clojure_repl_output_log`, `clojure_symbol_info`, `clojuredocs_info`
 
 **Structural Editing**: `clojure_create_file`, `clojure_append_code`, `replace_top_level_form`, `insert_top_level_form`, `clojure_balance_brackets`
 

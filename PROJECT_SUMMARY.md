@@ -8,9 +8,9 @@ Calva Backseat Driver (v0.0.27) is a VS Code extension that transforms AI coding
 
 ## Key Features
 
-### 10 Tools (VS Code Language Model API + MCP)
+### 11 Tools (VS Code Language Model API + MCP)
 
-**REPL Exploration & Understanding**: `clojure_evaluate_code` (opt-in for MCP), `clojure_list_sessions`, `clojure_repl_output_log`, `clojure_symbol_info`, `clojuredocs_info`
+**REPL Exploration & Understanding**: `clojure_evaluate_code` (opt-in for MCP, enabled by default for Copilot), `clojure_load_file` (requires Calva >= 2.0.576), `clojure_list_sessions`, `clojure_repl_output_log`, `clojure_symbol_info`, `clojuredocs_info`
 
 **Structural Editing**: `clojure_create_file`, `clojure_append_code`, `replace_top_level_form`, `insert_top_level_form`, `clojure_balance_brackets`
 

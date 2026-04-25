@@ -107,7 +107,7 @@ Verification is mandatory after every edit:
 1. **Check problems first** — review current diagnostics; fix existing compilation problems before introducing new edits
 2. **Edit the file** — use the structural tool with REPL-verified code
 3. **Check diagnostics** — read post-edit linting info; act on unexpected problems before the next edit
-4. **Reload** — `(require 'the.namespace :reload)` to confirm the file loads cleanly
+4. **Reload** — `clojure_load_file` to load the file, or `(require 'the.namespace :reload)` to confirm the file loads cleanly
 
 In a hot-reload environment, the REPL output log shows compile errors and warnings immediately after the edit. Read and act on them before proceeding.
 

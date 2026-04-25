@@ -1,6 +1,6 @@
 ---
 name: backseat-driver
-description: 'Effective use of the Backseat Driver extension and its tools for Clojure interactive programming. Use when: working in Clojure (including all dialects and runtimes) project, be it reading, planning, developing, or evaluating code in the REPL, looking up function documentation or ClojureDocs examples, choosing REPL sessions, editing Clojure files structurally, checking REPL output, planning implementations, reviewing code, or developing solutions incrementally. Whenever you consider any of these tools: clojure_evaluate_code, clojuredocs_info, clojure_list_sessions, clojure_symbol_info, clojure_repl_output_log, replace_top_level_form, insert_top_level_form, clojure_append_code, clojure_create_file, clojure_balance_brackets. Also use this skill when PLANNING or DISCUSSING Clojure development approaches — not only at the moment of REPL evaluation.'
+description: 'Effective use of the Backseat Driver extension and its tools for Clojure interactive programming. Use when: working in Clojure (including all dialects and runtimes) project, be it reading, planning, developing, or evaluating code in the REPL, looking up function documentation or ClojureDocs examples, choosing REPL sessions, editing Clojure files structurally, checking REPL output, planning implementations, reviewing code, or developing solutions incrementally. Whenever you consider any of these tools: clojure_evaluate_code, clojure_load_file, clojuredocs_info, clojure_list_sessions, clojure_symbol_info, clojure_repl_output_log, replace_top_level_form, insert_top_level_form, clojure_append_code, clojure_create_file, clojure_balance_brackets. Also use this skill when PLANNING or DISCUSSING Clojure development approaches — not only at the moment of REPL evaluation.'
 ---
 
 # Backseat Driver — Effective Tool Usage
@@ -36,7 +36,7 @@ Every task — implementing, debugging, planning, reviewing — follows this loo
 3. EXPLORE   → clojure_evaluate_code (test ideas in the REPL)
 4. BUILD UP  → clojure_evaluate_code (compose verified pieces)
 5. APPLY     → structural editing tools (edit files with verified code — check returned linter diagnostics)
-6. VERIFY    → clojure_evaluate_code (load namespace, call functions) + get_errors (Problems report)
+6. VERIFY    → clojure_load_file / clojure_evaluate_code (load file or namespace, call functions) + get_errors (Problems report)
 7. MONITOR   → clojure_repl_output_log (side effects, errors) + get_errors (new warnings/errors)
 
 Not every task needs all steps. A planner might stop at step 4. A reviewer might focus on steps 1-3. But the sequence is always orient → research → explore.
