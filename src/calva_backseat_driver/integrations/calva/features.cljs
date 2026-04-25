@@ -3,6 +3,7 @@
    ["vscode" :as vscode]
    [calva-backseat-driver.integrations.calva.api :as calva]
    [calva-backseat-driver.integrations.calva.editor :as editor]
+   [calva-backseat-driver.integrations.calva.version :as version]
    [calva-backseat-driver.integrations.parinfer :as parinfer]
    [clojure.string :as string]
    [promesa.core :as p]))
@@ -219,26 +220,10 @@
 ;; Version-gated features
 
 (defn calva-version-at-least?
-  "Returns true if the installed Calva version is >= the given version string.
-   Parses major.minor.patch, extracting leading digits from each segment
-   to handle prerelease suffixes like 2.0.576-3182-..."
+  "Returns true if the installed Calva version is >= the given version string."
   [min-version]
-  (let [parse-segment (fn [s] (some-> (re-find #"^\d+" s) js/parseInt))
-        parse-version (fn [v]
-                        (when v
-                          (let [parts (string/split v #"\.")]
-                            (mapv parse-segment (take 3 parts)))))
-        installed (parse-version (calva/calva-version))
-        required (parse-version min-version)]
-    (and (some? installed)
-         (some? required)
-         (let [[i-major i-minor i-patch] installed
-               [r-major r-minor r-patch] required]
-           (or (> i-major r-major)
-               (and (= i-major r-major)
-                    (or (> i-minor r-minor)
-                        (and (= i-minor r-minor)
-                             (>= i-patch r-patch)))))))))
+  (version/version>= (version/parse-version (calva/calva-version))
+                     (version/parse-version min-version)))
 
 (defn exists-load-file?
   "Returns true if the connected Calva supports calva.loadFile with a path argument (> 2.0.575)"
@@ -249,12 +234,13 @@
   "Loads/evaluates a Clojure file through Calva's connected REPL.
    Returns a promise resolving to the string result of the last evaluated form."
   [{:ex/keys [dispatch!]
-    :calva/keys [file-path repl-session-key]}]
+    :calva/keys [file-path repl-session-key who]}]
   (dispatch! [[:app/ax.log :debug "[Server] Loading file:" file-path]])
   (-> (p/let [result (vscode/commands.executeCommand
                       "calva.loadFile"
                       (cond-> #js {:path file-path :silent true}
-                        repl-session-key (doto (aset "sessionKey" repl-session-key))))]
+                        repl-session-key (doto (aset "sessionKey" repl-session-key))
+                        who (doto (aset "who" who))))]
         {:result (or result "nil")})
       (p/catch (fn [err]
                  (dispatch! [[:app/ax.log :debug "[Server] Load file failed:" err]])

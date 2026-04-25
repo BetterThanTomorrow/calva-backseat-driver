@@ -95,16 +95,17 @@
         (throw (ex-info "E2E tests failed" {:babashka/exit exit-code}))))))
 
 #_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
-(defn run-e2e-tests-with-vsix! [{:keys [vsix]}]
+(defn run-e2e-tests-with-vsix! [{:keys [vsix calva-vsix]}]
   (println "Running end-to-end tests using vsix:" vsix)
-  (util/shell false "node" "./e2e-test-ws/launch.js" (str "--vsix=" vsix)))
+  (apply util/shell false "node" "./e2e-test-ws/launch.js" (str "--vsix=" vsix)
+         (when calva-vsix [(str "--calva-vsix=" calva-vsix)])))
 
 (defn- prepare-tmp-test-workspace! []
   (println "Preparing temporary test workspace...")
   (when (fs/exists? e2e-tmp-dir)
     (fs/delete-tree e2e-tmp-dir))
   (fs/create-dirs e2e-tmp-dir)
-  (doseq [item [".joyride" ".vscode" "deps.edn"]]
+  (doseq [item [".joyride" ".vscode" "deps.edn" "test_load_target.clj"]]
     (let [src (fs/path e2e-test-ws-dir item)]
       (if (fs/directory? src)
         (fs/copy-tree src (fs/path e2e-tmp-dir item))
@@ -112,13 +113,14 @@
   e2e-tmp-dir)
 
 #_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
-(defn run-e2e-tests-from-working-dir! [{:keys [is-ci]}]
+(defn run-e2e-tests-from-working-dir! [{:keys [is-ci calva-vsix]}]
   (println "Running end-to-end tests using working directory")
   (if is-ci
     (util/shell false "node" "./e2e-test-ws/launch.js")
     (let [tmp-ws (prepare-tmp-test-workspace!)]
       (println "Using temporary test workspace:" tmp-ws)
-      (run-e2e-launch! (str "--test-workspace=" tmp-ws)))))
+      (apply run-e2e-launch! (str "--test-workspace=" tmp-ws)
+             (when calva-vsix [(str "--calva-vsix=" calva-vsix)])))))
 
 #_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
 (defn package-pre-release! [{:keys [slug dry]}]

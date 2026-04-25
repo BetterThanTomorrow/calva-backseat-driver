@@ -9,7 +9,7 @@
 		"calva.replConnectSequences": [
 			{
 				"name": "Mini Clojure Project",
-				"autoSelectForConnect": true,
+				// "autoSelectForConnect": true,
 				"projectRootPath": [
 					"."
 				],

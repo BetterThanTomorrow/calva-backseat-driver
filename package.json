@@ -507,10 +507,16 @@
             "replSessionKey": {
               "type": "string",
               "description": "The REPL session to load the file in (e.g. 'clj', 'cljs'). Without this, Calva uses its default session routing."
+            },
+            "who": {
+              "type": "string",
+              "description": "A short, stable kebab-case slug identifying you as an evaluator. Think about what the session is about and what your role is in it, then sluggify that role and use it for `who`. Reuse the same slug across all evaluations in a session."
             }
           },
           "required": [
-            "filePath"
+            "filePath",
+            "replSessionKey",
+            "who"
           ]
         }
       }

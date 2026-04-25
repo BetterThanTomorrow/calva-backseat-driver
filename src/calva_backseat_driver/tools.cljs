@@ -252,26 +252,33 @@
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
                             (let [file-path (-> options .-input .-filePath)
                                   session-key (-> options .-input .-replSessionKey)
+                                  who (-> options .-input .-who)
                                   message (str "Load file: " file-path
                                                (when session-key (str " in **" session-key "** REPL")))]
                               #js {:invocationMessage "Loading file"
-                                   :confirmationMessages #js {:title "Load Clojure File"
+                                   :confirmationMessages #js {:title (str "Load file as **" (or who "unknown") "**")
                                                               :message message}}))
 
        :invoke (fn invoke [^js options _token]
-                 (p/let [file-path (-> options .-input .-filePath)
-                         session-key (-> options .-input .-replSessionKey)
-                         result (calva/load-file+ {:ex/dispatch! dispatch!
-                                                   :calva/file-path file-path
-                                                   :calva/repl-session-key session-key})]
-                   (if (:error result)
-                     (vscode/LanguageModelToolResult.
-                      #js [(vscode/LanguageModelTextPart.
-                            (js/JSON.stringify (clj->js {:error (:error result)})))])
-                     (vscode/LanguageModelToolResult.
-                      #js [(vscode/LanguageModelTextPart.
-                            (js/JSON.stringify (clj->js result)))]))))})
-
+                 (let [who (-> options .-input .-who)]
+                   (if-let [who-error (calva/validate-who who)]
+                     (p/resolved
+                      (vscode/LanguageModelToolResult.
+                       #js [(vscode/LanguageModelTextPart.
+                             (js/JSON.stringify (clj->js {:error who-error})))]))
+                     (p/let [file-path (-> options .-input .-filePath)
+                             session-key (-> options .-input .-replSessionKey)
+                             result (calva/load-file+ {:ex/dispatch! dispatch!
+                                                       :calva/file-path file-path
+                                                       :calva/repl-session-key session-key
+                                                       :calva/who who})]
+                       (if (:error result)
+                         (vscode/LanguageModelToolResult.
+                          #js [(vscode/LanguageModelTextPart.
+                                (js/JSON.stringify (clj->js {:error (:error result)})))])
+                         (vscode/LanguageModelToolResult.
+                          #js [(vscode/LanguageModelTextPart.
+                                (js/JSON.stringify (clj->js result)))]))))))})
 (defn register-language-model-tools [dispatch!]
   ;; Set context for conditional tool visibility in UI
   (dispatch! [[:app/ax.set-when-context :calva-backseat-driver/listSessionsAvailable

@@ -1,6 +1,6 @@
 ---
 name: backseat-driver-testing
-description: 'Testing strategies for Calva Backseat Driver MCP tools. Use when: Testing Backseat Driver, validating tool updates, testing structural editing workflows, verifying REPL evaluation with who-tracking, testing output log filtering, smoke testing after dep bumps, or debugging tool behavior. Covers all Backseat Driver tool categories: structural editing, REPL eval, symbol info, bracket balancing, and output log.'
+description: 'Testing strategies for Calva Backseat Driver MCP tools. Use when: Testing Backseat Driver, validating tool updates, testing structural editing workflows, verifying REPL evaluation with who-tracking, testing output log filtering, testing load-file tool, smoke testing after dep bumps, or debugging tool behavior. Covers all Backseat Driver tool categories: structural editing, REPL eval, load file, symbol info, bracket balancing, and output log.'
 ---
 
 # Backseat Driver Testing Skill
@@ -25,6 +25,7 @@ Match the user's request to the relevant section(s). When asked to "run a full t
 **Section index** — each section lists its own prerequisites:
 - **REPL Session Listing** — no prerequisites
 - **REPL Evaluation** — requires session listing first
+- **Load File** — requires session listing first
 - **Structural Editing** — requires session listing first
 - **Output Log Queries** — requires some prior REPL evaluations to have populated the log
 - **Symbol Info and ClojureDocs** — requires session listing first
@@ -37,7 +38,7 @@ The `bd-tester` agent is a purpose-built subagent for Backseat Driver testing. I
 - **Parallel who-tracking**: Launch 3+ `bd-tester` instances simultaneously with distinct `who` slugs
 - **Full-suite parallelization**: After running REPL Session Listing yourself, delegate independent sections to parallel `bd-tester` subagents. Sections with no cross-dependencies can run simultaneously:
   - Group A (independent): Bracket Balancer, Symbol Info / ClojureDocs
-  - Group B (needs evals first): REPL Evaluation, then Output Log Queries
+  - Group B (needs evals first): REPL Evaluation, Load File, then Output Log Queries
   - Group C (needs evals first): Structural Editing
 
 When delegating, pass the specific section name, any prerequisite results (e.g., available session keys), and the success criteria from this skill. The `bd-tester` agent handles skill loading and reporting internally.
@@ -156,6 +157,33 @@ Use distinct slugs: `"parallel-a"`, `"parallel-b"`, `"parallel-c"`, etc.
         [?e :output/category "evaluationResults"]]
 ```
 Verify all three slugs appear with expected counts. At least some subagents should have reported non-empty `other-whos-since-last` arrays — confirming the REPL saw concurrent evaluators.
+
+## Load File
+
+Prerequisites: REPL Session Listing (to discover available sessions).
+
+The `clojure_load_file` tool loads and evaluates an entire Clojure file through Calva's connected REPL. It requires Calva >= 2.0.576 and is version-gated — the tool only appears when the version check passes.
+
+**Required parameters**:
+- `filePath`: Absolute or workspace-relative path to the Clojure file
+- `replSessionKey`: REPL session to load the file in (e.g., `"clj"`, `"bb"`)
+- `who`: Evaluator identity slug (e.g., `"smoke-tester"`)
+
+**Response fields to verify**:
+- `result`: String result of the last evaluated form in the file
+- `error`: Error message (on failure)
+
+**Test steps**:
+
+1. **Load file in clj session**: Call `clojure_load_file` with a file containing a namespace and definitions (e.g., a file whose last form evaluates to a known value). Provide `replSessionKey: "clj"`. Verify `result` matches the expected last-form value.
+
+2. **Load file in bb session** (when bb REPL connected): Call `clojure_load_file` with a simple file via `replSessionKey: "bb"`. Verify `result` is returned correctly.
+
+3. **Post-load usability**: After loading, evaluate a function from the loaded namespace via `clojure_evaluate_code`. Verify the function is callable and returns the expected result.
+
+4. **Missing file**: Call `clojure_load_file` with a non-existent file path. Verify the response contains an `error` field with a clear message about the missing file.
+
+5. **Who attribution**: After a load-file call, check `other-whos-since-last` on the next `clojure_evaluate_code` call. Load-file participates in who-tracking via the `who` parameter — verify that load-file does **not** leak a `"ui"` evaluator into `other-whos-since-last`.
 
 ## Structural Editing Tools
 
@@ -396,6 +424,8 @@ When reporting results, cover only the sections that were tested.
 **Symbol Info / ClojureDocs**: Docstrings, arglists, examples, and see-alsos returned.
 
 **Bracket Balancer**: Balanced code recognized, unbalanced code auto-fixed, malformed code produces clear error.
+
+**Load File**: File loads successfully in clj and bb sessions. Default routing works without explicit session key. Post-load functions are callable. Missing file produces clear error. Who attribution behavior is documented.
 
 **Legacy Calva**: Graceful degradation — informative feedback, no crashes.
 

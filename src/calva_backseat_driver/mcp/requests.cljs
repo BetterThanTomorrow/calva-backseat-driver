@@ -198,8 +198,10 @@
                    :properties {"filePath" {:type "string"
                                             :description (param-description tool-name "filePath")}
                                 "replSessionKey" {:type "string"
-                                                  :description (param-description tool-name "replSessionKey")}}
-                   :required ["filePath"]
+                                                  :description (param-description tool-name "replSessionKey")}
+                                "who" {:type "string"
+                                       :description (param-description tool-name "who")}}
+                   :required ["filePath" "replSessionKey" "who"]
                    :audience ["user" "assistant"]
                    :priority 8}}))
 
@@ -453,18 +455,34 @@
 
         (and (= tool "clojure_load_file")
              (= true repl-enabled?))
-        (p/let [{:keys [filePath replSessionKey]} arguments
-                result (calva/load-file+ (merge options
-                                                {:calva/file-path filePath
-                                                 :calva/repl-session-key replSessionKey}))]
-          {:jsonrpc "2.0"
-           :id id
-           :result (if (:error result)
-                     {:content [{:type "text"
-                                 :text (js/JSON.stringify (clj->js {:error (:error result)}))}]
-                      :isError true}
-                     {:content [{:type "text"
-                                 :text (js/JSON.stringify (clj->js result))}]})})
+        (let [{:keys [filePath replSessionKey who]} arguments
+              who-error (calva/validate-who who)]
+          (cond
+            (or (nil? replSessionKey) (and (string? replSessionKey) (string/blank? replSessionKey)))
+            {:jsonrpc "2.0"
+             :id id
+             :result {:content [{:type "text"
+                                 :text (js/JSON.stringify (clj->js {:error "The `replSessionKey` parameter is required. Use `clojure_list_sessions` to discover available sessions."}))}]}}
+
+            who-error
+            {:jsonrpc "2.0"
+             :id id
+             :result {:content [{:type "text"
+                                 :text (js/JSON.stringify (clj->js {:error who-error}))}]}}
+
+            :else
+            (p/let [result (calva/load-file+ (merge options
+                                                    {:calva/file-path filePath
+                                                     :calva/repl-session-key replSessionKey
+                                                     :calva/who who}))]
+              {:jsonrpc "2.0"
+               :id id
+               :result (if (:error result)
+                         {:content [{:type "text"
+                                     :text (js/JSON.stringify (clj->js {:error (:error result)}))}]
+                          :isError true}
+                         {:content [{:type "text"
+                                     :text (js/JSON.stringify (clj->js result))}]})})))
 
         :else
         {:jsonrpc "2.0"

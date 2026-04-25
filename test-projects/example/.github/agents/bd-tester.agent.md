@@ -2,7 +2,6 @@
 name: bd-tester
 description: Testing Backseat Driver tools. Use when: You want to delegate some part of testing to a subagent.
 argument-hint: A specific test task to execute and report results on.
-tools: [vscode/memory, vscode/askQuestions, read/problems, read/readFile, edit/createDirectory, edit/rename, search, betterthantomorrow.calva-backseat-driver/clojure-eval, betterthantomorrow.calva-backseat-driver/list-sessions, betterthantomorrow.calva-backseat-driver/clojure-symbol, betterthantomorrow.calva-backseat-driver/clojuredocs, betterthantomorrow.calva-backseat-driver/calva-output, betterthantomorrow.calva-backseat-driver/balance-brackets, betterthantomorrow.calva-backseat-driver/replace-top-level-form, betterthantomorrow.calva-backseat-driver/insert-top-level-form, betterthantomorrow.calva-backseat-driver/clojure-create-file, betterthantomorrow.calva-backseat-driver/append-code, todo]
 model: Auto (copilot)
 ---
 
