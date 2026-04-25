@@ -9,6 +9,11 @@
                    .-v1
                    (js->clj :keywordize-keys true)))
 
+(defn calva-version
+  "Returns Calva's installed version string, or nil if unavailable."
+  []
+  (some-> calvaExt .-packageJSON .-version))
+
 (defn when-calva-activated [{:ex/keys [dispatch! then]}]
   (let [!interval-id (atom nil)]
     (reset! !interval-id (js/setInterval (fn []

@@ -216,6 +216,50 @@
 
 (defn exists-on-output? [] (boolean (get-in calva/calva-api [:repl :onOutputLogged])))
 
+;; Version-gated features
+
+(defn calva-version-at-least?
+  "Returns true if the installed Calva version is >= the given version string.
+   Parses major.minor.patch, extracting leading digits from each segment
+   to handle prerelease suffixes like 2.0.576-3182-..."
+  [min-version]
+  (let [parse-segment (fn [s] (some-> (re-find #"^\d+" s) js/parseInt))
+        parse-version (fn [v]
+                        (when v
+                          (let [parts (string/split v #"\.")]
+                            (mapv parse-segment (take 3 parts)))))
+        installed (parse-version (calva/calva-version))
+        required (parse-version min-version)]
+    (and (some? installed)
+         (some? required)
+         (let [[i-major i-minor i-patch] installed
+               [r-major r-minor r-patch] required]
+           (or (> i-major r-major)
+               (and (= i-major r-major)
+                    (or (> i-minor r-minor)
+                        (and (= i-minor r-minor)
+                             (>= i-patch r-patch)))))))))
+
+(defn exists-load-file?
+  "Returns true if the connected Calva supports calva.loadFile with a path argument (> 2.0.575)"
+  []
+  (calva-version-at-least? "2.0.576"))
+
+(defn load-file+
+  "Loads/evaluates a Clojure file through Calva's connected REPL.
+   Returns a promise resolving to the string result of the last evaluated form."
+  [{:ex/keys [dispatch!]
+    :calva/keys [file-path repl-session-key]}]
+  (dispatch! [[:app/ax.log :debug "[Server] Loading file:" file-path]])
+  (-> (p/let [result (vscode/commands.executeCommand
+                      "calva.loadFile"
+                      (cond-> #js {:path file-path :silent true}
+                        repl-session-key (doto (aset "sessionKey" repl-session-key))))]
+        {:result (or result "nil")})
+      (p/catch (fn [err]
+                 (dispatch! [[:app/ax.log :debug "[Server] Load file failed:" err]])
+                 {:error (.-message err)}))))
+
 (defn- get-editor-config []
   (let [config (vscode/workspace.getConfiguration "calva-backseat-driver.editor")]
     {:search-padding (.get config "fuzzyLineTargetingPadding")
