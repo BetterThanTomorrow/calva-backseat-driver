@@ -65,7 +65,9 @@
                                 "who" {:type "string"
                                        :description (param-description tool-name "who")}
                                 "description" {:type "string"
-                                               :description (param-description tool-name "description")}}
+                                               :description (param-description tool-name "description")}
+                                "maxImages" {:type "number"
+                                             :description (param-description tool-name "maxImages")}}
                    :required ["code" "namespace" "replSessionKey" "who"]
                    :audience ["user" "assistant"]
                    :priority 9}}))
@@ -103,7 +105,9 @@
                    :properties {"query" {:type "string"
                                          :description (param-description tool-name "query")}
                                 "inputs" {:type "string"
-                                          :description (param-description tool-name "inputs")}}
+                                          :description (param-description tool-name "inputs")}
+                                "maxImages" {:type "number"
+                                             :description (param-description tool-name "maxImages")}}
                    :required ["query"]
                    :audience ["user" "assistant"]
                    :priority 10}}))
@@ -344,7 +348,7 @@
       (cond
         (and (= tool "clojure_evaluate_code")
              (= true repl-enabled?))
-        (let [{:keys [code replSessionKey who description]
+        (let [{:keys [code replSessionKey who description maxImages]
                ns :namespace} arguments
               who-error (calva/validate-who who)]
           (if who-error
@@ -361,7 +365,7 @@
                                                           {:calva/ns ns})))]
               {:jsonrpc "2.0"
                :id id
-               :result {:content (tools/mcp-content-with-images result)}})))
+               :result {:content (tools/mcp-content-with-images result :max-images maxImages)}})))
 
         (= tool "clojure_list_sessions")
         (p/let [result (calva/list-sessions+ options)]
@@ -392,13 +396,13 @@
                                :text (js/JSON.stringify clojure-docs)}]}})
 
         (= tool "clojure_repl_output_log")
-        (let [{:keys [query inputs]} arguments
+        (let [{:keys [query inputs maxImages]} arguments
               output (calva/query-output (merge options
                                                 {:calva/query-edn-str query
                                                  :calva/inputs inputs}))]
           {:jsonrpc "2.0"
            :id id
-           :result {:content (tools/mcp-content-with-images output)}})
+           :result {:content (tools/mcp-content-with-images output :max-images maxImages)}})
 
         (= tool "clojure_balance_brackets")
         (let [{:keys [text]} arguments

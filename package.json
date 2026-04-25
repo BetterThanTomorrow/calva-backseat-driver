@@ -176,6 +176,10 @@
             "description": {
               "type": "string",
               "description": "Succinct human-readable note explaining what you are evaluating and why. Shows up in the repl output tool's log, and is also in the human's output view. Use this *instead* of line comments in the code you are evaluating."
+            },
+            "maxImages": {
+              "type": "number",
+              "description": "Maximum number of images to return from image data found in the result. Defaults to 20. Images beyond this cap are replaced with <<image-N-capped>> markers in the text but not returned as image content."
             }
           },
           "required": [
@@ -301,6 +305,10 @@
               "type": "array",
               "items": {},
               "description": "A JSON array of values for parameterized queries. These are passed as additional `:in` arguments after `$`. Example: for `:in $ ?who ?since`, pass `[\"copilot\", 42]`."
+            },
+            "maxImages": {
+              "type": "number",
+              "description": "Maximum number of images to return from image data found in the result. Defaults to 20. Images beyond this cap are replaced with <<image-N-capped>> markers in the text but not returned as image content."
             }
           },
           "required": [
