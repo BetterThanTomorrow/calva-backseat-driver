@@ -10,9 +10,12 @@
 (defn reduce-images
   "Walks a Clojure data structure, replacing data:image/ URLs with <<image-N>>
    references. Returns {:data <cleaned-data> :images [{:mime :data :base64} ...]}
-   or nil if no images found."
-  [data]
-  (let [!images (atom [])
+   or nil if no images found. Images beyond max-images (default 20) are replaced
+   with <<image-N-capped>> markers but not included in the returned images."
+  [data & {:keys [max-images]}]
+  (let [max-images (or max-images 20)
+        !images (atom [])
+        !idx (atom 0)
         pattern #"data:(image/[^;]+);base64,([A-Za-z0-9+/=\s]+)"
         reduced (walk/postwalk
                  (fn [x]
@@ -20,12 +23,14 @@
                      (let [matches (re-seq pattern x)]
                        (if (seq matches)
                          (reduce (fn [s [full-match mime base64]]
-                                   (let [clean (string/replace base64 #"\s" "")
-                                         idx (inc (count @!images))]
-                                     (swap! !images conj {:mime mime
-                                                          :data (js/Uint8Array. (js/Buffer.from clean "base64"))
-                                                          :base64 clean})
-                                     (string/replace-first s full-match (str "<<image-" idx ">>"))))
+                                   (let [idx (swap! !idx inc)]
+                                     (if (<= idx max-images)
+                                       (let [clean (string/replace base64 #"\s" "")]
+                                         (swap! !images conj {:mime mime
+                                                              :data (js/Uint8Array. (js/Buffer.from clean "base64"))
+                                                              :base64 clean})
+                                         (string/replace-first s full-match (str "<<image-" idx ">>")))
+                                       (string/replace-first s full-match (str "<<image-" idx "-capped>>")))))
                                  x matches)
                          x))
                      x))
@@ -37,8 +42,8 @@
 (defn- tool-result-with-images
   "Builds a LanguageModelToolResult, extracting embedded images as separate parts.
    Works on Clojure data (before clj->js)."
-  [data]
-  (if-let [{:keys [data images]} (reduce-images data)]
+  [data & {:keys [max-images]}]
+  (if-let [{:keys [data images]} (reduce-images data :max-images max-images)]
     (let [text-part (vscode/LanguageModelTextPart. (js/JSON.stringify (clj->js data)))
           image-parts (mapv (fn [{:keys [mime data]}]
                               (vscode/LanguageModelDataPart.image data mime))
@@ -52,8 +57,8 @@
 (defn mcp-content-with-images
   "Builds MCP content array, extracting embedded images as separate items.
    Works on Clojure data (before clj->js)."
-  [data]
-  (if-let [{:keys [data images]} (reduce-images data)]
+  [data & {:keys [max-images]}]
+  (if-let [{:keys [data images]} (reduce-images data :max-images max-images)]
     (into [{:type "text" :text (js/JSON.stringify (clj->js data))}]
           (map (fn [{:keys [mime base64]}]
                  {:type "image" :mimeType mime :data base64}))
