@@ -76,13 +76,59 @@
   (p/do (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
         (.end socket)))
 
+(def ^:private backseat-driver-setting-defaults
+  {"enableMcpReplEvaluation" false
+   "autoStartMCPServer" false
+   "mcpSocketServerPort" 1664
+   "provideBdSkill" true
+   "provideEditSkill" true})
+
+(defn- read-settings-backup [backup-path]
+  (js->clj (.parse js/JSON (fs/readFileSync backup-path "utf8"))))
+
+(defn- backed-up-setting [settings setting-key]
+  (let [qualified-key (str "calva-backseat-driver." setting-key)]
+    (if (contains? settings qualified-key)
+      {:setting/value (get settings qualified-key)}
+      {:setting/absent? true})))
+
+(defn- restored-js-value [setting]
+  (if (:setting/absent? setting)
+    js/undefined
+    (:setting/value setting)))
+
+(defn- restored-effective-value [setting default-value]
+  (if (:setting/absent? setting)
+    default-value
+    (:setting/value setting)))
+
 (defn backup-settings! [backup-name]
   (let [backup-path (path/join (path/dirname settings-path) backup-name)]
     (fs/copyFileSync settings-path backup-path)
     backup-path))
 
 (defn restore-settings! [backup-path]
-  (fs/renameSync backup-path settings-path))
+  (let [settings (read-settings-backup backup-path)
+        restored-settings (into {}
+                                (map (fn [[setting-key _default-value]]
+                                       [setting-key (backed-up-setting settings setting-key)]))
+                                backseat-driver-setting-defaults)
+        config (vscode/workspace.getConfiguration "calva-backseat-driver")]
+    (p/let [_ (.update config "enableMcpReplEvaluation" (restored-js-value (get restored-settings "enableMcpReplEvaluation")) vscode/ConfigurationTarget.Workspace)
+            _ (.update config "autoStartMCPServer" (restored-js-value (get restored-settings "autoStartMCPServer")) vscode/ConfigurationTarget.Workspace)
+            _ (.update config "mcpSocketServerPort" (restored-js-value (get restored-settings "mcpSocketServerPort")) vscode/ConfigurationTarget.Workspace)
+            _ (.update config "provideBdSkill" (restored-js-value (get restored-settings "provideBdSkill")) vscode/ConfigurationTarget.Workspace)
+            _ (.update config "provideEditSkill" (restored-js-value (get restored-settings "provideEditSkill")) vscode/ConfigurationTarget.Workspace)
+            _ (wait-for+ #(let [current-config (vscode/workspace.getConfiguration "calva-backseat-driver")]
+                            (every? (fn [[setting-key default-value]]
+                                      (= (restored-effective-value (get restored-settings setting-key) default-value)
+                                         (.get current-config setting-key)))
+                                    backseat-driver-setting-defaults))
+                         :timeout 15000
+                         :message "[MCP helpers] Settings restore not propagated within 15s")]
+      (when (fs/existsSync backup-path)
+        (fs/unlinkSync backup-path))
+      nil)))
 
 (defn ensure-repl-and-eval-enabled!
   []
