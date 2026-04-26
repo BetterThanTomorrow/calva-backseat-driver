@@ -23,18 +23,24 @@
     (or result 0)))
 
 (defn- evaluate-code
-  "Evaluate code via the MCP evaluate tool."
+  "Evaluate code via the MCP evaluate tool. Returns {:result parsed :raw raw-response}."
   [socket id {:keys [code namespace session-key who description]}]
-  (mcp/call-tool socket id "clojure_evaluate_code"
-                 (cond-> {:code code
-                          :namespace namespace
-                          :replSessionKey session-key
-                          :who who}
-                   description (assoc :description description))))
+  (let [args (cond-> {:code code
+                      :namespace namespace
+                      :replSessionKey session-key
+                      :who who}
+               description (assoc :description description))]
+    (p/let [raw (mcp/call-tool-raw socket id "clojure_evaluate_code" args)
+            text (get-in raw [:result :content 0 :text])
+            parsed (when text
+                     (js->clj (.parse js/JSON text) :keywordize-keys true))]
+      {:result parsed :raw raw})))
 
 (defn- log-eval-result!
-  [label result]
+  [label result raw-response]
   (js/console.log label (pr-str result))
+  (when (nil? result)
+    (throw (js/Error. (str label " returned nil, raw response: " (pr-str raw-response)))))
   (when (:error result)
     (throw (js/Error. (str label " returned error " (pr-str result)))))
   result)
@@ -85,13 +91,13 @@
                 ;; === 1. Basic query (existing) ===
                 checkpoint (get-max-line socket)
 
-                basic-eval-result (evaluate-code socket 1
+                basic-eval (evaluate-code socket 1
                                                  {:code "(+ 21 21)"
                                                   :namespace "user"
                                                   :session-key session-key
                                                   :who "e2e-output-basic"
                                                   :description "e2e basic query test"})
-                _ (log-eval-result! "[output-log-basic] Eval result:" basic-eval-result)
+                _ (log-eval-result! "[output-log-basic] Eval result:" (:result basic-eval) (:raw basic-eval))
 
                 basic-rows (wait-for-output
                             socket
@@ -261,13 +267,13 @@
                 "Alpha and beta should have different line numbers"))
 
           (testing "Who validation: reserved values rejected"
-            (is (some? (:error ui-result))
+            (is (some? (:error (:result ui-result)))
                 "who='ui' should return an error")
-            (is (some? (:error api-result))
+            (is (some? (:error (:result api-result)))
                 "who='api' should return an error"))
 
           (testing "Who validation: blank value rejected"
-            (is (some? (:error blank-result))
+            (is (some? (:error (:result blank-result)))
                 "who='' (blank) should return an error"))
 
           (testing "Output categories: eval produces evaluationResults with who"
@@ -285,9 +291,9 @@
                 "Should have error output or output entry for stderr"))
 
           (testing "otherWhosSinceLast: cross-who awareness"
-            (is (some? (:other-whos-since-last cross-result))
+            (is (some? (:other-whos-since-last (:result cross-result)))
                 "Should include other-whos-since-last field")
-            (is (some #(= "e2e-cross-b" %) (:other-whos-since-last cross-result))
+            (is (some #(= "e2e-cross-b" %) (:other-whos-since-last (:result cross-result)))
                 "Should list the interloping who slug"))
 
           (testing "Category filter query: can filter by specific category"
@@ -316,13 +322,13 @@
                   checkpoint (get-max-line socket)
 
                   ;; Evaluate code that returns a data URL
-                  image-eval-result (evaluate-code socket 20
+                  image-eval (evaluate-code socket 20
                                                    {:code "\"data:image/png;base64,iVBORw0KGgo=\""
                                                     :namespace "user"
                                                     :session-key session-key
                                                     :who "e2e-output-image"
                                                     :description "output log image test"})
-                  _ (log-eval-result! "[output-log-image] Eval result:" image-eval-result)
+                  _ (log-eval-result! "[output-log-image] Eval result:" (:result image-eval) (:raw image-eval))
 
                   ;; Wait for the eval result to appear in the log
                   _ (wait-for-output
@@ -371,13 +377,13 @@
                   checkpoint (get-max-line socket)
 
                   ;; Evaluate code that returns a data URL
-                  cap-eval-result (evaluate-code socket 30
+                  cap-eval (evaluate-code socket 30
                                                  {:code "\"data:image/png;base64,iVBORw0KGgo=\""
                                                   :namespace "user"
                                                   :session-key session-key
                                                   :who "e2e-output-cap"
                                                   :description "output log default cap test"})
-                  _ (log-eval-result! "[output-log-cap] Eval result:" cap-eval-result)
+                  _ (log-eval-result! "[output-log-cap] Eval result:" (:result cap-eval) (:raw cap-eval))
 
                   ;; Wait for the eval result to appear in the log
                   _ (wait-for-output
