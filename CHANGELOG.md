@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.30] - 2026-04-26
+
 - [Add `clojure_load_file` tool — loads and evaluates entire Clojure files through Calva's connected REPL (requires Calva >= 2.0.576)](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/28)
 - Fix: [The output log tool can return to many images, stopping the agent in its tracks](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/51)
 
