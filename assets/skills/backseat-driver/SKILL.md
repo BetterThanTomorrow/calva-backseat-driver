@@ -113,7 +113,7 @@ When you need to understand what a value is, **evaluate the expression directly*
 
 Any `data:image/...` URLs found anywhere in a result — whether the result is a plain string, a map, a vector, or deeply nested data — are automatically extracted and returned as viewable images alongside the text. This applies to both evaluation results and output log queries. You can visually inspect rendered output through the REPL.
 
-**Image cap:** At most 20 images are returned per tool call by default. Images beyond the cap are replaced with `<<image-N-capped>>` markers in the text but not returned as image content. If you need more (or fewer), pass `maxImages` to `clojure_evaluate_code` or `clojure_repl_output_log`. Be aware that returning many images can exhaust the model's context — keep `maxImages` conservative.
+**Image cap:** `clojure_evaluate_code` returns at most 10 images per call by default. `clojure_repl_output_log` returns no images by default (pass `maxImages` to opt in). Images beyond the cap are replaced with `<<image-N-capped>>` markers in the text but not returned as image content. Be aware that returning many images can exhaust the model's context — keep `maxImages` conservative.
 
 ### Check the output log
 

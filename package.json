@@ -179,7 +179,7 @@
             },
             "maxImages": {
               "type": "number",
-              "description": "Maximum number of images to return from image data found in the result. Defaults to 20. Images beyond this cap are replaced with <<image-N-capped>> markers in the text but not returned as image content."
+              "description": "Maximum number of images to return from image data found in the result. Defaults to 10. Images beyond this cap are replaced with <<image-N-capped>> markers in the text but not returned as image content."
             }
           },
           "required": [
@@ -308,7 +308,7 @@
             },
             "maxImages": {
               "type": "number",
-              "description": "Maximum number of images to return from image data found in the result. Defaults to 20. Images beyond this cap are replaced with <<image-N-capped>> markers in the text but not returned as image content."
+              "description": "Maximum number of images to return from image data found in the result. Defaults to 0 (no images). Pass a positive number to include images. Images beyond this cap are replaced with <<image-N-capped>> markers in the text but not returned as image content."
             }
           },
           "required": [

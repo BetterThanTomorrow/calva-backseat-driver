@@ -11,7 +11,8 @@
   "Walks a Clojure data structure, replacing data:image/ URLs with <<image-N>>
    references. Returns {:data <cleaned-data> :images [{:mime :data :base64} ...]}
    or nil if no images found. Images beyond max-images (default 20) are replaced
-   with <<image-N-capped>> markers but not included in the returned images."
+   with <<image-N-capped>> markers but not included in the returned images.
+   When max-images is 0, all images are capped (stripped from text, none returned)."
   [data & {:keys [max-images]}]
   (let [max-images (or max-images 20)
         !images (atom [])
@@ -35,7 +36,7 @@
                          x))
                      x))
                  data)]
-    (when (seq @!images)
+    (when (pos? @!idx)
       {:data reduced
        :images @!images})))
 
@@ -94,7 +95,7 @@
                                                            :calva/repl-session-key session-key
                                                            :calva/who who
                                                            :calva/description description})]
-                       (tool-result-with-images result :max-images max-images)))))})
+                       (tool-result-with-images result :max-images (or max-images 10))))))})
 
 
 (defn GetSymbolInfoTool [dispatch!]
@@ -148,7 +149,7 @@
                        result (calva/query-output {:ex/dispatch! dispatch!
                                                    :calva/query-edn-str query
                                                    :calva/inputs inputs})]
-                   (tool-result-with-images result :max-images max-images)))}))
+                   (tool-result-with-images result :max-images (or max-images 0)))}))
 
 
 (defn InferBracketsTool [dispatch!]
