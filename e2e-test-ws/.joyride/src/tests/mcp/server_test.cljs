@@ -397,3 +397,51 @@
                      (throw e)))
           (p/finally (fn []
                        (mcp/restore-settings! backup-path)))))))
+
+(deftest-async eval-max-images-zero-caps-all
+  (testing "Evaluation with maxImages 0 returns only text, no images"
+    (let [backup-path (mcp/backup-settings! "eval-max-images-zero-backup.json")]
+      (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
+                  {:keys [socket]} (mcp/start-mcp-session!)
+
+                  ;; Get a session key for evaluation
+                  sessions-resp (mcp/send-request socket
+                                  {:jsonrpc "2.0"
+                                   :id 1
+                                   :method "tools/call"
+                                   :params {:name "clojure_list_sessions"
+                                            :arguments {}}})
+                  session-key (let [outer (js->clj sessions-resp :keywordize-keys true)
+                                    text (get-in outer [:result :content 0 :text])
+                                    parsed (js->clj (.parse js/JSON text) :keywordize-keys true)]
+                                (or (->> (:sessions parsed)
+                                         (some (fn [s] (when (:isActiveSession s) (:replSessionKey s)))))
+                                    (:replSessionKey (first (:sessions parsed)))))
+
+                  ;; Evaluate code that returns a data URL string, with maxImages 0
+                  eval-resp (mcp/send-request socket
+                              {:jsonrpc "2.0"
+                               :id 2
+                               :method "tools/call"
+                               :params {:name "clojure_evaluate_code"
+                                        :arguments {:code "\"data:image/png;base64,iVBORw0KGgo=\""
+                                                    :namespace "user"
+                                                    :replSessionKey session-key
+                                                    :who "e2e-image-cap-test"
+                                                    :maxImages 0}}})
+                  content (let [outer (js->clj eval-resp :keywordize-keys true)]
+                            (get-in outer [:result :content]))
+
+                  _ (mcp/stop-mcp-session! socket)]
+            (is (= 1 (count content))
+                "Should have only text content (no images with maxImages 0)")
+            (is (= "text" (:type (first content)))
+                "Content should be text type")
+            (is (string? (re-find #"image-1-capped" (:text (first content))))
+                "Text should contain capped image marker"))
+          (p/catch (fn [e]
+                     (js/console.error "[eval-max-images-zero] Error:" (.-message e) e)
+                     (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                     (throw e)))
+          (p/finally (fn []
+                       (mcp/restore-settings! backup-path)))))))

@@ -313,12 +313,13 @@
 
                   ;; Query via send-request to see all content items (including images)
                   log-resp (mcp/send-request socket
-                             {:jsonrpc "2.0"
-                              :id 21
-                              :method "tools/call"
-                              :params {:name "clojure_repl_output_log"
-                                       :arguments {:query "[:find [(pull ?e [*]) ...] :in $ ?since ?who :where [?e :output/line ?l] [(> ?l ?since)] [?e :output/who ?who] [?e :output/category \"evaluationResults\"]]"
-                                                   :inputs [checkpoint "e2e-output-image"]}}})
+                                             {:jsonrpc "2.0"
+                                              :id 21
+                                              :method "tools/call"
+                                              :params {:name "clojure_repl_output_log"
+                                                       :arguments {:query "[:find [(pull ?e [*]) ...] :in $ ?since ?who :where [?e :output/line ?l] [(> ?l ?since)] [?e :output/who ?who] [?e :output/category \"evaluationResults\"]]"
+                                                                   :inputs [checkpoint "e2e-output-image"]
+                                                                   :maxImages 1}}})
                   content (get-in (js->clj log-resp :keywordize-keys true)
                                   [:result :content])
 
@@ -336,6 +337,55 @@
                 "Image content should have base64 data string"))
           (p/catch (fn [e]
                      (js/console.error "[output-log-image] Error:" (.-message e) e)
+                     (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                     (throw e)))
+          (p/finally (fn []
+                       (mcp/restore-settings! backup-path)))))))
+
+(deftest-async output-log-default-caps-images
+  (testing "Output log query with image data returns only text by default (maxImages defaults to 0)"
+    (let [backup-path (mcp/backup-settings! "output-log-default-cap-backup.json")]
+      (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
+                  {:keys [socket]} (mcp/start-mcp-session!)
+                  session-key (get-session-key socket)
+                  checkpoint (get-max-line socket)
+
+                  ;; Evaluate code that returns a data URL
+                  _ (evaluate-code socket 30
+                                   {:code "\"data:image/png;base64,iVBORw0KGgo=\""
+                                    :namespace "user"
+                                    :session-key session-key
+                                    :who "e2e-output-cap"
+                                    :description "output log default cap test"})
+
+                  ;; Wait for the eval result to appear in the log
+                  _ (wait-for-output
+                     socket
+                     "[:find [(pull ?e [*]) ...] :in $ ?since ?who :where [?e :output/line ?l] [(> ?l ?since)] [?e :output/who ?who] [?e :output/category \"evaluationResults\"]]"
+                     [checkpoint "e2e-output-cap"]
+                     seq)
+
+                  ;; Query without maxImages — default is 0, so no images
+                  log-resp (mcp/send-request socket
+                             {:jsonrpc "2.0"
+                              :id 31
+                              :method "tools/call"
+                              :params {:name "clojure_repl_output_log"
+                                       :arguments {:query "[:find [(pull ?e [*]) ...] :in $ ?since ?who :where [?e :output/line ?l] [(> ?l ?since)] [?e :output/who ?who] [?e :output/category \"evaluationResults\"]]"
+                                                   :inputs [checkpoint "e2e-output-cap"]}}})
+                  content (get-in (js->clj log-resp :keywordize-keys true)
+                                  [:result :content])
+
+                  _ (mcp/stop-mcp-session! socket)]
+
+            (is (= 1 (count content))
+                "Should have only text content (no images by default)")
+            (is (= "text" (:type (first content)))
+                "Content should be text type")
+            (is (string? (re-find #"image-1-capped" (:text (first content))))
+                "Text should contain capped image marker"))
+          (p/catch (fn [e]
+                     (js/console.error "[output-log-cap] Error:" (.-message e) e)
                      (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
                      (throw e)))
           (p/finally (fn []
