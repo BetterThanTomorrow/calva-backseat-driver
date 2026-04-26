@@ -32,6 +32,13 @@
                           :who who}
                    description (assoc :description description))))
 
+(defn- log-eval-result!
+  [label result]
+  (js/console.log label (pr-str result))
+  (when (:error result)
+    (throw (js/Error. (str label " returned error " (pr-str result)))))
+  result)
+
 (defn- output-after-checkpoint
   [socket checkpoint]
   (when (number? checkpoint)
@@ -78,12 +85,13 @@
                 ;; === 1. Basic query (existing) ===
                 checkpoint (get-max-line socket)
 
-                _ (evaluate-code socket 1
-                                 {:code "(+ 21 21)"
-                                  :namespace "user"
-                                  :session-key session-key
-                                  :who "e2e-output-basic"
-                                  :description "e2e basic query test"})
+                basic-eval-result (evaluate-code socket 1
+                                                 {:code "(+ 21 21)"
+                                                  :namespace "user"
+                                                  :session-key session-key
+                                                  :who "e2e-output-basic"
+                                                  :description "e2e basic query test"})
+                _ (log-eval-result! "[output-log-basic] Eval result:" basic-eval-result)
 
                 basic-rows (wait-for-output
                             socket
@@ -308,12 +316,13 @@
                   checkpoint (get-max-line socket)
 
                   ;; Evaluate code that returns a data URL
-                  _ (evaluate-code socket 20
-                                   {:code "\"data:image/png;base64,iVBORw0KGgo=\""
-                                    :namespace "user"
-                                    :session-key session-key
-                                    :who "e2e-output-image"
-                                    :description "output log image test"})
+                  image-eval-result (evaluate-code socket 20
+                                                   {:code "\"data:image/png;base64,iVBORw0KGgo=\""
+                                                    :namespace "user"
+                                                    :session-key session-key
+                                                    :who "e2e-output-image"
+                                                    :description "output log image test"})
+                  _ (log-eval-result! "[output-log-image] Eval result:" image-eval-result)
 
                   ;; Wait for the eval result to appear in the log
                   _ (wait-for-output
@@ -362,12 +371,13 @@
                   checkpoint (get-max-line socket)
 
                   ;; Evaluate code that returns a data URL
-                  _ (evaluate-code socket 30
-                                   {:code "\"data:image/png;base64,iVBORw0KGgo=\""
-                                    :namespace "user"
-                                    :session-key session-key
-                                    :who "e2e-output-cap"
-                                    :description "output log default cap test"})
+                  cap-eval-result (evaluate-code socket 30
+                                                 {:code "\"data:image/png;base64,iVBORw0KGgo=\""
+                                                  :namespace "user"
+                                                  :session-key session-key
+                                                  :who "e2e-output-cap"
+                                                  :description "output log default cap test"})
+                  _ (log-eval-result! "[output-log-cap] Eval result:" cap-eval-result)
 
                   ;; Wait for the eval result to appear in the log
                   _ (wait-for-output
