@@ -179,7 +179,7 @@
             },
             "maxImages": {
               "type": "number",
-              "description": "Maximum number of images to return from image data found in the result. Defaults to 10. Images beyond this cap are replaced with <<image-N-capped>> markers in the text but not returned as image content."
+              "description": "Maximum number of images to return from image data found in the result. Defaults to 10. Images beyond this cap are replaced with <<image-N-capped>> markers in the text but not returned as image content. Avoid settings this above 20, because Copilot has a hard cap of 20 images."
             }
           },
           "required": [

@@ -312,6 +312,35 @@ Use `pull` to select only the attributes you need — this protects the context 
 
    Verify results match the equivalent inline-value query from step 3.
 
+8. **Image capping (`maxImages`)** — the output log tool defaults to `maxImages: 0`, replacing all `data:image/...` URLs with `<<image-N-capped>>` markers and returning no image content. The `clojure_evaluate_code` tool defaults to `maxImages: 10`.
+
+   **Setup** — evaluate a string containing a `data:image/png;base64,...` URL (use a real but small PNG, at least 10×10 pixels to avoid API rejection of degenerate images):
+   ```clojure
+   (str "test-image: data:image/png;base64,<valid-base64>")
+   ```
+
+   **⚠️ Pitfall**: Do not use 1×1 pixel images — the model API rejects them with a 400 `"Could not process image"` error, which crashes the entire request. Use at least 10×10 pixel images for testing.
+
+   **Test steps**:
+
+   a. **Default (no maxImages)** — query the log for the image-bearing entry. Verify:
+      - Text contains `<<image-1-capped>>` marker (not the raw data URI)
+      - No image content is returned alongside the text
+
+   b. **Explicit maxImages: 0** — same query with `maxImages: 0`. Verify identical capping behavior.
+
+   c. **maxImages: 1** — same query with `maxImages: 1`. Verify:
+      - Text contains `<<image-1>>` (not `capped`)
+      - Image content is returned alongside the text
+
+   d. **Partial capping** — if the log contains an entry with multiple images, query with `maxImages` lower than the image count. Verify:
+      - First N images use `<<image-N>>` markers and are returned
+      - Remaining images use `<<image-N-capped>>` markers and are not returned
+
+   e. **Plain results unaffected** — query a non-image entry. Verify text passes through unmodified with no markers.
+
+   f. **evaluatedCode entries** — verify that source code containing data URIs also has images capped in the text.
+
 ## Symbol Info and ClojureDocs
 
 Prerequisites: REPL Session Listing.
@@ -419,7 +448,7 @@ When reporting results, cover only the sections that were tested.
 
 **Structural Editing**: Full create → append → insert → replace → delete → reload lifecycle completes. Post-edit diagnostics are accurate. REPL reload succeeds after definition order is correct.
 
-**Output Log**: Datalog queries return correct results across all query styles (pull, aggregation, predicates, parameterized `:in` clauses).
+**Output Log**: Datalog queries return correct results across all query styles (pull, aggregation, predicates, parameterized `:in` clauses). Image capping: default `maxImages: 0` replaces data URIs with `<<image-N-capped>>` markers; explicit `maxImages > 0` returns images with `<<image-N>>` markers; plain results pass through unmodified.
 
 **Symbol Info / ClojureDocs**: Docstrings, arglists, examples, and see-alsos returned.
 
