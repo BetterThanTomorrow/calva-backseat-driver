@@ -51,14 +51,7 @@
     (server/send-notification-params {:ex/dispatch! (partial dispatch! context)} notification)
 
     [:mcp/fx.handle-request options request]
-    (let [response (requests/handle-request-fn (assoc options :ex/dispatch! (partial dispatch! context)) request)]
-      (if (p/promise? response)
-        (p/catch response
-                 (fn [err]
-                   {:jsonrpc "2.0" :id (:id request)
-                    :error {:code -32603
-                            :message (str "Internal error: " (ex-message err))}}))
-        response))
+    (requests/handle-request-fn (assoc options :ex/dispatch! (partial dispatch! context)) request)
 
     [:mcp/fx.copy-wrapper-script-to-config-dir wrapper-config-path]
     (let [extension-uri (-> (vscode/extensions.getExtension

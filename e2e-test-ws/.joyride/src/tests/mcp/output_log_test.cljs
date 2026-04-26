@@ -34,7 +34,7 @@
 
 (defn- wait-for-output
   "Poll the output log until pred returns truthy for the query result."
-  [socket query inputs pred & {:keys [timeout] :or {timeout 15000}}]
+  [socket query inputs pred & {:keys [timeout] :or {timeout 5000}}]
   (let [start (.now js/Date)]
     (p/loop []
       (p/let [result (query-output-log socket 98 query inputs)]
