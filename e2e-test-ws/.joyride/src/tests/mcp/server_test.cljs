@@ -432,6 +432,7 @@
                   content (let [outer (js->clj eval-resp :keywordize-keys true)]
                             (get-in outer [:result :content]))
 
+                  _ (js/console.log "[eval-max-images-zero] content:" (pr-str content))
                   _ (mcp/stop-mcp-session! socket)]
             (is (= 1 (count content))
                 "Should have only text content (no images with maxImages 0)")
