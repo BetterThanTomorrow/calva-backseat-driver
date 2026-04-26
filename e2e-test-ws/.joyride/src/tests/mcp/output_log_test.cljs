@@ -377,7 +377,6 @@
                                   [:result :content])
 
                   _ (mcp/stop-mcp-session! socket)]
-
             (is (= 1 (count content))
                 "Should have only text content (no images by default)")
             (is (= "text" (:type (first content)))

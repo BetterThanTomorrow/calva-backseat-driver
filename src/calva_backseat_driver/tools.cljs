@@ -149,7 +149,7 @@
                        result (calva/query-output {:ex/dispatch! dispatch!
                                                    :calva/query-edn-str query
                                                    :calva/inputs inputs})]
-                   (tool-result-with-images result :max-images (if (some? max-images) max-images 0)))}))
+                   (tool-result-with-images result :max-images (if (some? max-images) max-images 0))))})
 
 
 (defn InferBracketsTool [dispatch!]
