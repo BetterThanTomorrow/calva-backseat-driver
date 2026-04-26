@@ -32,6 +32,13 @@
                           :who who}
                    description (assoc :description description))))
 
+(defn- output-after-checkpoint
+  [socket checkpoint]
+  (when (number? checkpoint)
+    (query-output-log socket 96
+                      "[:find [(pull ?e [*]) ...] :in $ ?since :where [?e :output/line ?l] [(> ?l ?since)]]"
+                      [checkpoint])))
+
 (defn- wait-for-output
   "Poll the output log until pred returns truthy for the query result."
   [socket query inputs pred & {:keys [timeout] :or {timeout 5000}}]
@@ -41,7 +48,11 @@
         (if (pred result)
           result
           (if (> (- (.now js/Date) start) timeout)
-            (throw (js/Error. (str "wait-for-output timed out after " timeout "ms")))
+            (p/let [rows-after-checkpoint (output-after-checkpoint socket (first inputs))]
+              (throw (js/Error. (str "wait-for-output timed out after " timeout "ms"
+                                     " inputs=" (pr-str inputs)
+                                     " last-result=" (pr-str result)
+                                     " rows-after-checkpoint=" (pr-str rows-after-checkpoint)))))
             (p/do (p/delay 100)
                   (p/recur))))))))
 
