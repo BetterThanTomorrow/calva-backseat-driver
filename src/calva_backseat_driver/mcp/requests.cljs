@@ -365,7 +365,7 @@
                                                           {:calva/ns ns})))]
               {:jsonrpc "2.0"
                :id id
-               :result {:content (tools/mcp-content-with-images result :max-images (or maxImages 10))}})))
+               :result {:content (tools/mcp-content-with-images result :max-images (if (some? maxImages) maxImages 10))}})))
 
         (= tool "clojure_list_sessions")
         (p/let [result (calva/list-sessions+ options)]
@@ -402,7 +402,7 @@
                                                  :calva/inputs inputs}))]
           {:jsonrpc "2.0"
            :id id
-           :result {:content (tools/mcp-content-with-images output :max-images (or maxImages 0))}})
+           :result {:content (tools/mcp-content-with-images output :max-images (if (some? maxImages) maxImages 0))}})
 
         (= tool "clojure_balance_brackets")
         (let [{:keys [text]} arguments

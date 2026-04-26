@@ -14,7 +14,7 @@
    with <<image-N-capped>> markers but not included in the returned images.
    When max-images is 0, all images are capped (stripped from text, none returned)."
   [data & {:keys [max-images]}]
-  (let [max-images (or max-images 20)
+  (let [max-images (if (some? max-images) max-images 20)
         !images (atom [])
         !idx (atom 0)
         pattern #"data:(image/[^;]+);base64,([A-Za-z0-9+/=\s]+)"
@@ -95,7 +95,7 @@
                                                            :calva/repl-session-key session-key
                                                            :calva/who who
                                                            :calva/description description})]
-                       (tool-result-with-images result :max-images (or max-images 10))))))})
+                       (tool-result-with-images result :max-images (if (some? max-images) max-images 10))))))})
 
 
 (defn GetSymbolInfoTool [dispatch!]
@@ -149,7 +149,7 @@
                        result (calva/query-output {:ex/dispatch! dispatch!
                                                    :calva/query-edn-str query
                                                    :calva/inputs inputs})]
-                   (tool-result-with-images result :max-images (or max-images 0)))}))
+                   (tool-result-with-images result :max-images (if (some? max-images) max-images 0)))}))
 
 
 (defn InferBracketsTool [dispatch!]

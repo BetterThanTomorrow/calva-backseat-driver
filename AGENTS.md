@@ -70,7 +70,7 @@ npm run watch           # shadow-cljs + nREPL, auto-runs tests
 
 ### Testing Commands
 ```bash
-bb run-e2e-tests-ws     # Full E2E (VS Code Insiders must NOT be running)
+bb run-e2e-tests-ws     # Full E2E (can run with VS Code Insiders open)
 bb run-mcp-inspector    # Test MCP tools interactively
 bb package-pre-release  # Package pre-release VSIX
 ```
