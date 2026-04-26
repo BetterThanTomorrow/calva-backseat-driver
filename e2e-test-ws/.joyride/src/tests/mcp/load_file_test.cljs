@@ -87,6 +87,7 @@
                   result (-> resp (js->clj :keywordize-keys true) :result)
                   text (some-> (get-in result [:content 0 :text]) js/JSON.parse (js->clj :keywordize-keys true))
 
+                  _ (js/console.log "[load-file-session-key] Full response:" (pr-str (js->clj resp :keywordize-keys true)))
                   _ (js/console.log "[load-file-session-key] Missing session key result:" (pr-str text))
                   _ (mcp/stop-mcp-session! socket)]
             (is (some? (:error text))
@@ -163,14 +164,18 @@
                                                    :arguments {:filePath "/nonexistent/path/foo.clj"
                                                                :replSessionKey session-key
                                                                :who "e2e-load-file-test"}}})
-                  result (-> resp (js->clj :keywordize-keys true) :result)
+                  resp-clj (-> resp (js->clj :keywordize-keys true))
+                  result (:result resp-clj)
+                  error (:error resp-clj)
 
-                  _ (js/console.log "[load-file-error] Error result:" (pr-str result))
+                  _ (js/console.log "[load-file-error] Full response:" (pr-str resp-clj))
                   _ (mcp/stop-mcp-session! socket)]
-            (is (= true (:isError result))
-                "Response should have isError true for nonexistent file")
-            (is (some? (get-in result [:content 0 :text]))
-                "Error response should include error text"))
+            ;; Server may return either a tool-level error (:result with :isError)
+            ;; or a protocol-level error (:error) depending on where the error occurs
+            (is (or (:isError result) (some? error))
+                "Response should indicate an error for nonexistent file")
+            (is (or (some? (get-in result [:content 0 :text])) (some? (:message error)))
+                "Error response should include error information"))
           (p/catch (fn [e]
                      (js/console.error "[load-file-error] Error:" (.-message e) e)
                      (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")

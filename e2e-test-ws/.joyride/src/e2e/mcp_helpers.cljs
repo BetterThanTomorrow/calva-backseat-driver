@@ -27,12 +27,13 @@
 (defn- try-parse-json [s]
   (try (.parse js/JSON s) (catch :default _ nil)))
 
-(defn send-request [socket request-obj]
+(defn send-request [socket request-obj & {:keys [timeout] :or {timeout 30000}}]
   (p/create
-   (fn [resolve _reject]
+   (fn [resolve reject]
      (let [buffer (atom "")
            request-id (.-id (clj->js request-obj))
            request-str (str (.stringify js/JSON (clj->js request-obj)) "\n")
+           timeout-id (atom nil)
            on-data (fn on-data [data]
                      (swap! buffer str data)
                      (let [lines (.split @buffer "\n")
@@ -41,9 +42,15 @@
                                       (filter #(= request-id (.-id %)))
                                       first)]
                        (when match
+                         (some-> @timeout-id js/clearTimeout)
                          (.removeListener socket "data" on-data)
                          (resolve match))))]
        (.on socket "data" on-data)
+       (reset! timeout-id
+               (js/setTimeout (fn []
+                                (.removeListener socket "data" on-data)
+                                (reject (js/Error. (str "send-request timed out after " timeout "ms for request id " request-id))))
+                              timeout))
        (.write socket request-str)))))
 
 (defn call-tool
