@@ -86,6 +86,7 @@
   (let [backup-path (mcp/backup-settings! "output-log-test-backup.json")]
     (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
                 {:keys [socket]} (mcp/start-mcp-session!)
+                _ (mcp/wait-for-tool! socket "clojure_evaluate_code")
                 session-key (get-session-key socket)
 
                 ;; === 1. Basic query (existing) ===
@@ -318,6 +319,7 @@
     (let [backup-path (mcp/backup-settings! "output-log-image-test-backup.json")]
       (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
                   {:keys [socket]} (mcp/start-mcp-session!)
+                  _ (mcp/wait-for-tool! socket "clojure_evaluate_code")
                   session-key (get-session-key socket)
                   checkpoint (get-max-line socket)
 
@@ -373,6 +375,7 @@
     (let [backup-path (mcp/backup-settings! "output-log-default-cap-backup.json")]
       (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
                   {:keys [socket]} (mcp/start-mcp-session!)
+                  _ (mcp/wait-for-tool! socket "clojure_evaluate_code")
                   session-key (get-session-key socket)
                   checkpoint (get-max-line socket)
 

@@ -78,6 +78,17 @@
           _ (send-request socket {:jsonrpc "2.0" :id 0 :method "initialize"})]
     {:socket socket :port port}))
 
+(defn wait-for-tool!
+  "Poll tools/list until a tool with the given name is registered."
+  [socket tool-name & {:keys [timeout] :or {timeout 15000}}]
+  (wait-for+ (fn []
+               (p/let [resp (send-request socket {:jsonrpc "2.0" :id 999 :method "tools/list"})
+                       outer (js->clj resp :keywordize-keys true)
+                       tools (get-in outer [:result :tools])]
+                 (some #(= tool-name (:name %)) tools)))
+             :timeout timeout
+             :message (str "[MCP helpers] Tool " tool-name " not registered within " timeout "ms")))
+
 (defn stop-mcp-session! [socket]
   (p/do (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
         (.end socket)))
