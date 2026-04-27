@@ -23,34 +23,14 @@
     (or result 0)))
 
 (defn- evaluate-code
-  "Evaluate code via the MCP evaluate tool. Returns {:result parsed :raw raw-response}."
+  "Evaluate code via the MCP evaluate tool."
   [socket id {:keys [code namespace session-key who description]}]
-  (let [args (cond-> {:code code
-                      :namespace namespace
-                      :replSessionKey session-key
-                      :who who}
-               description (assoc :description description))]
-    (p/let [raw (mcp/call-tool-raw socket id "clojure_evaluate_code" args)
-            text (get-in raw [:result :content 0 :text])
-            parsed (when text
-                     (js->clj (.parse js/JSON text) :keywordize-keys true))]
-      {:result parsed :raw raw})))
-
-(defn- log-eval-result!
-  [label result raw-response]
-  (js/console.log label (pr-str result))
-  (when (nil? result)
-    (throw (js/Error. (str label " returned nil, raw response: " (pr-str raw-response)))))
-  (when (:error result)
-    (throw (js/Error. (str label " returned error " (pr-str result)))))
-  result)
-
-(defn- output-after-checkpoint
-  [socket checkpoint]
-  (when (number? checkpoint)
-    (query-output-log socket 96
-                      "[:find [(pull ?e [*]) ...] :in $ ?since :where [?e :output/line ?l] [(> ?l ?since)]]"
-                      [checkpoint])))
+  (mcp/call-tool socket id "clojure_evaluate_code"
+                 (cond-> {:code code
+                          :namespace namespace
+                          :replSessionKey session-key
+                          :who who}
+                   description (assoc :description description))))
 
 (defn- wait-for-output
   "Poll the output log until pred returns truthy for the query result."
@@ -61,11 +41,7 @@
         (if (pred result)
           result
           (if (> (- (.now js/Date) start) timeout)
-            (p/let [rows-after-checkpoint (output-after-checkpoint socket (first inputs))]
-              (throw (js/Error. (str "wait-for-output timed out after " timeout "ms"
-                                     " inputs=" (pr-str inputs)
-                                     " last-result=" (pr-str result)
-                                     " rows-after-checkpoint=" (pr-str rows-after-checkpoint)))))
+            (throw (js/Error. (str "wait-for-output timed out after " timeout "ms")))
             (p/do (p/delay 100)
                   (p/recur))))))))
 
@@ -92,13 +68,12 @@
                 ;; === 1. Basic query (existing) ===
                 checkpoint (get-max-line socket)
 
-                basic-eval (evaluate-code socket 1
+                _ (evaluate-code socket 1
                                                  {:code "(+ 21 21)"
                                                   :namespace "user"
                                                   :session-key session-key
                                                   :who "e2e-output-basic"
                                                   :description "e2e basic query test"})
-                _ (log-eval-result! "[output-log-basic] Eval result:" (:result basic-eval) (:raw basic-eval))
 
                 basic-rows (wait-for-output
                             socket
@@ -268,13 +243,13 @@
                 "Alpha and beta should have different line numbers"))
 
           (testing "Who validation: reserved values rejected"
-            (is (some? (:error (:result ui-result)))
+            (is (some? (:error ui-result))
                 "who='ui' should return an error")
-            (is (some? (:error (:result api-result)))
+            (is (some? (:error api-result))
                 "who='api' should return an error"))
 
           (testing "Who validation: blank value rejected"
-            (is (some? (:error (:result blank-result)))
+            (is (some? (:error blank-result))
                 "who='' (blank) should return an error"))
 
           (testing "Output categories: eval produces evaluationResults with who"
@@ -292,9 +267,9 @@
                 "Should have error output or output entry for stderr"))
 
           (testing "otherWhosSinceLast: cross-who awareness"
-            (is (some? (:other-whos-since-last (:result cross-result)))
+            (is (some? (:other-whos-since-last cross-result))
                 "Should include other-whos-since-last field")
-            (is (some #(= "e2e-cross-b" %) (:other-whos-since-last (:result cross-result)))
+            (is (some #(= "e2e-cross-b" %) (:other-whos-since-last cross-result))
                 "Should list the interloping who slug"))
 
           (testing "Category filter query: can filter by specific category"
@@ -324,13 +299,12 @@
                   checkpoint (get-max-line socket)
 
                   ;; Evaluate code that returns a data URL
-                  image-eval (evaluate-code socket 20
+                  _ (evaluate-code socket 20
                                                    {:code "\"data:image/png;base64,iVBORw0KGgo=\""
                                                     :namespace "user"
                                                     :session-key session-key
                                                     :who "e2e-output-image"
                                                     :description "output log image test"})
-                  _ (log-eval-result! "[output-log-image] Eval result:" (:result image-eval) (:raw image-eval))
 
                   ;; Wait for the eval result to appear in the log
                   _ (wait-for-output
@@ -380,13 +354,12 @@
                   checkpoint (get-max-line socket)
 
                   ;; Evaluate code that returns a data URL
-                  cap-eval (evaluate-code socket 30
+                  _ (evaluate-code socket 30
                                                  {:code "\"data:image/png;base64,iVBORw0KGgo=\""
                                                   :namespace "user"
                                                   :session-key session-key
                                                   :who "e2e-output-cap"
                                                   :description "output log default cap test"})
-                  _ (log-eval-result! "[output-log-cap] Eval result:" (:result cap-eval) (:raw cap-eval))
 
                   ;; Wait for the eval result to appear in the log
                   _ (wait-for-output

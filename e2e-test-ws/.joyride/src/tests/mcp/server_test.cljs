@@ -417,7 +417,6 @@
                                 (or (->> (:sessions parsed)
                                          (some (fn [s] (when (:isActiveSession s) (:replSessionKey s)))))
                                     (:replSessionKey (first (:sessions parsed)))))
-
                   ;; Evaluate code that returns a data URL string, with maxImages 0
                   eval-resp (mcp/send-request socket
                               {:jsonrpc "2.0"
@@ -431,8 +430,6 @@
                                                     :maxImages 0}}})
                   content (let [outer (js->clj eval-resp :keywordize-keys true)]
                             (get-in outer [:result :content]))
-
-                  _ (js/console.log "[eval-max-images-zero] content:" (pr-str content))
                   _ (mcp/stop-mcp-session! socket)]
             (is (= 1 (count content))
                 "Should have only text content (no images with maxImages 0)")

@@ -46,21 +46,15 @@
        (.on socket "data" on-data)
        (.write socket request-str)))))
 
-(defn call-tool-raw
-  "Send a tools/call request and return the full response (keywordized)."
+(defn call-tool
+  "Send a tools/call request and return the parsed text content."
   [socket id tool-name arguments]
   (p/let [resp (send-request socket {:jsonrpc "2.0"
                                      :id id
                                      :method "tools/call"
                                      :params {:name tool-name
                                               :arguments arguments}})
-          outer (js->clj resp :keywordize-keys true)]
-    outer))
-
-(defn call-tool
-  "Send a tools/call request and return the parsed text content."
-  [socket id tool-name arguments]
-  (p/let [outer (call-tool-raw socket id tool-name arguments)
+          outer (js->clj resp :keywordize-keys true)
           text (get-in outer [:result :content 0 :text])]
     (when text
       (js->clj (.parse js/JSON text) :keywordize-keys true))))
@@ -160,5 +154,3 @@
                        :timeout 15000
                        :message "[MCP helpers] Config enableMcpReplEvaluation not propagated within 15s")]
     nil))
-
-
