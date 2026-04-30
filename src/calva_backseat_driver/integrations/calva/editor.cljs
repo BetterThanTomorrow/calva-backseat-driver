@@ -188,16 +188,16 @@
                                 form-range (first (:ranges-object form-data))
                                 ;; For deletions, extend range to consume surrounding blank lines
                                 effective-range (if (and (string/blank? trimmed-form)
-                                                        (not= :insertionPoint ranges-fn-key))
+                                                         (not= :insertionPoint ranges-fn-key))
                                                   (let [start-line (.. form-range -start -line)
                                                         end-line (.. form-range -end -line)
                                                         total-lines (.-lineCount vscode-document)
                                                         next-line (inc end-line)
                                                         ;; Extend start to consume preceding blank line
                                                         effective-start (if (and (pos? start-line)
-                                                                                (string/blank? (.-text (.lineAt vscode-document (dec start-line)))))
-                                                                         (vscode/Position. (dec start-line) 0)
-                                                                         (.-start form-range))
+                                                                                 (string/blank? (.-text (.lineAt vscode-document (dec start-line)))))
+                                                                          (vscode/Position. (dec start-line) 0)
+                                                                          (.-start form-range))
                                                         ;; Extend end to consume trailing newline
                                                         effective-end (if (< next-line total-lines)
                                                                         (vscode/Position. next-line 0)
@@ -208,12 +208,12 @@
                                                                 effective-range
                                                                 text)
                                 diagnostics-after-edit (p/loop [attempts 0]
-                                                        (p/let [_ (p/delay 10)
-                                                                diags (get-diagnostics-for-file file-path)]
-                                                          (if (or (not= diags diagnostics-before-edit)
-                                                                  (>= attempts 100))
-                                                            diags
-                                                            (p/recur (inc attempts)))))]
+                                                         (p/let [_ (p/delay 10)
+                                                                 diags (get-diagnostics-for-file file-path)]
+                                                           (if (or (not= diags diagnostics-before-edit)
+                                                                   (>= attempts 100))
+                                                             diags
+                                                             (p/recur (inc attempts)))))]
                           (if edit-result
                             (do
                               (.save vscode-document)
