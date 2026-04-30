@@ -181,14 +181,39 @@
                       ;; Valid brackets - proceed with edit
                       (p/let [form-data (get-ranges-form-data-by-line file-path final-line-number ranges-fn-key)
                               diagnostics-before-edit (get-diagnostics-for-file file-path)]
-                        (p/let [text (if (= :insertionPoint ranges-fn-key)
-                                       (str (string/trim new-form) "\n\n")
-                                       (string/trim new-form))
+                        (p/let [trimmed-form (string/trim new-form)
+                                text (if (= :insertionPoint ranges-fn-key)
+                                       (str trimmed-form "\n\n")
+                                       trimmed-form)
+                                form-range (first (:ranges-object form-data))
+                                ;; For deletions, extend range to consume surrounding blank lines
+                                effective-range (if (and (string/blank? trimmed-form)
+                                                        (not= :insertionPoint ranges-fn-key))
+                                                  (let [start-line (.. form-range -start -line)
+                                                        end-line (.. form-range -end -line)
+                                                        total-lines (.-lineCount vscode-document)
+                                                        next-line (inc end-line)
+                                                        ;; Extend start to consume preceding blank line
+                                                        effective-start (if (and (pos? start-line)
+                                                                                (string/blank? (.-text (.lineAt vscode-document (dec start-line)))))
+                                                                         (vscode/Position. (dec start-line) 0)
+                                                                         (.-start form-range))
+                                                        ;; Extend end to consume trailing newline
+                                                        effective-end (if (< next-line total-lines)
+                                                                        (vscode/Position. next-line 0)
+                                                                        (.-end form-range))]
+                                                    (vscode/Range. effective-start effective-end))
+                                                  form-range)
                                 edit-result (edit-replace-range file-path
-                                                                (first (:ranges-object form-data))
+                                                                effective-range
                                                                 text)
-                                _ (p/delay 1000)
-                                diagnostics-after-edit (get-diagnostics-for-file file-path)]
+                                diagnostics-after-edit (p/loop [attempts 0]
+                                                        (p/let [_ (p/delay 10)
+                                                                diags (get-diagnostics-for-file file-path)]
+                                                          (if (or (not= diags diagnostics-before-edit)
+                                                                  (>= attempts 100))
+                                                            diags
+                                                            (p/recur (inc attempts)))))]
                           (if edit-result
                             (do
                               (.save vscode-document)

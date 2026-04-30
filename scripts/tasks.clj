@@ -80,18 +80,20 @@
   [& args]
   (fs/create-dirs (fs/parent e2e-output-log))
   (println "Output:" e2e-output-log)
-  (let [exit-code (with-open [writer (io/writer (io/file e2e-output-log))]
+  (let [start-ms (System/currentTimeMillis)
+        exit-code (with-open [writer (io/writer (io/file e2e-output-log))]
                     (with-spinner "Running e2e tests..."
                       #(:exit @(p/process (into ["node" "./e2e-test-ws/launch.js"] args)
                                           {:out writer :err writer}))))
+        elapsed-s (/ (- (System/currentTimeMillis) start-ms) 1000.0)
         {:keys [passed failed total warning]} (parse-test-counts e2e-output-log)]
     (println)
     (when warning (println (str "WARNING: " warning)))
     (println (format "Tests: %d/%d passed" passed total))
     (if (zero? exit-code)
-      (println "Status: ALL TESTS PASSED")
+      (println (format "Status: ALL TESTS PASSED (%.1fs)" elapsed-s))
       (do
-        (println (format "Status: TESTS FAILED (%d failed, exit code %d)" failed exit-code))
+        (println (format "Status: TESTS FAILED (%d failed, exit code %d, %.1fs)" failed exit-code elapsed-s))
         (throw (ex-info "E2E tests failed" {:babashka/exit exit-code}))))))
 
 #_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
