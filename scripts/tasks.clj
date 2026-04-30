@@ -70,9 +70,10 @@
   (let [content (slurp log-file)]
     (if-let [[_ pass fail error] (re-find #"Runner: tests run, results: \{:pass (\d+),?\s*:fail (\d+),?\s*:error (\d+)\}" content)]
       (let [passed (parse-long pass)
-            failed (+ (parse-long fail) (parse-long error))]
-        {:passed passed :failed failed :total (+ passed failed)})
-      {:passed 0 :failed 0 :total 0 :warning "Could not find Runner summary in log"})))
+            failed (parse-long fail)
+            errored (parse-long error)]
+        {:passed passed :failed failed :errored errored :total (+ passed failed errored)})
+      {:passed 0 :failed 0 :errored 0 :total 0 :warning "Could not find Runner summary in log"})))
 
 (defn- run-e2e-launch!
   "Run e2e tests via launch.js with output redirected to log file.
@@ -86,14 +87,15 @@
                       #(:exit @(p/process (into ["node" "./e2e-test-ws/launch.js"] args)
                                           {:out writer :err writer}))))
         elapsed-s (/ (- (System/currentTimeMillis) start-ms) 1000.0)
-        {:keys [passed failed total warning]} (parse-test-counts e2e-output-log)]
+        {:keys [passed failed errored total warning]} (parse-test-counts e2e-output-log)
+        problems (+ failed errored)]
     (println)
     (when warning (println (str "WARNING: " warning)))
-    (println (format "Tests: %d/%d passed" passed total))
+    (println (format "Tests: %d passed, %d failed, %d errored, %d total" passed failed errored total))
     (if (zero? exit-code)
       (println (format "Status: ALL TESTS PASSED (%.1fs)" elapsed-s))
       (do
-        (println (format "Status: TESTS FAILED (%d failed, exit code %d, %.1fs)" failed exit-code elapsed-s))
+        (println (format "Status: TESTS FAILED (%d problems, exit code %d, %.1fs)" problems exit-code elapsed-s))
         (throw (ex-info "E2E tests failed" {:babashka/exit exit-code}))))))
 
 #_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
