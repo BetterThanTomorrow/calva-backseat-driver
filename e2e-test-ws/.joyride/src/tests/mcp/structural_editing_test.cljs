@@ -18,8 +18,10 @@
 (defn- read-test-file+ [previous-content]
   (if (some? previous-content)
     ;; Poll until content changes from previous
+    ;; Ignore empty string — transient state from truncate-before-write on Linux
     (wait-for+ #(let [content (fs/readFileSync (test-file-path) "utf8")]
-                  (when (not= content previous-content)
+                  (when (and (seq content)
+                             (not= content previous-content))
                     content))
                :interval 10
                :timeout 5000

@@ -13,7 +13,6 @@
 				"projectRootPath": [
 					"."
 				],
-				"autoSelectForConnect": true,
 				"menuSelections": {
 					"cljAliases": [],
 					"cljsDefaultBuild": ":extension",
