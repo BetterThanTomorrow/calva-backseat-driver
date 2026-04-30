@@ -136,6 +136,14 @@
       },
       {
         "path": "./assets/instructions/backseat-driver.instructions.md"
+      },
+      {
+        "path": "./assets/skills/backseat-driver/SKILL.md",
+        "when": "config.calva-backseat-driver.provideBdSkill"
+      },
+      {
+        "path": "./assets/skills/editing-clojure-files/SKILL.md",
+        "when": "config.calva-backseat-driver.provideEditSkill"
       }
     ],
     "languageModelTools": [
