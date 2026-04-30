@@ -10,7 +10,7 @@ E2e tests run inside a VS Code Extension Host via Joyride. They exercise the ful
 ## Running Tests
 
 ```bash
-bb run-e2e-tests-ws     # VS Code Insiders must NOT be running
+bb run-e2e-tests-ws
 ```
 
 - Output summary prints to stdout

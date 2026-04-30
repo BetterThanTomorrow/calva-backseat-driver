@@ -183,7 +183,7 @@
                               diagnostics-before-edit (get-diagnostics-for-file file-path)]
                         (p/let [text (if (= :insertionPoint ranges-fn-key)
                                        (str (string/trim new-form) "\n\n")
-                                       new-form)
+                                       (string/trim new-form))
                                 edit-result (edit-replace-range file-path
                                                                 (first (:ranges-object form-data))
                                                                 text)

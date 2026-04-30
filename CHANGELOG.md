@@ -6,6 +6,7 @@ Changes to Calva Backseat Driver
 
 - Workaround: VS Code is not exposing bundled skills in a way that the agent can consume, duplicating them as instructions for now
   - https://github.com/microsoft/vscode/issues/313263
+- Fix: Structural editor leaving extra blank lines behind
 
 ## [v0.0.30] - 2026-04-26
 

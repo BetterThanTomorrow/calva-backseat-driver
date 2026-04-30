@@ -11,6 +11,9 @@ node_modules
 # CLJS
 .shadow-cljs/
 
+# E2E test temp files
+structural_edit_target.clj
+
 # Calva, lsp, kondo
 .cache
 output.calva-repl
