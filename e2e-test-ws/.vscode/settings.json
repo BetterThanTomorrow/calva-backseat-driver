@@ -1,5 +1,6 @@
 {
     "git.openRepositoryInParentFolders": "never",
+    "calva-backseat-driver.mcpSocketServerPort": 0,
     "calva.customREPLCommandSnippets": [
         {
 "name": "Run all vsc-et e2e tests",
