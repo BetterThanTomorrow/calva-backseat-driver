@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- MCP server: Fix `input` param schema for log tool
+
 ## [v0.0.31] - 2026-04-30
 
 - Workaround: VS Code is not exposing bundled skills in a way that the agent can consume, duplicating them as instructions for now
