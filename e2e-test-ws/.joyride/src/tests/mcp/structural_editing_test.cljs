@@ -70,6 +70,20 @@
   (when (fs/existsSync (tiny-file-path))
     (fs/unlinkSync (tiny-file-path))))
 
+(defn- active-editor-path []
+  (some-> vscode/window .-activeTextEditor .-document .-uri .-fsPath))
+
+(defn- activate-decoy-editor+ []
+  (let [uri (vscode/Uri.joinPath mcp/workspace-uri ".vscode" "settings.json")]
+    (p/let [document (vscode/workspace.openTextDocument uri)
+            _ (vscode/window.showTextDocument document #js {:preview false})
+            _ (wait-for+ #(when (= (.-fsPath uri) (active-editor-path))
+                            true)
+                         :interval 10
+                         :timeout 5000
+                         :message "Decoy editor did not become active within 5s")]
+      nil)))
+
 (deftest-async structural-editing-tests
   (-> (p/let [{:keys [socket]} (mcp/start-mcp-session!)
 
@@ -84,6 +98,8 @@
               ;; === 1. Replace with trailing newlines — should NOT accumulate blank lines ===
 
               _ (js/console.log "[structural-edit] Testing replace with trailing newlines...")
+              _ (activate-decoy-editor+)
+              active-before-replace (active-editor-path)
               replace-result (mcp/call-tool socket 101 "replace_top_level_form"
                                             {:filePath file-path
                                              :line 3
@@ -108,6 +124,8 @@
               ;; === 3. Insert form — should have proper spacing ===
 
               _ (js/console.log "[structural-edit] Testing insert...")
+              _ (activate-decoy-editor+)
+              active-before-insert (active-editor-path)
               insert-result (mcp/call-tool socket 103 "insert_top_level_form"
                                            {:filePath file-path
                                             :line 3
@@ -209,6 +227,8 @@
               "File creation should succeed"))
 
         (testing "replace_top_level_form trims trailing whitespace"
+          (is (not= active-before-replace file-path)
+              "Replace should run while a different file is active")
           (is (:success replace-result)
               "Replace should succeed")
           (is (<= (count-consecutive-blank-lines content-after-replace) 1)
@@ -223,6 +243,8 @@
               "Replacing with same content should be idempotent"))
 
         (testing "insert_top_level_form produces proper spacing"
+          (is (not= active-before-insert file-path)
+              "Insert should run while a different file is active")
           (is (:success insert-result)
               "Insert should succeed")
           (is (<= (count-consecutive-blank-lines content-after-insert) 1)
