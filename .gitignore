@@ -39,3 +39,5 @@ dist/
 /ignore/
 example-projects/
 dev/agent-docs
+
+calva-mcp-server.code-workspace
