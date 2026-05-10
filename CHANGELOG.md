@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.32] - 2026-05-10
+
 - MCP server: Fix `input` param schema for log tool
 
 ## [v0.0.31] - 2026-04-30
