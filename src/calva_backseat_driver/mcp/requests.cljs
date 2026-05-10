@@ -104,7 +104,8 @@
      :inputSchema {:type "object"
                    :properties {"query" {:type "string"
                                          :description (param-description tool-name "query")}
-                                "inputs" {:type "string"
+                                "inputs" {:type "array"
+                                          :items {}
                                           :description (param-description tool-name "inputs")}
                                 "maxImages" {:type "number"
                                              :description (param-description tool-name "maxImages")}}
@@ -548,5 +549,4 @@
 
     :else ;; returning nil so that the response is not sent (JSON-RPC notifications)
     nil))
-
 
