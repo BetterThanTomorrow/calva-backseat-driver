@@ -58,17 +58,15 @@
                              "betterthantomorrow.calva-backseat-driver")
                             .-extensionUri)
           script-uri (vscode/Uri.joinPath extension-uri "dist" "calva-mcp-server.js")
-          script-path (.-fsPath script-uri)]
-      (fs/mkdirSync wrapper-config-path
-                    #js {:recursive true}
-                    (fn [err]
-                      (when err (throw err))
-                      (js/console.log "Directories created successfully")))
+          script-path (.-fsPath script-uri)
+          dest-path (path/join wrapper-config-path "calva-mcp-server.js")]
+      (fs/mkdirSync wrapper-config-path #js {:recursive true})
+      (try (fs/unlinkSync dest-path) (catch :default _e))
       (if js/goog.DEBUG
         (try
-          (fs/symlinkSync script-path (path/join wrapper-config-path "calva-mcp-server.js"))
+          (fs/symlinkSync script-path dest-path)
           (catch :default _e))
-        (fs/copyFileSync script-path (path/join wrapper-config-path "calva-mcp-server.js"))))
+        (fs/copyFileSync script-path dest-path)))
 
     :else
     (js/console.warn "Unknown MCP effect:" (pr-str effect))))
