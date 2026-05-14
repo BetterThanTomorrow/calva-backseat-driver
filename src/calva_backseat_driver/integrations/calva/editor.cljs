@@ -32,17 +32,15 @@
    in the document at the absolute `file-path`."
   [file-path line-number ranges-fn-key]
   (p/let [^js vscode-document (get-document-from-path file-path)
-          vscode-editor (get-editor-from-document vscode-document)
           vscode-position (vscode/Position. (dec line-number) 0)]
     {:vscode-document vscode-document
      :ranges-object (if (= :insertionPoint ranges-fn-key)
                       [(vscode/Range. vscode-position vscode-position), ""]
-                      ((get-in calva/calva-api [:ranges ranges-fn-key]) vscode-editor vscode-position))}))
+                      ((get-in calva/calva-api [:ranges ranges-fn-key]) vscode-document vscode-position))}))
 
 (defn- edit-replace-range [file-path vscode-range new-text]
-  (p/let [^js editor (get-editor-from-file-path file-path)]
-    (.revealRange editor vscode-range)
-    ((get-in calva/calva-api [:editor :replace]) editor vscode-range new-text)))
+  (p/let [^js vscode-document (get-document-from-path file-path)]
+    ((get-in calva/calva-api [:editor :replace]) vscode-document vscode-range new-text)))
 
 (def ^:private severity-map
   "Map VS Code diagnostic severity levels to keywords"
@@ -207,6 +205,7 @@
                                 edit-result (edit-replace-range file-path
                                                                 effective-range
                                                                 text)
+                                _ (.save vscode-document)
                                 diagnostics-after-edit (p/loop [attempts 0]
                                                          (p/let [_ (p/delay 10)
                                                                  diags (get-diagnostics-for-file file-path)]
@@ -215,13 +214,11 @@
                                                              diags
                                                              (p/recur (inc attempts)))))]
                           (if edit-result
-                            (do
-                              (.save vscode-document)
-                              (cond-> {:success true
-                                       :diagnostics-before-edit diagnostics-before-edit
-                                       :diagnostics-after-edit diagnostics-after-edit}
-                                (not= final-line-number line-number)
-                                (assoc :actual-line-used final-line-number)))
+                            (cond-> {:success true
+                                     :diagnostics-before-edit diagnostics-before-edit
+                                     :diagnostics-after-edit diagnostics-after-edit}
+                              (not= final-line-number line-number)
+                              (assoc :actual-line-used final-line-number))
                             {:success false
                              :diagnostics-before-edit diagnostics-before-edit})))))))))
           (p/catch (fn [e]
@@ -335,9 +332,15 @@
                   workspace-edit (vscode/WorkspaceEdit.)
                   _ (.set workspace-edit uri #js [edit])
                   edit-result (vscode/workspace.applyEdit workspace-edit)
-                  _ (p/delay 1000)
-                  diagnostics-after-edit (get-diagnostics-for-file file-path)]
-            (.save vscode-document)
+                  _ (.save vscode-document)
+                  diagnostics-after-edit (p/loop [attempts 0]
+                                           (p/let [_ (p/delay 10)
+                                                   diags (get-diagnostics-for-file file-path)]
+                                             (if (or (not= diags diagnostics-before-edit)
+                                                     (>= attempts 100))
+                                               diags
+                                               (p/recur (inc attempts)))))]
+
             (if edit-result
               {:success true
                :appended-at-end true
