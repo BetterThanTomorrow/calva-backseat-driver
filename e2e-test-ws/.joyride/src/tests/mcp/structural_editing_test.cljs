@@ -88,235 +88,202 @@
                          :message "Decoy editor did not become active within 5s")]
       nil)))
 
+;; --- Test scenario helpers ---
+
+(defn- test-create-file+ [socket file-path]
+  (p/let [result (mcp/call-tool socket 100 "clojure_create_file"
+                                {:filePath file-path
+                                 :content (initial-file-content)})]
+    (testing "create_file creates file successfully"
+      (is (:success result) "File creation should succeed"))))
+
+(defn- edit-with-decoy-and-verify+
+  "Activate decoy editor, perform edit, verify active editor unchanged and file not visible."
+  [socket file-path tool-call-fn prev-content]
+  (p/let [_ (activate-decoy-editor+)
+          active-before (active-editor-path)
+          result (tool-call-fn)
+          content (read-test-file+ prev-content)
+          active-after (active-editor-path)]
+    {:result result :content content
+     :active-before active-before :active-after active-after}))
+
+(defn- assert-invisible-edit [{:keys [active-before active-after]} file-path]
+  (is (not= active-before file-path)
+      "Edit should run while a different file is active")
+  (is (not (file-in-visible-editors? file-path))
+      "Edited file should not appear in any visible editor")
+  (is (= active-after active-before)
+      "Active editor should remain unchanged"))
+
+(defn- test-replace-trims-whitespace+ [socket file-path]
+  (p/let [{:keys [result content] :as ctx}
+          (edit-with-decoy-and-verify+
+           socket file-path
+           #(mcp/call-tool socket 101 "replace_top_level_form"
+                           {:filePath file-path
+                            :line 3
+                            :targetLineText "(defn add-numbers"
+                            :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b))\n\n\n"})
+           nil)]
+    (testing "replace_top_level_form trims trailing whitespace"
+      (assert-invisible-edit ctx file-path)
+      (is (:success result) "Replace should succeed")
+      (is (<= (count-consecutive-blank-lines content) 1)
+          "Replace should not leave more than 1 consecutive blank line"))))
+
+(defn- test-replace-idempotent+ [socket file-path]
+  (p/let [content-before (read-test-file+ nil)
+          result (mcp/call-tool socket 102 "replace_top_level_form"
+                                {:filePath file-path
+                                 :line 3
+                                 :targetLineText "(defn add-numbers"
+                                 :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b))\n\n"})
+          content-after (read-test-file+ nil)]
+    (testing "replace_top_level_form is idempotent for whitespace"
+      (is (:success result) "Second replace should succeed")
+      (is (<= (count-consecutive-blank-lines content-after) 1)
+          "Repeated replace should not accumulate blank lines")
+      (is (= content-before content-after)
+          "Replacing with same content should be idempotent"))))
+
+(defn- test-insert-proper-spacing+ [socket file-path]
+  (p/let [content-before (read-test-file+ nil)
+          {:keys [result content] :as ctx}
+          (edit-with-decoy-and-verify+
+           socket file-path
+           #(mcp/call-tool socket 103 "insert_top_level_form"
+                           {:filePath file-path
+                            :line 3
+                            :targetLineText "(defn add-numbers"
+                            :newForm "(defn multiply-numbers\n  \"Multiplies a and b\"\n  [a b]\n  (* a b))\n\n"})
+           content-before)]
+    (testing "insert_top_level_form produces proper spacing"
+      (assert-invisible-edit ctx file-path)
+      (is (:success result) "Insert should succeed")
+      (is (<= (count-consecutive-blank-lines content) 1)
+          "Insert should not leave more than 1 consecutive blank line")
+      (is (string/includes? content "(defn multiply-numbers")
+          "Inserted form should appear in file"))))
+
+(defn- test-append-trims-whitespace+ [socket file-path]
+  (p/let [content-before (read-test-file+ nil)
+          result (mcp/call-tool socket 104 "clojure_append_code"
+                                {:filePath file-path
+                                 :code "(defn divide-numbers\n  \"Divides a by b\"\n  [a b]\n  (/ a b))\n\n\n"})
+          content (read-test-file+ content-before)
+          active-after (active-editor-path)]
+    (testing "clojure_append_code trims trailing whitespace"
+      (is (:success result) "Append should succeed")
+      (is (<= (count-consecutive-blank-lines content) 1)
+          "Append should not leave more than 1 consecutive blank line")
+      (is (string/includes? content "(defn divide-numbers")
+          "Appended form should appear in file")
+      (is (not (file-in-visible-editors? file-path))
+          "Edited file should not appear in any visible editor after append"))))
+
+(defn- test-delete-form+ [socket file-path]
+  (p/let [content-before (read-test-file+ nil)
+          result (mcp/call-tool socket 105 "replace_top_level_form"
+                                {:filePath file-path
+                                 :line 8
+                                 :targetLineText "(defn add-numbers"
+                                 :newForm ""})
+          content (read-test-file+ content-before)]
+    (testing "replace_top_level_form with empty string deletes form"
+      (is (:success result) "Delete should succeed")
+      (is (not (string/includes? content "(defn add-numbers"))
+          "Deleted form should not appear in file")
+      (is (<= (count-consecutive-blank-lines content) 1)
+          "Delete should not leave more than 1 consecutive blank line")
+      (is (string/includes? content "(defn multiply-numbers")
+          "Other forms should remain after delete")
+      (is (string/includes? content "(defn subtract-numbers")
+          "Other forms should remain after delete")
+      (is (not (file-in-visible-editors? file-path))
+          "Edited file should not appear in any visible editor after delete"))))
+
+(defn- delete-and-verify-gone+
+  "Delete a form by replacing with empty string and verify it's gone from file."
+  [socket file-path {:keys [id line target-text form-name test-label]}]
+  (p/let [content-before (read-test-file+ nil)
+          result (mcp/call-tool socket id "replace_top_level_form"
+                                {:filePath file-path
+                                 :line line
+                                 :targetLineText target-text
+                                 :newForm ""})
+          content (read-test-file+ content-before)]
+    (testing test-label
+      (is (:success result))
+      (is (<= (count-consecutive-blank-lines content) 1))
+      (is (not (string/includes? content form-name))))))
+
+(defn- test-delete-first-form+ [socket file-path]
+  (delete-and-verify-gone+ socket file-path
+    {:id 106 :line 3 :target-text "(defn multiply-numbers"
+     :form-name "(defn multiply-numbers"
+     :test-label "delete first form keeps spacing stable"}))
+
+(defn- test-delete-last-form+ [socket file-path]
+  (delete-and-verify-gone+ socket file-path
+    {:id 107 :line 8 :target-text "(defn divide-numbers"
+     :form-name "(defn divide-numbers"
+     :test-label "delete last form keeps spacing stable"}))
+
+(defn- test-wrong-target-text+ [socket file-path]
+  (p/let [result (mcp/call-tool socket 108 "insert_top_level_form"
+                                {:filePath file-path
+                                 :line 3
+                                 :targetLineText "(defn does-not-exist [x]"
+                                 :newForm "(defn nope [] :nope)"})]
+    (testing "wrong targetLineText returns clear error"
+      (is (expect-tool-failure result "Target line text not found")))))
+
+(defn- test-fuzzy-window-miss+ [socket file-path]
+  (p/let [result (mcp/call-tool socket 109 "replace_top_level_form"
+                                {:filePath file-path
+                                 :line 999
+                                 :targetLineText "(defn subtract-numbers"
+                                 :newForm "(defn subtract-numbers [a b] (- a b))"})]
+    (testing "line outside fuzzy window fails even with matching text"
+      (is (expect-tool-failure result "Target line text not found")))))
+
+(defn- test-tiny-file+ [socket]
+  (p/let [create-result (mcp/call-tool socket 110 "clojure_create_file"
+                                       {:filePath (tiny-file-path)
+                                        :content "(ns structural-edit-tiny-target)\n(def x 1)\n"})
+          replace-result (mcp/call-tool socket 111 "replace_top_level_form"
+                                        {:filePath (tiny-file-path)
+                                         :line 2
+                                         :targetLineText "(def x 1)"
+                                         :newForm "(def x 2)"})
+          content (wait-for+ #(let [c (fs/readFileSync (tiny-file-path) "utf8")]
+                                (when (string/includes? c "(def x 2)") c))
+                             :interval 10
+                             :timeout 5000
+                             :message "Tiny file content did not update within 5s")]
+    (testing "tiny file replace works"
+      (is (:success create-result))
+      (is (:success replace-result))
+      (is (string/includes? content "(def x 2)")))))
+
+;; --- Test orchestrator ---
+
 (deftest-async structural-editing-tests
   (-> (p/let [{:keys [socket]} (mcp/start-mcp-session!)
-
-              ;; Create test file
-              file-path (test-file-path)
-              create-result (mcp/call-tool socket 100 "clojure_create_file"
-                                           {:filePath file-path
-                                            :content (initial-file-content)})
-
-              _ (js/console.log "[structural-edit] Create result:" (pr-str create-result))
-
-              ;; === 1. Replace with trailing newlines — should NOT accumulate blank lines ===
-
-              _ (js/console.log "[structural-edit] Testing replace with trailing newlines...")
-              _ (activate-decoy-editor+)
-              active-before-replace (active-editor-path)
-              replace-result (mcp/call-tool socket 101 "replace_top_level_form"
-                                            {:filePath file-path
-                                             :line 3
-                                             :targetLineText "(defn add-numbers"
-                                             :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b))\n\n\n"})
-
-              _ (js/console.log "[structural-edit] Replace result:" (pr-str replace-result))
-              content-after-replace (read-test-file+ nil)
-              _ (js/console.log "[structural-edit] Content after replace:" (pr-str content-after-replace))
-              active-after-replace (active-editor-path)
-
-              ;; === 2. Replace again to test idempotency ===
-
-              replace-result-2 (mcp/call-tool socket 102 "replace_top_level_form"
-                                              {:filePath file-path
-                                               :line 3
-                                               :targetLineText "(defn add-numbers"
-                                               :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b))\n\n"})
-
-              content-after-replace-2 (read-test-file+ nil)
-              _ (js/console.log "[structural-edit] Content after second replace:" (pr-str content-after-replace-2))
-
-              ;; === 3. Insert form — should have proper spacing ===
-
-              _ (js/console.log "[structural-edit] Testing insert...")
-              _ (activate-decoy-editor+)
-              active-before-insert (active-editor-path)
-              insert-result (mcp/call-tool socket 103 "insert_top_level_form"
-                                           {:filePath file-path
-                                            :line 3
-                                            :targetLineText "(defn add-numbers"
-                                            :newForm "(defn multiply-numbers\n  \"Multiplies a and b\"\n  [a b]\n  (* a b))\n\n"})
-
-              _ (js/console.log "[structural-edit] Insert result:" (pr-str insert-result))
-              content-after-insert (read-test-file+ content-after-replace-2)
-              _ (js/console.log "[structural-edit] Content after insert:" (pr-str content-after-insert))
-              active-after-insert (active-editor-path)
-
-              ;; === 4. Append code — should not produce extra blank lines ===
-
-              _ (js/console.log "[structural-edit] Testing append...")
-              append-result (mcp/call-tool socket 104 "clojure_append_code"
-                                           {:filePath file-path
-                                            :code "(defn divide-numbers\n  \"Divides a by b\"\n  [a b]\n  (/ a b))\n\n\n"})
-
-              _ (js/console.log "[structural-edit] Append result:" (pr-str append-result))
-              content-after-append (read-test-file+ content-after-insert)
-              _ (js/console.log "[structural-edit] Content after append:" (pr-str content-after-append))
-              active-after-append (active-editor-path)
-
-              ;; === 5. Delete form — should not leave extra blank lines ===
-
-              _ (js/console.log "[structural-edit] Testing delete...")
-              delete-result (mcp/call-tool socket 105 "replace_top_level_form"
-                                           {:filePath file-path
-                                            :line 8
-                                            :targetLineText "(defn add-numbers"
-                                            :newForm ""})
-
-              _ (js/console.log "[structural-edit] Delete result:" (pr-str delete-result))
-              content-after-delete (read-test-file+ content-after-append)
-              _ (js/console.log "[structural-edit] Content after delete:" (pr-str content-after-delete))
-              active-after-delete (active-editor-path)
-
-              ;; === 6. Delete first form — should not leave extra blank lines ===
-              _ (js/console.log "[structural-edit] Testing delete first form...")
-              delete-first-result (mcp/call-tool socket 106 "replace_top_level_form"
-                                                 {:filePath file-path
-                                                  :line 3
-                                                  :targetLineText "(defn multiply-numbers"
-                                                  :newForm ""})
-              _ (js/console.log "[structural-edit] Delete first result:" (pr-str delete-first-result))
-              content-after-delete-first (read-test-file+ content-after-delete)
-              _ (js/console.log "[structural-edit] Content after delete first:" (pr-str content-after-delete-first))
-
-              ;; === 7. Delete last function form — should not leave extra blank lines ===
-              ;; After step 6, file has: ns (1), subtract-numbers (3), divide-numbers (8)
-              _ (js/console.log "[structural-edit] Testing delete last form...")
-              delete-last-result (mcp/call-tool socket 107 "replace_top_level_form"
-                                                {:filePath file-path
-                                                 :line 8
-                                                 :targetLineText "(defn divide-numbers"
-                                                 :newForm ""})
-              _ (js/console.log "[structural-edit] Delete last result:" (pr-str delete-last-result))
-              content-after-delete-last (read-test-file+ content-after-delete-first)
-              _ (js/console.log "[structural-edit] Content after delete last:" (pr-str content-after-delete-last))
-
-              ;; === 8. Wrong targetLineText should fail clearly ===
-              _ (js/console.log "[structural-edit] Testing wrong target text...")
-              wrong-target-result (mcp/call-tool socket 108 "insert_top_level_form"
-                                                 {:filePath file-path
-                                                  :line 3
-                                                  :targetLineText "(defn does-not-exist [x]"
-                                                  :newForm "(defn nope [] :nope)"})
-              _ (js/console.log "[structural-edit] Wrong target result:" (pr-str wrong-target-result))
-
-              ;; === 9. Correct target text but far-away line should fail ===
-              _ (js/console.log "[structural-edit] Testing fuzzy window miss...")
-              fuzzy-window-miss-result (mcp/call-tool socket 109 "replace_top_level_form"
-                                                      {:filePath file-path
-                                                       :line 999
-                                                       :targetLineText "(defn subtract-numbers"
-                                                       :newForm "(defn subtract-numbers [a b] (- a b))"})
-              _ (js/console.log "[structural-edit] Fuzzy window miss result:" (pr-str fuzzy-window-miss-result))
-              ;; === 10. Tiny file replace should work ===
-              _ (js/console.log "[structural-edit] Testing tiny file...")
-              tiny-create-result (mcp/call-tool socket 110 "clojure_create_file"
-                                                {:filePath (tiny-file-path)
-                                                 :content "(ns structural-edit-tiny-target)\n(def x 1)\n"})
-              tiny-replace-result (mcp/call-tool socket 111 "replace_top_level_form"
-                                                 {:filePath (tiny-file-path)
-                                                  :line 2
-                                                  :targetLineText "(def x 1)"
-                                                  :newForm "(def x 2)"})
-              _ (js/console.log "[structural-edit] Tiny replace result:" (pr-str tiny-replace-result))
-              tiny-content-after-replace (wait-for+ #(let [content (fs/readFileSync (tiny-file-path) "utf8")]
-                                                       (when (string/includes? content "(def x 2)")
-                                                         content))
-                                                    :interval 10
-                                                    :timeout 5000
-                                                    :message "Tiny file content did not update within 5s")
-
-              _ (mcp/stop-mcp-session! socket)]
-
-        ;; === Assertions ===
-
-        (testing "create_file creates file successfully"
-          (is (:success create-result)
-              "File creation should succeed"))
-
-        (testing "replace_top_level_form trims trailing whitespace"
-          (is (not= active-before-replace file-path)
-              "Replace should run while a different file is active")
-          (is (:success replace-result)
-              "Replace should succeed")
-          (is (<= (count-consecutive-blank-lines content-after-replace) 1)
-              "Replace should not leave more than 1 consecutive blank line")
-          (is (not (file-in-visible-editors? file-path))
-              "Edited file should not appear in any visible editor after replace")
-          (is (= active-after-replace active-before-replace)
-              "Active editor should remain unchanged after replace"))
-
-        (testing "replace_top_level_form is idempotent for whitespace"
-          (is (:success replace-result-2)
-              "Second replace should succeed")
-          (is (<= (count-consecutive-blank-lines content-after-replace-2) 1)
-              "Repeated replace should not accumulate blank lines")
-          (is (= content-after-replace content-after-replace-2)
-              "Replacing with same content should be idempotent"))
-
-        (testing "insert_top_level_form produces proper spacing"
-          (is (not= active-before-insert file-path)
-              "Insert should run while a different file is active")
-          (is (:success insert-result)
-              "Insert should succeed")
-          (is (<= (count-consecutive-blank-lines content-after-insert) 1)
-              "Insert should not leave more than 1 consecutive blank line")
-          (is (string/includes? content-after-insert "(defn multiply-numbers")
-              "Inserted form should appear in file")
-          (is (not (file-in-visible-editors? file-path))
-              "Edited file should not appear in any visible editor after insert")
-          (is (= active-after-insert active-before-insert)
-              "Active editor should remain unchanged after insert"))
-
-        (testing "clojure_append_code trims trailing whitespace"
-          (is (:success append-result)
-              "Append should succeed")
-          (is (<= (count-consecutive-blank-lines content-after-append) 1)
-              "Append should not leave more than 1 consecutive blank line")
-          (is (string/includes? content-after-append "(defn divide-numbers")
-              "Appended form should appear in file")
-          (is (not (file-in-visible-editors? file-path))
-              "Edited file should not appear in any visible editor after append")
-          (is (= active-after-append active-before-insert)
-              "Active editor should remain unchanged after append"))
-
-        (testing "replace_top_level_form with empty string deletes form"
-          (is (:success delete-result)
-              "Delete should succeed")
-          (is (not (string/includes? content-after-delete "(defn add-numbers"))
-              "Deleted form should not appear in file")
-          (is (<= (count-consecutive-blank-lines content-after-delete) 1)
-              "Delete should not leave more than 1 consecutive blank line")
-          (is (string/includes? content-after-delete "(defn multiply-numbers")
-              "Other forms should remain after delete")
-          (is (string/includes? content-after-delete "(defn subtract-numbers")
-              "Other forms should remain after delete")
-          (is (not (file-in-visible-editors? file-path))
-              "Edited file should not appear in any visible editor after delete")
-          (is (= active-after-delete active-before-insert)
-              "Active editor should remain unchanged after delete"))
-
-        (testing "delete first form keeps spacing stable"
-          (is (:success delete-first-result))
-          (is (<= (count-consecutive-blank-lines content-after-delete-first) 1))
-          (is (not (string/includes? content-after-delete-first "(defn multiply-numbers"))))
-
-        (testing "delete last form keeps spacing stable"
-          (is (:success delete-last-result))
-          (is (<= (count-consecutive-blank-lines content-after-delete-last) 1))
-          (is (not (string/includes? content-after-delete-last "(defn divide-numbers"))))
-
-        (testing "wrong targetLineText returns clear error"
-          (is (expect-tool-failure wrong-target-result "Target line text not found")))
-
-        (testing "line outside fuzzy window fails even with matching text"
-          (is (expect-tool-failure fuzzy-window-miss-result "Target line text not found")))
-
-        (testing "tiny file replace works"
-          (is (:success tiny-create-result))
-          (is (:success tiny-replace-result))
-          (is (string/includes? tiny-content-after-replace "(def x 2)"))))
-
+              file-path (test-file-path)]
+        (p/do (test-create-file+ socket file-path)
+              (test-replace-trims-whitespace+ socket file-path)
+              (test-replace-idempotent+ socket file-path)
+              (test-insert-proper-spacing+ socket file-path)
+              (test-append-trims-whitespace+ socket file-path)
+              (test-delete-form+ socket file-path)
+              (test-delete-first-form+ socket file-path)
+              (test-delete-last-form+ socket file-path)
+              (test-wrong-target-text+ socket file-path)
+              (test-fuzzy-window-miss+ socket file-path)
+              (test-tiny-file+ socket)
+              (mcp/stop-mcp-session! socket)))
       (p/catch (fn [e]
                  (js/console.error "[structural-edit] Error:" (.-message e) e)
                  (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")

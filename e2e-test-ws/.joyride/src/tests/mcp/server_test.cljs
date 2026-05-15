@@ -347,39 +347,45 @@
           (p/finally (fn []
                        (mcp/restore-settings! backup-path)))))))
 
+(defn- get-eval-session-key+
+  "Discover a REPL session key via MCP tools/call on clojure_list_sessions."
+  [socket]
+  (p/let [sessions-resp (mcp/send-request socket
+                          {:jsonrpc "2.0"
+                           :id 1
+                           :method "tools/call"
+                           :params {:name "clojure_list_sessions"
+                                    :arguments {}}})
+          outer (js->clj sessions-resp :keywordize-keys true)
+          text (get-in outer [:result :content 0 :text])
+          parsed (js->clj (.parse js/JSON text) :keywordize-keys true)]
+    (or (->> (:sessions parsed)
+             (some (fn [s] (when (:isActiveSession s) (:replSessionKey s)))))
+        (:replSessionKey (first (:sessions parsed))))))
+
+(defn- eval-data-url+
+  "Evaluate a data URL expression and return the response content."
+  [socket session-key {:keys [who max-images]}]
+  (p/let [eval-resp (mcp/send-request socket
+                      {:jsonrpc "2.0"
+                       :id 2
+                       :method "tools/call"
+                       :params {:name "clojure_evaluate_code"
+                                :arguments (cond-> {:code "\"data:image/png;base64,iVBORw0KGgo=\""
+                                                    :namespace "user"
+                                                    :replSessionKey session-key
+                                                    :who who}
+                                             (some? max-images) (assoc :maxImages max-images))}})
+          outer (js->clj eval-resp :keywordize-keys true)]
+    (get-in outer [:result :content])))
+
 (deftest-async image-content-in-eval-result
   (testing "Evaluation returning data URL produces image content in response"
     (let [backup-path (mcp/backup-settings! "image-content-test-backup.json")]
       (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
                   {:keys [socket]} (mcp/start-mcp-session!)
-
-                  ;; Get a session key for evaluation
-                  sessions-resp (mcp/send-request socket
-                                  {:jsonrpc "2.0"
-                                   :id 1
-                                   :method "tools/call"
-                                   :params {:name "clojure_list_sessions"
-                                            :arguments {}}})
-                  session-key (let [outer (js->clj sessions-resp :keywordize-keys true)
-                                    text (get-in outer [:result :content 0 :text])
-                                    parsed (js->clj (.parse js/JSON text) :keywordize-keys true)]
-                                (or (->> (:sessions parsed)
-                                         (some (fn [s] (when (:isActiveSession s) (:replSessionKey s)))))
-                                    (:replSessionKey (first (:sessions parsed)))))
-
-                  ;; Evaluate code that returns a data URL string
-                  eval-resp (mcp/send-request socket
-                              {:jsonrpc "2.0"
-                               :id 2
-                               :method "tools/call"
-                               :params {:name "clojure_evaluate_code"
-                                        :arguments {:code "\"data:image/png;base64,iVBORw0KGgo=\""
-                                                    :namespace "user"
-                                                    :replSessionKey session-key
-                                                    :who "e2e-image-test"}}})
-                  content (let [outer (js->clj eval-resp :keywordize-keys true)]
-                            (get-in outer [:result :content]))
-
+                  session-key (get-eval-session-key+ socket)
+                  content (eval-data-url+ socket session-key {:who "e2e-image-test"})
                   _ (mcp/stop-mcp-session! socket)]
             (is (= 2 (count content))
                 "Should have text + image content items")
@@ -403,33 +409,9 @@
     (let [backup-path (mcp/backup-settings! "eval-max-images-zero-backup.json")]
       (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
                   {:keys [socket]} (mcp/start-mcp-session!)
-
-                  ;; Get a session key for evaluation
-                  sessions-resp (mcp/send-request socket
-                                  {:jsonrpc "2.0"
-                                   :id 1
-                                   :method "tools/call"
-                                   :params {:name "clojure_list_sessions"
-                                            :arguments {}}})
-                  session-key (let [outer (js->clj sessions-resp :keywordize-keys true)
-                                    text (get-in outer [:result :content 0 :text])
-                                    parsed (js->clj (.parse js/JSON text) :keywordize-keys true)]
-                                (or (->> (:sessions parsed)
-                                         (some (fn [s] (when (:isActiveSession s) (:replSessionKey s)))))
-                                    (:replSessionKey (first (:sessions parsed)))))
-                  ;; Evaluate code that returns a data URL string, with maxImages 0
-                  eval-resp (mcp/send-request socket
-                              {:jsonrpc "2.0"
-                               :id 2
-                               :method "tools/call"
-                               :params {:name "clojure_evaluate_code"
-                                        :arguments {:code "\"data:image/png;base64,iVBORw0KGgo=\""
-                                                    :namespace "user"
-                                                    :replSessionKey session-key
-                                                    :who "e2e-image-cap-test"
-                                                    :maxImages 0}}})
-                  content (let [outer (js->clj eval-resp :keywordize-keys true)]
-                            (get-in outer [:result :content]))
+                  session-key (get-eval-session-key+ socket)
+                  content (eval-data-url+ socket session-key
+                            {:who "e2e-image-cap-test" :max-images 0})
                   _ (mcp/stop-mcp-session! socket)]
             (is (= 1 (count content))
                 "Should have only text content (no images with maxImages 0)")
