@@ -42,6 +42,32 @@
                            (persist-history!))
                          500)))
 
+(defn- transact-output! [entity]
+  (d/transact! db/!output-conn [entity])
+  (cap-conn! db/!output-conn 1000)
+  (when (= "evaluatedCode" (:output/category entity))
+    (d/transact! db/!history-conn [entity])
+    (cap-conn! db/!history-conn 10000)
+    (schedule-persist!)))
+
+(defn- restore-history! [storage-uri]
+  (let [transit-str (.readFileSync fs (.-fsPath storage-uri) "utf8")
+        entities (db/deserialize-history transit-str)]
+    (when (seq entities)
+      (d/transact! db/!history-conn entities)
+      (d/transact! db/!output-conn entities)
+      (d/q '[:find (max ?l) . :where [?e :output/line ?l]] @db/!history-conn))))
+
+(defn- load-history-from-disk! [dispatch! context storage-uri]
+  (let [loaded-line (when (and storage-uri (.existsSync fs (.-fsPath storage-uri)))
+                      (try
+                        (restore-history! storage-uri)
+                        (catch :default e
+                          (js/console.warn "[History] Failed to load, starting fresh:" (.-message e))
+                          (try (.unlinkSync fs (.-fsPath storage-uri)) (catch :default _))
+                          nil)))]
+    (dispatch! context [[:calva/ax.history-loaded (or loaded-line 0)]])))
+
 (defn perform-effect! [dispatch! ^js context effect]
   (match effect
     [:calva/fx.when-activated actions]
@@ -54,33 +80,10 @@
       (.push (.-subscriptions context) disposable))
 
     [:calva/fx.transact-output entity]
-    (do
-      (d/transact! db/!output-conn [entity])
-      (cap-conn! db/!output-conn 1000)
-      (when (= "evaluatedCode" (:output/category entity))
-        (d/transact! db/!history-conn [entity])
-        (cap-conn! db/!history-conn 10000)
-        (schedule-persist!)))
+    (transact-output! entity)
 
     [:calva/fx.load-history-from-disk storage-uri]
-    (if (and storage-uri (.existsSync fs (.-fsPath storage-uri)))
-      (try
-        (let [transit-str (.readFileSync fs (.-fsPath storage-uri) "utf8")
-              entities (db/deserialize-history transit-str)]
-          (if (seq entities)
-            (do
-              (d/transact! db/!history-conn entities)
-              (d/transact! db/!output-conn entities)
-              (let [max-line (d/q '[:find (max ?l) . :where [?e :output/line ?l]] @db/!history-conn)]
-                (dispatch! context [[:calva/ax.history-loaded (or max-line 0)]])))
-            (dispatch! context [[:calva/ax.history-loaded 0]])))
-        (catch :default e
-          (js/console.warn "[History] Failed to load, starting fresh:" (.-message e))
-          (try
-            (.unlinkSync fs (.-fsPath storage-uri))
-            (catch :default _))
-          (dispatch! context [[:calva/ax.history-loaded 0]])))
-      (dispatch! context [[:calva/ax.history-loaded 0]]))
+    (load-history-from-disk! dispatch! context storage-uri)
 
     [:calva/fx.flush-history]
     (do

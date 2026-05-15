@@ -66,6 +66,21 @@
           images)
     [{:type "text" :text (js/JSON.stringify (clj->js data))}]))
 
+(defn- text-tool-result [data]
+  (vscode/LanguageModelToolResult.
+   #js [(vscode/LanguageModelTextPart.
+         (js/JSON.stringify (clj->js data)))]))
+
+(defn- text-tool-result-raw [js-data]
+  (vscode/LanguageModelToolResult.
+   #js [(vscode/LanguageModelTextPart.
+         (js/JSON.stringify js-data))]))
+
+(defn- prepare-invocation-messages [invocation-msg confirm-title confirm-msg]
+  #js {:invocationMessage invocation-msg
+       :confirmationMessages #js {:title confirm-title
+                                  :message confirm-msg}})
+
 (defn EvaluateClojureCodeTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
                             (let [code (-> options .-input .-code)
@@ -114,25 +129,21 @@
                                                          :calva/clojure-symbol symbol
                                                          :calva/ns ns
                                                          :calva/repl-session-key session-key})]
-                   (vscode/LanguageModelToolResult.
-                    #js [(vscode/LanguageModelTextPart.
-                          (js/JSON.stringify (clj->js result)))])))})
+                   (text-tool-result result)))})
 
 (defn GetClojureDocsTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [symbol (-> options .-input .-clojureSymbol)
-                                  message (str "Look up docs for Clojure symbol: **" symbol "**")]
-                              #js {:invocationMessage "Looking up ClojureDocs"
-                                   :confirmationMessages #js {:title "Get ClojureDocs Info"
-                                                              :message message}}))
+                            (let [symbol (-> options .-input .-clojureSymbol)]
+                              (prepare-invocation-messages
+                               "Looking up ClojureDocs"
+                               "Get ClojureDocs Info"
+                               (str "Look up docs for Clojure symbol: **" symbol "**"))))
 
        :invoke (fn invoke [^js options _token]
                  (p/let [symbol (-> options .-input .-clojureSymbol)
                          result (calva/get-clojuredocs+ {:ex/dispatch! dispatch!
                                                          :calva/clojure-symbol symbol})]
-                   (vscode/LanguageModelToolResult.
-                    #js [(vscode/LanguageModelTextPart.
-                          (js/JSON.stringify (clj->js result)))])))})
+                   (text-tool-result result)))})
 
 (defn GetOutputLogTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
@@ -154,19 +165,17 @@
 
 (defn InferBracketsTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [text (-> options .-input .-text)
-                                  message (str "Infer from indents for: " text)]
-                              #js {:invocationMessage "Inferred brackets"
-                                   :confirmationMessages #js {:title "Infer brackets"
-                                                              :message message}}))
+                            (let [text (-> options .-input .-text)]
+                              (prepare-invocation-messages
+                               "Inferred brackets"
+                               "Infer brackets"
+                               (str "Infer from indents for: " text))))
 
        :invoke (fn invoke [^js options _token]
                  (let [text (-> options .-input .-text)
                        result (balance/infer-parens-response {:ex/dispatch! dispatch!
                                                               :calva/text text})]
-                   (vscode/LanguageModelToolResult.
-                    #js [(vscode/LanguageModelTextPart.
-                          (js/JSON.stringify result))])))})
+                   (text-tool-result-raw result)))})
 
 (defn- ReplaceOrInsertTopLevelFormTool [dispatch! ranges-fn-key confirm-prefix invoked-prefix]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
@@ -198,9 +207,7 @@
                                                                  :calva/line line
                                                                  :calva/target-line-text target-line
                                                                  :calva/new-form new-form}))]
-                   (vscode/LanguageModelToolResult.
-                    #js [(vscode/LanguageModelTextPart.
-                          (js/JSON.stringify (clj->js result)))])))})
+                   (text-tool-result result)))})
 
 (defn ReplaceTopLevelFormTool [dispatch!]
   (ReplaceOrInsertTopLevelFormTool dispatch! :currentTopLevelForm "Replace" "Replaced"))
@@ -208,41 +215,36 @@
 (defn InsertTopLevelFormTool [dispatch!]
   (ReplaceOrInsertTopLevelFormTool dispatch! :insertionPoint "Insert" "Inserted"))
 
-(defn StructuralCreateFileTool [dispatch!]
+(defn- FileEditTool [dispatch! {:keys [invocation-msg title msg-prefix input-key calva-fn]}]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [file-path (-> options .-input .-filePath)
-                                  message (str "Create file: " file-path)]
-                              #js {:invocationMessage "Creating Clojure file"
-                                   :confirmationMessages #js {:title "Create Clojure File"
-                                                              :message message}}))
+                            (let [file-path (-> options .-input .-filePath)]
+                              (prepare-invocation-messages
+                               invocation-msg title (str msg-prefix file-path))))
 
        :invoke (fn invoke [^js options _token]
                  (p/let [file-path (-> options .-input .-filePath)
-                         content (-> options .-input .-content)
-                         result (calva/structural-create-file+ {:ex/dispatch! dispatch!
-                                                                :calva/file-path file-path
-                                                                :calva/content content})]
-                   (vscode/LanguageModelToolResult.
-                    #js [(vscode/LanguageModelTextPart.
-                          (js/JSON.stringify (clj->js result)))])))})
+                         input-val (aget (.-input options) input-key)
+                         args {:ex/dispatch! dispatch!
+                               :calva/file-path file-path
+                               (keyword "calva" input-key) input-val}
+                         result (calva-fn args)]
+                   (text-tool-result result)))})
+
+(defn StructuralCreateFileTool [dispatch!]
+  (FileEditTool dispatch!
+                {:invocation-msg "Creating Clojure file"
+                 :title "Create Clojure File"
+                 :msg-prefix "Create file: "
+                 :input-key "content"
+                 :calva-fn calva/structural-create-file+}))
 
 (defn AppendCodeTool [dispatch!]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [file-path (-> options .-input .-filePath)
-                                  message (str "Append form to: " file-path)]
-                              #js {:invocationMessage "Appending code"
-                                   :confirmationMessages #js {:title "Append code"
-                                                              :message message}}))
-
-       :invoke (fn invoke [^js options _token]
-                 (p/let [file-path (-> options .-input .-filePath)
-                         code (-> options .-input .-code)
-                         result (calva/append-code+ {:ex/dispatch! dispatch!
-                                                     :calva/file-path file-path
-                                                     :calva/code code})]
-                   (vscode/LanguageModelToolResult.
-                    #js [(vscode/LanguageModelTextPart.
-                          (js/JSON.stringify (clj->js result)))])))})
+  (FileEditTool dispatch!
+                {:invocation-msg "Appending code"
+                 :title "Append code"
+                 :msg-prefix "Append form to: "
+                 :input-key "code"
+                 :calva-fn calva/append-code+}))
 
 (defn ListSessionsTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js _options _token]
@@ -252,9 +254,7 @@
 
        :invoke (fn invoke [^js _options _token]
                  (p/let [result (calva/list-sessions+ {:ex/dispatch! dispatch!})]
-                   (vscode/LanguageModelToolResult.
-                    #js [(vscode/LanguageModelTextPart.
-                          (js/JSON.stringify result))])))})
+                   (text-tool-result-raw result)))})
 
 (defn LoadFileTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
@@ -270,10 +270,7 @@
        :invoke (fn invoke [^js options _token]
                  (let [who (-> options .-input .-who)]
                    (if-let [who-error (calva/validate-who who)]
-                     (p/resolved
-                      (vscode/LanguageModelToolResult.
-                       #js [(vscode/LanguageModelTextPart.
-                             (js/JSON.stringify (clj->js {:error who-error})))]))
+                     (p/resolved (text-tool-result {:error who-error}))
                      (p/let [file-path (-> options .-input .-filePath)
                              session-key (-> options .-input .-replSessionKey)
                              result (calva/load-file+ {:ex/dispatch! dispatch!
@@ -281,12 +278,8 @@
                                                        :calva/repl-session-key session-key
                                                        :calva/who who})]
                        (if (:error result)
-                         (vscode/LanguageModelToolResult.
-                          #js [(vscode/LanguageModelTextPart.
-                                (js/JSON.stringify (clj->js {:error (:error result)})))])
-                         (vscode/LanguageModelToolResult.
-                          #js [(vscode/LanguageModelTextPart.
-                                (js/JSON.stringify (clj->js result)))]))))))})
+                         (text-tool-result {:error (:error result)})
+                         (text-tool-result result))))))})
 
 (defn register-language-model-tools [dispatch!]
   [(vscode/lm.registerTool

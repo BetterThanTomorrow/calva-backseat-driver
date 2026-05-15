@@ -9,6 +9,42 @@
    [cljs.core.match :refer [match]]
    [promesa.core :as p]))
 
+(defn- show-server-started-message! [server-info wrapper-config-path]
+  (let [{:server/keys [port ^js port-file-uri port-note]} server-info
+        script-path (path/join wrapper-config-path "calva-mcp-server.js")]
+    (p/let [button (vscode/window.showInformationMessage
+                    (str port-note " MCP socket server started on port: " port
+                         ". Now your MCP client can run the `calva` stdio server command."
+                         " (See Backseat Driver README and the docs of your AI Agent for how to do this.)")
+                    "Copy command + port"
+                    "Copy command + port-file")]
+      (case button
+        "Copy command + port"
+        (vscode/env.clipboard.writeText
+         (str "node " script-path " " port))
+
+        "Copy command + port-file"
+        (let [port-file-path (.-fsPath port-file-uri)]
+          (vscode/env.clipboard.writeText
+           (str "node " script-path " " port-file-path)))
+
+        nil))))
+
+(defn- copy-wrapper-script! [wrapper-config-path]
+  (let [extension-uri (-> (vscode/extensions.getExtension
+                           "betterthantomorrow.calva-backseat-driver")
+                          .-extensionUri)
+        script-uri (vscode/Uri.joinPath extension-uri "dist" "calva-mcp-server.js")
+        script-path (.-fsPath script-uri)
+        dest-path (path/join wrapper-config-path "calva-mcp-server.js")]
+    (fs/mkdirSync wrapper-config-path #js {:recursive true})
+    (try (fs/unlinkSync dest-path) (catch :default _e))
+    (if js/goog.DEBUG
+      (try
+        (fs/symlinkSync script-path dest-path)
+        (catch :default _e))
+      (fs/copyFileSync script-path dest-path))))
+
 (defn perform-effect! [dispatch! ^js context effect]
   (match effect
     [:mcp/fx.start-server options]
@@ -32,20 +68,7 @@
                     (dispatch! context (ax/enrich-with-args on-success success?))))))
 
     [:mcp/fx.show-server-started-message server-info wrapper-config-path]
-    (let [{:server/keys [port ^js port-file-uri port-note]} server-info
-          script-path (path/join wrapper-config-path "calva-mcp-server.js")]
-      (p/let [button (vscode/window.showInformationMessage (str port-note " MCP socket server started on port: " port ". Now your MCP client can run the `calva` stdio server command. (See Backseat Driver README and the docs of your AI Agent for how to do this.)") "Copy command + port" "Copy command + port-file")]
-        (case button
-          "Copy command + port"
-          (vscode/env.clipboard.writeText
-           (str "node " script-path " " port))
-
-          "Copy command + port-file"
-          (let [port-file-path (.-fsPath port-file-uri)]
-            (vscode/env.clipboard.writeText
-             (str "node " script-path " " port-file-path)))
-
-          nil)))
+    (show-server-started-message! server-info wrapper-config-path)
 
     [:mcp/fx.send-notification notification]
     (server/send-notification-params {:ex/dispatch! (partial dispatch! context)} notification)
@@ -54,19 +77,7 @@
     (requests/handle-request-fn (assoc options :ex/dispatch! (partial dispatch! context)) request)
 
     [:mcp/fx.copy-wrapper-script-to-config-dir wrapper-config-path]
-    (let [extension-uri (-> (vscode/extensions.getExtension
-                             "betterthantomorrow.calva-backseat-driver")
-                            .-extensionUri)
-          script-uri (vscode/Uri.joinPath extension-uri "dist" "calva-mcp-server.js")
-          script-path (.-fsPath script-uri)
-          dest-path (path/join wrapper-config-path "calva-mcp-server.js")]
-      (fs/mkdirSync wrapper-config-path #js {:recursive true})
-      (try (fs/unlinkSync dest-path) (catch :default _e))
-      (if js/goog.DEBUG
-        (try
-          (fs/symlinkSync script-path dest-path)
-          (catch :default _e))
-        (fs/copyFileSync script-path dest-path)))
+    (copy-wrapper-script! wrapper-config-path)
 
     :else
     (js/console.warn "Unknown MCP effect:" (pr-str effect))))
