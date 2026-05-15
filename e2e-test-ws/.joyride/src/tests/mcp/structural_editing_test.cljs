@@ -168,6 +168,7 @@
 
 (defn- test-append-trims-whitespace+ [socket file-path]
   (p/let [content-before (read-test-file+ nil)
+          active-before (active-editor-path)
           result (mcp/call-tool socket 104 "clojure_append_code"
                                 {:filePath file-path
                                  :code "(defn divide-numbers\n  \"Divides a by b\"\n  [a b]\n  (/ a b))\n\n\n"})
@@ -180,16 +181,20 @@
       (is (string/includes? content "(defn divide-numbers")
           "Appended form should appear in file")
       (is (not (file-in-visible-editors? file-path))
-          "Edited file should not appear in any visible editor after append"))))
+          "Edited file should not appear in any visible editor after append")
+      (is (= active-after active-before)
+          "Active editor should remain unchanged after append"))))
 
 (defn- test-delete-form+ [socket file-path]
   (p/let [content-before (read-test-file+ nil)
+          active-before (active-editor-path)
           result (mcp/call-tool socket 105 "replace_top_level_form"
                                 {:filePath file-path
                                  :line 8
                                  :targetLineText "(defn add-numbers"
                                  :newForm ""})
-          content (read-test-file+ content-before)]
+          content (read-test-file+ content-before)
+          active-after (active-editor-path)]
     (testing "replace_top_level_form with empty string deletes form"
       (is (:success result) "Delete should succeed")
       (is (not (string/includes? content "(defn add-numbers"))
@@ -201,7 +206,9 @@
       (is (string/includes? content "(defn subtract-numbers")
           "Other forms should remain after delete")
       (is (not (file-in-visible-editors? file-path))
-          "Edited file should not appear in any visible editor after delete"))))
+          "Edited file should not appear in any visible editor after delete")
+      (is (= active-after active-before)
+          "Active editor should remain unchanged after delete"))))
 
 (defn- delete-and-verify-gone+
   "Delete a form by replacing with empty string and verify it's gone from file."
