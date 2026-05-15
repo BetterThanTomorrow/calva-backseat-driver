@@ -73,6 +73,10 @@
 (defn- active-editor-path []
   (some-> vscode/window .-activeTextEditor .-document .-uri .-fsPath))
 
+(defn- file-in-visible-editors? [file-path]
+  (some #(= (.-fsPath (.-uri (.-document ^js %))) file-path)
+        vscode/window.visibleTextEditors))
+
 (defn- activate-decoy-editor+ []
   (let [uri (vscode/Uri.joinPath mcp/workspace-uri ".vscode" "settings.json")]
     (p/let [document (vscode/workspace.openTextDocument uri)
@@ -109,6 +113,7 @@
               _ (js/console.log "[structural-edit] Replace result:" (pr-str replace-result))
               content-after-replace (read-test-file+ nil)
               _ (js/console.log "[structural-edit] Content after replace:" (pr-str content-after-replace))
+              active-after-replace (active-editor-path)
 
               ;; === 2. Replace again to test idempotency ===
 
@@ -135,6 +140,7 @@
               _ (js/console.log "[structural-edit] Insert result:" (pr-str insert-result))
               content-after-insert (read-test-file+ content-after-replace-2)
               _ (js/console.log "[structural-edit] Content after insert:" (pr-str content-after-insert))
+              active-after-insert (active-editor-path)
 
               ;; === 4. Append code — should not produce extra blank lines ===
 
@@ -146,6 +152,7 @@
               _ (js/console.log "[structural-edit] Append result:" (pr-str append-result))
               content-after-append (read-test-file+ content-after-insert)
               _ (js/console.log "[structural-edit] Content after append:" (pr-str content-after-append))
+              active-after-append (active-editor-path)
 
               ;; === 5. Delete form — should not leave extra blank lines ===
 
@@ -159,6 +166,7 @@
               _ (js/console.log "[structural-edit] Delete result:" (pr-str delete-result))
               content-after-delete (read-test-file+ content-after-append)
               _ (js/console.log "[structural-edit] Content after delete:" (pr-str content-after-delete))
+              active-after-delete (active-editor-path)
 
               ;; === 6. Delete first form — should not leave extra blank lines ===
               _ (js/console.log "[structural-edit] Testing delete first form...")
@@ -212,8 +220,8 @@
                                                   :newForm "(def x 2)"})
               _ (js/console.log "[structural-edit] Tiny replace result:" (pr-str tiny-replace-result))
               tiny-content-after-replace (wait-for+ #(let [content (fs/readFileSync (tiny-file-path) "utf8")]
-                                                      (when (string/includes? content "(def x 2)")
-                                                        content))
+                                                       (when (string/includes? content "(def x 2)")
+                                                         content))
                                                     :interval 10
                                                     :timeout 5000
                                                     :message "Tiny file content did not update within 5s")
@@ -232,7 +240,11 @@
           (is (:success replace-result)
               "Replace should succeed")
           (is (<= (count-consecutive-blank-lines content-after-replace) 1)
-              "Replace should not leave more than 1 consecutive blank line"))
+              "Replace should not leave more than 1 consecutive blank line")
+          (is (not (file-in-visible-editors? file-path))
+              "Edited file should not appear in any visible editor after replace")
+          (is (= active-after-replace active-before-replace)
+              "Active editor should remain unchanged after replace"))
 
         (testing "replace_top_level_form is idempotent for whitespace"
           (is (:success replace-result-2)
@@ -250,7 +262,11 @@
           (is (<= (count-consecutive-blank-lines content-after-insert) 1)
               "Insert should not leave more than 1 consecutive blank line")
           (is (string/includes? content-after-insert "(defn multiply-numbers")
-              "Inserted form should appear in file"))
+              "Inserted form should appear in file")
+          (is (not (file-in-visible-editors? file-path))
+              "Edited file should not appear in any visible editor after insert")
+          (is (= active-after-insert active-before-insert)
+              "Active editor should remain unchanged after insert"))
 
         (testing "clojure_append_code trims trailing whitespace"
           (is (:success append-result)
@@ -258,7 +274,11 @@
           (is (<= (count-consecutive-blank-lines content-after-append) 1)
               "Append should not leave more than 1 consecutive blank line")
           (is (string/includes? content-after-append "(defn divide-numbers")
-              "Appended form should appear in file"))
+              "Appended form should appear in file")
+          (is (not (file-in-visible-editors? file-path))
+              "Edited file should not appear in any visible editor after append")
+          (is (= active-after-append active-before-insert)
+              "Active editor should remain unchanged after append"))
 
         (testing "replace_top_level_form with empty string deletes form"
           (is (:success delete-result)
@@ -270,7 +290,11 @@
           (is (string/includes? content-after-delete "(defn multiply-numbers")
               "Other forms should remain after delete")
           (is (string/includes? content-after-delete "(defn subtract-numbers")
-              "Other forms should remain after delete"))
+              "Other forms should remain after delete")
+          (is (not (file-in-visible-editors? file-path))
+              "Edited file should not appear in any visible editor after delete")
+          (is (= active-after-delete active-before-insert)
+              "Active editor should remain unchanged after delete"))
 
         (testing "delete first form keeps spacing stable"
           (is (:success delete-first-result))
