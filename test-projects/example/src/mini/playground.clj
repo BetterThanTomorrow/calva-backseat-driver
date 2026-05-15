@@ -53,6 +53,10 @@
     :left  {:x (dec (:x head)) :y (:y head)}
     :right {:x (inc (:x head)) :y (:y head)}))
 
+(defn dead? [new-head snake]
+  (or (not (in-bounds? new-head))
+      (self-collision? new-head (rest snake))))
+
 (defn move-snake []
   (when-not (:game-over @state)
     (let [{:keys [snake direction food score]} @state
