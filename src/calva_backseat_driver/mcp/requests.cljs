@@ -51,164 +51,102 @@
   (param-description "clojure_evaluate_code" "code")
   :rcf)
 
+(defn- tool-listing [{:keys [tool-name properties required priority]}]
+  {:name tool-name
+   :description (tool-description tool-name)
+   :inputSchema {:type "object"
+                 :properties (into {}
+                                   (map (fn [[k v]]
+                                          [k (merge v {:description (param-description tool-name k)})]))
+                                   properties)
+                 :required required
+                 :audience ["user" "assistant"]
+                 :priority priority}})
+
 (def evaluate-code-tool-listing
-  (let [tool-name "clojure_evaluate_code"]
-    {:name tool-name
-     :description (tool-description tool-name)
-     :inputSchema {:type "object"
-                   :properties {"code" {:type "string"
-                                        :description (param-description tool-name "code")}
-                                "namespace" {:type "string"
-                                             :description (param-description tool-name "namespace")}
-                                "replSessionKey" {:type "string"
-                                                  :description (param-description tool-name "replSessionKey")}
-                                "who" {:type "string"
-                                       :description (param-description tool-name "who")}
-                                "description" {:type "string"
-                                               :description (param-description tool-name "description")}
-                                "maxImages" {:type "number"
-                                             :description (param-description tool-name "maxImages")}}
-                   :required ["code" "namespace" "replSessionKey" "who"]
-                   :audience ["user" "assistant"]
-                   :priority 9}}))
+  (tool-listing {:tool-name "clojure_evaluate_code"
+                 :properties {"code" {:type "string"}
+                              "namespace" {:type "string"}
+                              "replSessionKey" {:type "string"}
+                              "who" {:type "string"}
+                              "description" {:type "string"}
+                              "maxImages" {:type "number"}}
+                 :required ["code" "namespace" "replSessionKey" "who"]
+                 :priority 9}))
 
 (def list-sessions-tool-listing
-  (let [tool-name "clojure_list_sessions"]
-    {:name tool-name
-     :description (tool-description tool-name)
-     :inputSchema {:type "object"
-                   :properties {}
-                   :required []
-                   :audience ["user" "assistant"]
-                   :priority 9}}))
+  (tool-listing {:tool-name "clojure_list_sessions"
+                 :properties {}
+                 :required []
+                 :priority 9}))
 
 (def symbol-info-tool-listing
-  (let [tool-name "clojure_symbol_info"]
-    {:name tool-name
-     :description (tool-description tool-name)
-     :inputSchema {:type "object"
-                   :properties {"clojureSymbol" {:type "string"
-                                                 :description (param-description tool-name "clojureSymbol")}
-                                "namespace" {:type "string"
-                                             :description (param-description tool-name "namespace")}
-                                "replSessionKey" {:type "string"
-                                                  :description (param-description tool-name "replSessionKey")}}
-                   :required ["clojureSymbol"  "replSessionKey" "namespace"]
-                   :audience ["user" "assistant"]
-                   :priority 8}}))
+  (tool-listing {:tool-name "clojure_symbol_info"
+                 :properties {"clojureSymbol" {:type "string"}
+                              "namespace" {:type "string"}
+                              "replSessionKey" {:type "string"}}
+                 :required ["clojureSymbol" "replSessionKey" "namespace"]
+                 :priority 8}))
 
 (def output-log-tool-info
-  (let [tool-name "clojure_repl_output_log"]
-    {:name tool-name
-     :description (tool-description tool-name)
-     :inputSchema {:type "object"
-                   :properties {"query" {:type "string"
-                                         :description (param-description tool-name "query")}
-                                "inputs" {:type "array"
-                                          :items {}
-                                          :description (param-description tool-name "inputs")}
-                                "maxImages" {:type "number"
-                                             :description (param-description tool-name "maxImages")}}
-                   :required ["query"]
-                   :audience ["user" "assistant"]
-                   :priority 10}}))
+  (tool-listing {:tool-name "clojure_repl_output_log"
+                 :properties {"query" {:type "string"}
+                              "inputs" {:type "array" :items {}}
+                              "maxImages" {:type "number"}}
+                 :required ["query"]
+                 :priority 10}))
 
 (def clojuredocs-tool-listing
-  (let [tool-name "clojuredocs_info"]
-    {:name tool-name
-     :description (tool-description tool-name)
-     :inputSchema {:type "object"
-                   :properties {"clojureSymbol" {:type "string"
-                                                 :description (param-description tool-name "clojureSymbol")}}
-                   :required ["clojureSymbol"]
-                   :audience ["user" "assistant"]
-                   :priority 8}}))
+  (tool-listing {:tool-name "clojuredocs_info"
+                 :properties {"clojureSymbol" {:type "string"}}
+                 :required ["clojureSymbol"]
+                 :priority 8}))
 
 (def replace-top-level-form-tool-listing
-  (let [tool-name "replace_top_level_form"]
-    {:name tool-name
-     :description (tool-description tool-name)
-     :inputSchema {:type "object"
-                   :properties {"filePath" {:type "string"
-                                            :description (param-description tool-name "filePath")}
-                                "line" {:type "integer"
-                                        :description (param-description tool-name "line")}
-                                "targetLineText" {:type "string"
-                                                  :description (param-description tool-name "targetLineText")}
-                                "newForm" {:type "string"
-                                           :description (param-description tool-name "newForm")}}
-                   :required ["filePath" "line" "targetLineText" "newForm"]
-                   :audience ["user" "assistant"]
-                   :priority 7}}))
+  (tool-listing {:tool-name "replace_top_level_form"
+                 :properties {"filePath" {:type "string"}
+                              "line" {:type "integer"}
+                              "targetLineText" {:type "string"}
+                              "newForm" {:type "string"}}
+                 :required ["filePath" "line" "targetLineText" "newForm"]
+                 :priority 7}))
 
 (def insert-top-level-form-tool-listing
-  (let [tool-name "insert_top_level_form"]
-    {:name tool-name
-     :description (tool-description tool-name)
-     :inputSchema {:type "object"
-                   :properties {"filePath" {:type "string"
-                                            :description (param-description tool-name "filePath")}
-                                "line" {:type "integer"
-                                        :description (param-description tool-name "line")}
-                                "targetLineText" {:type "string"
-                                                  :description (param-description tool-name "targetLineText")}
-                                "newForm" {:type "string"
-                                           :description (param-description tool-name "newForm")}}
-                   :required ["filePath" "line" "targetLineText" "newForm"]
-                   :audience ["user" "assistant"]
-                   :priority 7}}))
+  (tool-listing {:tool-name "insert_top_level_form"
+                 :properties {"filePath" {:type "string"}
+                              "line" {:type "integer"}
+                              "targetLineText" {:type "string"}
+                              "newForm" {:type "string"}}
+                 :required ["filePath" "line" "targetLineText" "newForm"]
+                 :priority 7}))
 
 (def bracket-balance-tool-listing
-  (let [tool-name "clojure_balance_brackets"]
-    {:name tool-name
-     :description (tool-description tool-name)
-     :inputSchema {:type "object"
-                   :properties {"text" {:type "string"
-                                        :description (param-description tool-name "text")}}
-                   :required ["text"]
-                   :audience ["user" "assistant"]
-                   :priority 10}}))
+  (tool-listing {:tool-name "clojure_balance_brackets"
+                 :properties {"text" {:type "string"}}
+                 :required ["text"]
+                 :priority 10}))
 
 (def structural-create-file-tool-listing
-  (let [tool-name "clojure_create_file"]
-    {:name tool-name
-     :description (tool-description tool-name)
-     :inputSchema {:type "object"
-                   :properties {"filePath" {:type "string"
-                                            :description (param-description tool-name "filePath")}
-                                "content" {:type "string"
-                                           :description (param-description tool-name "content")}}
-                   :required ["filePath" "content"]
-                   :audience ["user" "assistant"]
-                   :priority 7}}))
+  (tool-listing {:tool-name "clojure_create_file"
+                 :properties {"filePath" {:type "string"}
+                              "content" {:type "string"}}
+                 :required ["filePath" "content"]
+                 :priority 7}))
 
 (def append-code-tool-listing
-  (let [tool-name "clojure_append_code"]
-    {:name tool-name
-     :description (tool-description tool-name)
-     :inputSchema {:type "object"
-                   :properties {"filePath" {:type "string"
-                                            :description (param-description tool-name "filePath")}
-                                "code" {:type "string"
-                                        :description (param-description tool-name "code")}}
-                   :required ["filePath" "code"]
-                   :audience ["user" "assistant"]
-                   :priority 7}}))
+  (tool-listing {:tool-name "clojure_append_code"
+                 :properties {"filePath" {:type "string"}
+                              "code" {:type "string"}}
+                 :required ["filePath" "code"]
+                 :priority 7}))
 
 (def load-file-tool-listing
-  (let [tool-name "clojure_load_file"]
-    {:name tool-name
-     :description (tool-description tool-name)
-     :inputSchema {:type "object"
-                   :properties {"filePath" {:type "string"
-                                            :description (param-description tool-name "filePath")}
-                                "replSessionKey" {:type "string"
-                                                  :description (param-description tool-name "replSessionKey")}
-                                "who" {:type "string"
-                                       :description (param-description tool-name "who")}}
-                   :required ["filePath" "replSessionKey" "who"]
-                   :audience ["user" "assistant"]
-                   :priority 8}}))
+  (tool-listing {:tool-name "clojure_load_file"
+                 :properties {"filePath" {:type "string"}
+                              "replSessionKey" {:type "string"}
+                              "who" {:type "string"}}
+                 :required ["filePath" "replSessionKey" "who"]
+                 :priority 8}))
 
 (defn- skill-manifests []
   (try
