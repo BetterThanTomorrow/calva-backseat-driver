@@ -75,6 +75,12 @@
     ;; Handle stdin close
     (.on stdin "close" (fn [] (log-stderr :info "stdin closed.")))))
 
+(defn- json-message? [s]
+  (and (string? s)
+       (not (string/blank? s))
+       (or (.startsWith s "{")
+           (.startsWith s "["))))
+
 (defn handle-socket [^js socket]
   (.setEncoding socket "utf8")
 
@@ -83,8 +89,7 @@
        (fn [data]
          (log-stderr :debug "Received from socket:" data)
          (let [message-str (string/trim data)]
-           (if (and (string? message-str) (not (string/blank? message-str))
-                    (or (.startsWith message-str "{") (.startsWith message-str "[")))
+           (if (json-message? message-str)
              (do
                (log-stderr :info "Sending to stdout:" message-str)
                (.write original-stdout (str message-str "\n")))

@@ -42,19 +42,21 @@
        x))
    action-or-effect))
 
+(defn- db-get-form? [x]
+  (and (vector? x)
+       (= :db/get (first x))))
+
+(defn- config-keyword? [x]
+  (and (keyword? x)
+       (string/starts-with? (str x) ":vscode/config.")))
+
 (defn- enrich-from-state [action-or-effect state]
   (walk/postwalk
    (fn [x]
      (cond
-       (and (vector? x)
-            (= :db/get (first x)))
-       (get state (second x))
-
-       (and (keyword? x)
-            (string/starts-with? (str x) ":vscode/config."))
-       (some-> ^js ((:app/getConfiguration state) "calva-backseat-driver")
-               (.get (second (re-find #"(?:\.)(.*?)$" (str x)))))
-
+       (db-get-form? x)     (get state (second x))
+       (config-keyword? x)  (some-> ^js ((:app/getConfiguration state) "calva-backseat-driver")
+                                    (.get (second (re-find #"(?:\.)(.*?)$" (str x)))))
        :else x))
    action-or-effect))
 
