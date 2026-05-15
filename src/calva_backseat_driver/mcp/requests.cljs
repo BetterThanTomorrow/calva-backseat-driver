@@ -192,275 +192,285 @@
 
 
 
-(defn handle-request-fn [{:ex/keys [dispatch!] :as options
-                          :mcp/keys [repl-enabled? provide-bd-skill? provide-edit-skill?]}
-                         {:keys [id method params] :as request}]
-  (dispatch! [[:app/ax.log :debug "[Server] handle-request " (pr-str request)]])
-  (cond
-    (= method "initialize")
-    (let [response {:jsonrpc "2.0"
-                    :id id
-                    :result {:serverInfo {:name "calva-backseat-driver"
-                                          :version (get-extension-version)}
-                             :protocolVersion "2024-11-05"
-                             :capabilities {:tools {:listChanged true}
-                                            :resources {:listChanged true}}
-                             :instructions (skills/compose-instructions repl-enabled?
-                                                                        (skills/filter-skills (get-skills)
-                                                                                              {:provide-bd-skill? provide-bd-skill?
-                                                                                               :provide-edit-skill? provide-edit-skill?}))
-                             :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (if this is enabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."}}]
-      response)
+(defn- text-response
+  "JSON-RPC success response with JSON-stringified text content."
+  [id data]
+  {:jsonrpc "2.0"
+   :id id
+   :result {:content [{:type "text"
+                       :text (js/JSON.stringify data)}]}})
 
-    (= method "tools/list")
-    (let [response {:jsonrpc "2.0"
-                    :id id
-                    :result {:tools (cond-> [bracket-balance-tool-listing
-                                             list-sessions-tool-listing
-                                             symbol-info-tool-listing
-                                             clojuredocs-tool-listing
-                                             output-log-tool-info
-                                             replace-top-level-form-tool-listing
-                                             insert-top-level-form-tool-listing
-                                             structural-create-file-tool-listing
-                                             append-code-tool-listing]
+(defn- clj-response
+  "JSON-RPC success response with clj->js JSON-stringified text content."
+  [id data]
+  {:jsonrpc "2.0"
+   :id id
+   :result {:content [{:type "text"
+                       :text (js/JSON.stringify (clj->js data))}]}})
 
-                                      (= true repl-enabled?)
-                                      (conj evaluate-code-tool-listing
-                                            load-file-tool-listing))}}]
-      response)
+(defn- content-response
+  "JSON-RPC success response with pre-built content array."
+  [id content]
+  {:jsonrpc "2.0"
+   :id id
+   :result {:content content}})
 
-    (= method "resources/list")
-    (let [filtered-skills (skills/filter-skills (get-skills)
-                                                {:provide-bd-skill? provide-bd-skill?
-                                                 :provide-edit-skill? provide-edit-skill?})
-          resources (mapv (fn [{:skill/keys [name description uri]}]
-                            {:uri uri
-                             :name name
-                             :description description
-                             :mimeType "text/markdown"})
-                          filtered-skills)]
-      {:jsonrpc "2.0"
-       :id id
-       :result {:resources resources}})
+(defn- error-response
+  "JSON-RPC error response."
+  [id code message]
+  {:jsonrpc "2.0"
+   :id id
+   :error {:code code :message message}})
 
-    (= method "resources/templates/list")
-    (let [response {:jsonrpc "2.0"
-                    :id id
-                    :result {:resourceTemplates [{:uriTemplate "/symbol-info/{symbol}@{session-key}@{namespace}"
-                                                  :name "symbol-info"
-                                                  :description (tool-description "clojure_symbol_info")
-                                                  :mimeType "application/json"}
-                                                 {:uriTemplate "/clojuredocs/{symbol}"
-                                                  :name "clojuredocs"
-                                                  :description (tool-description "clojuredocs_info")
-                                                  :mimeType "application/json"}]}}]
-      response)
+(defn- handle-evaluate-code [options id arguments]
+  (let [{:keys [code replSessionKey who description maxImages]
+         ns :namespace} arguments
+        who-error (calva/validate-who who)]
+    (if who-error
+      (clj-response id {:error who-error})
+      (p/let [result (calva/evaluate-code+ (merge options
+                                                  {:calva/code code
+                                                   :calva/repl-session-key replSessionKey
+                                                   :calva/who who
+                                                   :calva/description description}
+                                                  (when ns {:calva/ns ns})))]
+        (content-response id (tools/mcp-content-with-images result :max-images (if (some? maxImages) maxImages 10)))))))
 
-    (= method "tools/call")
-    (let [{:keys [arguments]
-           tool :name} params]
-      (cond
-        (and (= tool "clojure_evaluate_code")
-             (= true repl-enabled?))
-        (let [{:keys [code replSessionKey who description maxImages]
-               ns :namespace} arguments
-              who-error (calva/validate-who who)]
-          (if who-error
-            {:jsonrpc "2.0"
-             :id id
-             :result {:content [{:type "text"
-                                 :text (js/JSON.stringify (clj->js {:error who-error}))}]}}
-            (p/let [result (calva/evaluate-code+ (merge options
-                                                        {:calva/code code
-                                                         :calva/repl-session-key replSessionKey
-                                                         :calva/who who
-                                                         :calva/description description}
-                                                        (when ns
-                                                          {:calva/ns ns})))]
-              {:jsonrpc "2.0"
-               :id id
-               :result {:content (tools/mcp-content-with-images result :max-images (if (some? maxImages) maxImages 10))}})))
+(defn- handle-list-sessions [options id _arguments]
+  (p/let [result (calva/list-sessions+ options)]
+    (text-response id result)))
 
-        (= tool "clojure_list_sessions")
-        (p/let [result (calva/list-sessions+ options)]
+(defn- handle-symbol-info [options id arguments]
+  (p/let [{:keys [clojureSymbol replSessionKey]
+           ns :namespace} arguments
+          info (calva/get-symbol-info+ (merge options
+                                              {:calva/clojure-symbol clojureSymbol
+                                               :calva/repl-session-key replSessionKey
+                                               :calva/ns ns}))]
+    (text-response id info)))
+
+(defn- handle-clojuredocs [options id arguments]
+  (p/let [{:keys [clojureSymbol]} arguments
+          info (calva/get-clojuredocs+ (merge options
+                                              {:calva/clojure-symbol clojureSymbol}))]
+    (text-response id info)))
+
+(defn- handle-output-log [options id arguments]
+  (let [{:keys [query inputs maxImages]} arguments
+        output (calva/query-output (merge options
+                                          {:calva/query-edn-str query
+                                           :calva/inputs inputs}))]
+    (content-response id (tools/mcp-content-with-images output :max-images (if (some? maxImages) maxImages 0)))))
+
+(defn- handle-balance-brackets [options id arguments]
+  (let [{:keys [text]} arguments
+        result (bracket-balance/infer-parens-response (merge options {:calva/text text}))]
+    (text-response id result)))
+
+(defn- handle-replace-top-level-form [options id arguments]
+  (p/let [{:keys [filePath line targetLineText newForm]} arguments
+          result (calva/replace-top-level-form+ (merge options
+                                                       {:calva/file-path filePath
+                                                        :calva/line line
+                                                        :calva/target-line-text targetLineText
+                                                        :calva/new-form newForm}))]
+    (clj-response id result)))
+
+(defn- handle-insert-top-level-form [options id arguments]
+  (p/let [{:keys [filePath line targetLineText newForm]} arguments
+          result (calva/insert-top-level-form+ (merge options
+                                                      {:calva/file-path filePath
+                                                       :calva/line line
+                                                       :calva/target-line-text targetLineText
+                                                       :calva/new-form newForm}))]
+    (clj-response id result)))
+
+(defn- handle-create-file [options id arguments]
+  (p/let [{:keys [filePath content]} arguments
+          result (calva/structural-create-file+ (merge options
+                                                       {:calva/file-path filePath
+                                                        :calva/content content}))]
+    (clj-response id result)))
+
+(defn- handle-append-code [options id arguments]
+  (p/let [{:keys [filePath code]} arguments
+          result (calva/append-code+ (merge options
+                                            {:calva/file-path filePath
+                                             :calva/code code}))]
+    (clj-response id result)))
+
+(defn- blank-session-key? [k]
+  (or (nil? k) (and (string? k) (string/blank? k))))
+
+(defn- handle-load-file [options id arguments]
+  (let [{:keys [filePath replSessionKey who]} arguments
+        who-error (calva/validate-who who)]
+    (cond
+      (blank-session-key? replSessionKey)
+      (clj-response id {:error "The `replSessionKey` parameter is required. Use `clojure_list_sessions` to discover available sessions."})
+
+      who-error
+      (clj-response id {:error who-error})
+
+      :else
+      (p/let [result (calva/load-file+ (merge options
+                                              {:calva/file-path filePath
+                                               :calva/repl-session-key replSessionKey
+                                               :calva/who who}))]
+        (if (:error result)
           {:jsonrpc "2.0"
            :id id
            :result {:content [{:type "text"
-                               :text (js/JSON.stringify result)}]}})
+                               :text (js/JSON.stringify (clj->js {:error (:error result)}))}]
+                    :isError true}}
+          (clj-response id result))))))
 
-        (= tool "clojure_symbol_info")
-        (p/let [{:keys [clojureSymbol replSessionKey]
-                 ns :namespace} arguments
-                clojure-docs (calva/get-symbol-info+ (merge options
-                                                            {:calva/clojure-symbol clojureSymbol
-                                                             :calva/repl-session-key replSessionKey
-                                                             :calva/ns ns}))]
-          {:jsonrpc "2.0"
-           :id id
-           :result {:content [{:type "text"
-                               :text (js/JSON.stringify clojure-docs)}]}})
+(def ^:private tool-handlers
+  {"clojure_evaluate_code"    {:handler handle-evaluate-code :repl-required? true}
+   "clojure_list_sessions"    {:handler handle-list-sessions}
+   "clojure_symbol_info"      {:handler handle-symbol-info}
+   "clojuredocs_info"         {:handler handle-clojuredocs}
+   "clojure_repl_output_log"  {:handler handle-output-log}
+   "clojure_balance_brackets" {:handler handle-balance-brackets}
+   "replace_top_level_form"   {:handler handle-replace-top-level-form}
+   "insert_top_level_form"    {:handler handle-insert-top-level-form}
+   "clojure_create_file"      {:handler handle-create-file}
+   "clojure_append_code"      {:handler handle-append-code}
+   "clojure_load_file"        {:handler handle-load-file :repl-required? true}})
 
-        (= tool "clojuredocs_info")
-        (p/let [{:keys [clojureSymbol]} arguments
-                clojure-docs (calva/get-clojuredocs+ (merge options
-                                                            {:calva/clojure-symbol clojureSymbol}))]
-          {:jsonrpc "2.0"
-           :id id
-           :result {:content [{:type "text"
-                               :text (js/JSON.stringify clojure-docs)}]}})
+(defn- handle-tools-call [{:keys [id params] :as _request}
+                          {:mcp/keys [repl-enabled?] :as options}]
+  (let [{:keys [arguments] tool :name} params
+        {:keys [handler repl-required?]} (get tool-handlers tool)]
+    (cond
+      (nil? handler)
+      (error-response id -32601 "Unknown tool")
 
-        (= tool "clojure_repl_output_log")
-        (let [{:keys [query inputs maxImages]} arguments
-              output (calva/query-output (merge options
-                                                {:calva/query-edn-str query
-                                                 :calva/inputs inputs}))]
-          {:jsonrpc "2.0"
-           :id id
-           :result {:content (tools/mcp-content-with-images output :max-images (if (some? maxImages) maxImages 0))}})
+      (and repl-required? (not (true? repl-enabled?)))
+      (error-response id -32601 "Unknown tool")
 
-        (= tool "clojure_balance_brackets")
-        (let [{:keys [text]} arguments
-              result (bracket-balance/infer-parens-response (merge options
-                                                                   {:calva/text text}))]
-          {:jsonrpc "2.0"
-           :id id
-           :result {:content [{:type "text"
-                               :text (js/JSON.stringify result)}]}})
+      :else
+      (handler options id arguments))))
 
-        (= tool "replace_top_level_form")
-        (p/let [{:keys [filePath line targetLineText newForm]} arguments
-                result (calva/replace-top-level-form+ (merge options
-                                                             {:calva/file-path filePath
-                                                              :calva/line line
-                                                              :calva/target-line-text targetLineText
-                                                              :calva/new-form newForm}))]
-          {:jsonrpc "2.0"
-           :id id
-           :result {:content [{:type "text"
-                               :text (js/JSON.stringify (clj->js result))}]}})
-
-        (= tool "insert_top_level_form")
-        (p/let [{:keys [filePath line targetLineText newForm]} arguments
-                result (calva/insert-top-level-form+ (merge options
-                                                            {:calva/file-path filePath
-                                                             :calva/line line
-                                                             :calva/target-line-text targetLineText
-                                                             :calva/new-form newForm}))]
-          {:jsonrpc "2.0"
-           :id id
-           :result {:content [{:type "text"
-                               :text (js/JSON.stringify (clj->js result))}]}})
-
-        (= tool "clojure_create_file")
-        (p/let [{:keys [filePath content]} arguments
-                result (calva/structural-create-file+ (merge options
-                                                             {:calva/file-path filePath
-                                                              :calva/content content}))]
-          {:jsonrpc "2.0"
-           :id id
-           :result {:content [{:type "text"
-                               :text (js/JSON.stringify (clj->js result))}]}})
-
-        (= tool "clojure_append_code")
-        (p/let [{:keys [filePath code]} arguments
-                result (calva/append-code+ (merge options
-                                                  {:calva/file-path filePath
-                                                   :calva/code code}))]
-          {:jsonrpc "2.0"
-           :id id
-           :result {:content [{:type "text"
-                               :text (js/JSON.stringify (clj->js result))}]}})
-
-        (and (= tool "clojure_load_file")
-             (= true repl-enabled?))
-        (let [{:keys [filePath replSessionKey who]} arguments
-              who-error (calva/validate-who who)]
-          (cond
-            (or (nil? replSessionKey) (and (string? replSessionKey) (string/blank? replSessionKey)))
-            {:jsonrpc "2.0"
-             :id id
-             :result {:content [{:type "text"
-                                 :text (js/JSON.stringify (clj->js {:error "The `replSessionKey` parameter is required. Use `clojure_list_sessions` to discover available sessions."}))}]}}
-
-            who-error
-            {:jsonrpc "2.0"
-             :id id
-             :result {:content [{:type "text"
-                                 :text (js/JSON.stringify (clj->js {:error who-error}))}]}}
-
-            :else
-            (p/let [result (calva/load-file+ (merge options
-                                                    {:calva/file-path filePath
-                                                     :calva/repl-session-key replSessionKey
-                                                     :calva/who who}))]
-              {:jsonrpc "2.0"
-               :id id
-               :result (if (:error result)
-                         {:content [{:type "text"
-                                     :text (js/JSON.stringify (clj->js {:error (:error result)}))}]
-                          :isError true}
-                         {:content [{:type "text"
-                                     :text (js/JSON.stringify (clj->js result))}]})})))
-
-        :else
+(defn- handle-resources-read [{:keys [id params] :as _request}
+                              {:mcp/keys [provide-bd-skill? provide-edit-skill?] :as options}]
+  (let [{:keys [uri]} params]
+    (cond
+      (string/starts-with? uri "/symbol-info/")
+      (p/let [[_ clojureSymbol session-key ns] (re-find #"^/symbol-info/([^@]+)@([^@]+)@(.+)$" uri)
+              info (calva/get-symbol-info+ (merge options
+                                                  {:calva/clojure-symbol clojureSymbol
+                                                   :calva/repl-session-key session-key
+                                                   :calva/ns ns}))]
         {:jsonrpc "2.0"
          :id id
-         :error {:code -32601
-                 :message "Unknown tool"}}))
+         :result {:contents [{:uri uri
+                              :text (js/JSON.stringify info)}]}})
 
-    (= method "resources/read")
-    (let [{:keys [uri]} params]
-      (cond
-        (string/starts-with? uri "/symbol-info/")
-        (p/let [[_ clojureSymbol session-key ns] (re-find #"^/symbol-info/([^@]+)@([^@]+)@(.+)$" uri)
-                info (calva/get-symbol-info+ (merge options
-                                                    {:calva/clojure-symbol clojureSymbol
-                                                     :calva/repl-session-key session-key
-                                                     :calva/ns ns}))]
+      (string/starts-with? uri "/clojuredocs/")
+      (p/let [[_ clojureSymbol] (re-find #"^/clojuredocs/(.+)$" uri)
+              info (calva/get-clojuredocs+ (merge options
+                                                  {:calva/clojure-symbol clojureSymbol}))]
+        {:jsonrpc "2.0"
+         :id id
+         :result {:contents [{:uri uri
+                              :text (js/JSON.stringify info)}]}})
+
+      (string/starts-with? uri "/skills/")
+      (let [[_ skill-name] (re-find #"^/skills/([^/]+)/SKILL\.md$" uri)
+            filtered-skills (skills/filter-skills (get-skills)
+                                                  {:provide-bd-skill? provide-bd-skill?
+                                                   :provide-edit-skill? provide-edit-skill?})
+            skill (some #(when (= (:skill/name %) skill-name) %) filtered-skills)]
+        (if skill
           {:jsonrpc "2.0"
            :id id
            :result {:contents [{:uri uri
-                                :text (js/JSON.stringify info)}]}})
+                                :text (:skill/content skill)
+                                :mimeType "text/markdown"}]}}
+          (error-response id -32602 (str "Skill not found: " uri))))
 
-        (string/starts-with? uri "/clojuredocs/")
-        (p/let [[_ clojureSymbol] (re-find #"^/clojuredocs/(.+)$" uri)
-                info (calva/get-clojuredocs+ (merge options
-                                                    {:calva/clojure-symbol clojureSymbol}))]
-          {:jsonrpc "2.0"
-           :id id
-           :result {:contents [{:uri uri
-                                :text (js/JSON.stringify info)}]}})
+      :else
+      (error-response id -32602 "Unknown resource URI"))))
 
-        (string/starts-with? uri "/skills/")
-        (let [[_ skill-name] (re-find #"^/skills/([^/]+)/SKILL\.md$" uri)
-              filtered-skills (skills/filter-skills (get-skills)
-                                                    {:provide-bd-skill? provide-bd-skill?
-                                                     :provide-edit-skill? provide-edit-skill?})
-              skill (some #(when (= (:skill/name %) skill-name) %) filtered-skills)]
-          (if skill
-            {:jsonrpc "2.0"
-             :id id
-             :result {:contents [{:uri uri
-                                  :text (:skill/content skill)
-                                  :mimeType "text/markdown"}]}}
-            {:jsonrpc "2.0"
-             :id id
-             :error {:code -32602 :message (str "Skill not found: " uri)}}))
-
-        :else
-        {:jsonrpc "2.0"
-         :id id
-         :error {:code -32602 :message "Unknown resource URI"}}))
-
-    (= method "ping")
+(defn- handle-initialize [options id]
+  (let [{:mcp/keys [repl-enabled? provide-bd-skill? provide-edit-skill?]} options]
     {:jsonrpc "2.0"
      :id id
-     :result {}}
+     :result {:serverInfo {:name "calva-backseat-driver"
+                           :version (get-extension-version)}
+              :protocolVersion "2024-11-05"
+              :capabilities {:tools {:listChanged true}
+                             :resources {:listChanged true}}
+              :instructions (skills/compose-instructions repl-enabled?
+                                                         (skills/filter-skills (get-skills)
+                                                                               {:provide-bd-skill? provide-bd-skill?
+                                                                                :provide-edit-skill? provide-edit-skill?}))
+              :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (if this is enabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."}}))
 
-    id
-    {:jsonrpc "2.0" :id id :error {:code -32601 :message "Method not found"}}
+(defn- handle-tools-list [options id]
+  (let [{:mcp/keys [repl-enabled?]} options]
+    {:jsonrpc "2.0"
+     :id id
+     :result {:tools (cond-> [bracket-balance-tool-listing
+                              list-sessions-tool-listing
+                              symbol-info-tool-listing
+                              clojuredocs-tool-listing
+                              output-log-tool-info
+                              replace-top-level-form-tool-listing
+                              insert-top-level-form-tool-listing
+                              structural-create-file-tool-listing
+                              append-code-tool-listing]
+                       (true? repl-enabled?)
+                       (conj evaluate-code-tool-listing
+                             load-file-tool-listing))}}))
 
-    :else ;; returning nil so that the response is not sent (JSON-RPC notifications)
-    nil))
+(defn handle-request-fn [{:ex/keys [dispatch!] :as options
+                          :mcp/keys [provide-bd-skill? provide-edit-skill?]}
+                         {:keys [id method] :as request}]
+  (dispatch! [[:app/ax.log :debug "[Server] handle-request " (pr-str request)]])
+  (case method
+    "initialize"
+    (handle-initialize options id)
+
+    "tools/list"
+    (handle-tools-list options id)
+
+    "resources/list"
+    (let [filtered-skills (skills/filter-skills (get-skills)
+                                                {:provide-bd-skill? provide-bd-skill?
+                                                 :provide-edit-skill? provide-edit-skill?})]
+      {:jsonrpc "2.0"
+       :id id
+       :result {:resources (mapv (fn [{:skill/keys [name description uri]}]
+                                   {:uri uri
+                                    :name name
+                                    :description description
+                                    :mimeType "text/markdown"})
+                                 filtered-skills)}})
+
+    "resources/templates/list"
+    {:jsonrpc "2.0"
+     :id id
+     :result {:resourceTemplates [{:uriTemplate "/symbol-info/{symbol}@{session-key}@{namespace}"
+                                   :name "symbol-info"
+                                   :description (tool-description "clojure_symbol_info")
+                                   :mimeType "application/json"}
+                                  {:uriTemplate "/clojuredocs/{symbol}"
+                                   :name "clojuredocs"
+                                   :description (tool-description "clojuredocs_info")
+                                   :mimeType "application/json"}]}}
+
+    "tools/call"
+    (handle-tools-call request options)
+
+    "resources/read"
+    (handle-resources-read request options)
+
+    "ping"
+    {:jsonrpc "2.0" :id id :result {}}
+
+    (if id
+      (error-response id -32601 "Method not found")
+      nil)))
 
