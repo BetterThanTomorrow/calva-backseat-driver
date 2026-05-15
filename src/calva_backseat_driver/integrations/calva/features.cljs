@@ -3,7 +3,6 @@
    ["vscode" :as vscode]
    [calva-backseat-driver.integrations.calva.api :as calva]
    [calva-backseat-driver.integrations.calva.editor :as editor]
-   [calva-backseat-driver.integrations.calva.version :as version]
    [calva-backseat-driver.integrations.parinfer :as parinfer]
    [clojure.string :as string]
    [promesa.core :as p]))
@@ -40,52 +39,29 @@
 
 ;; Session listing and validation
 
-(def ^:private legacy-session-keys
-  "Fallback session keys for older Calva versions without listSessions API"
-  #{"clj" "cljs" "cljc"})
-
-(defn exists-list-sessions?
-  "Returns true if the Calva API supports listing sessions"
-  []
-  (boolean (get-in calva/calva-api [:repl :listSessions])))
-
 (defn list-sessions+
-  "Returns a promise that resolves to a list of available REPL sessions.
-   Falls back to legacy session keys when API is not available."
+  "Returns a promise that resolves to a list of available REPL sessions."
   [{:ex/keys [dispatch!]}]
   (dispatch! [[:app/ax.log :debug "[Server] Listing REPL sessions"]])
-  (if-let [list-sessions-fn (get-in calva/calva-api [:repl :listSessions])]
-    (p/let [sessions (list-sessions-fn)]
-      #js {:sessions sessions})
-    (p/resolved
-     #js {:sessions (to-array (map (fn [k] #js {:replSessionKey k}) legacy-session-keys))
-          :note "Session listing API not available, showing legacy session keys"})))
+  (p/let [sessions ((get-in calva/calva-api [:repl :listSessions]))]
+    #js {:sessions sessions}))
 
 (defn- validate-session-key+
   "Validates a session key against available sessions.
    Returns {:valid? true} or {:valid? false :error ... :available-sessions ...}"
   [session-key]
-  (if-let [list-sessions-fn (get-in calva/calva-api [:repl :listSessions])]
-    ;; New Calva with listSessions API
-    (p/let [sessions (list-sessions-fn)
-            session-keys (->> sessions
-                              (map #(.-replSessionKey ^js %))
-                              set)]
-      (if (contains? session-keys session-key)
-        {:valid? true}
-        {:valid? false
-         :error (str "Session '" session-key "' not found.")
-         :available-sessions (mapv (fn [^js s]
-                                     {:session-key (.-replSessionKey s)
-                                      :project-root (.-projectRoot s)})
-                                   sessions)}))
-    ;; Fallback for older Calva
-    (p/resolved
-     (if (contains? legacy-session-keys session-key)
-       {:valid? true}
-       {:valid? false
-        :error (str "Session '" session-key "' not recognized.")
-        :available-sessions (mapv (fn [k] {:session-key k}) legacy-session-keys)}))))
+  (p/let [sessions ((get-in calva/calva-api [:repl :listSessions]))
+          session-keys (->> sessions
+                            (map #(.-replSessionKey ^js %))
+                            set)]
+    (if (contains? session-keys session-key)
+      {:valid? true}
+      {:valid? false
+       :error (str "Session '" session-key "' not found.")
+       :available-sessions (mapv (fn [^js s]
+                                   {:session-key (.-replSessionKey s)
+                                    :project-root (.-projectRoot s)})
+                                 sessions)})))
 
 (defn evaluate-code+
   "Returns a promise that resolves to the result of evaluating Clojure/ClojureScript code.
@@ -195,14 +171,10 @@
   (dispatch! [[:app/ax.log :debug "[Server] Getting clojuredocs for:" clojure-symbol]])
   ((get-in calva/calva-api [:info :getClojureDocsDotOrg]) clojure-symbol "user"))
 
-(defn exists-get-clojuredocs? [] (boolean (get-in calva/calva-api [:info :getClojureDocsDotOrg])))
-
 (defn get-symbol-info+ [{:ex/keys [dispatch!]
                          :calva/keys [clojure-symbol ns repl-session-key]}]
   (dispatch! [[:app/ax.log :debug "[Server] Getting symbol info for:" clojure-symbol]])
   ((get-in calva/calva-api [:info :getSymbolInfo]) clojure-symbol repl-session-key ns))
-
-(defn exists-get-symbol-info? [] (boolean (get-in calva/calva-api [:info :getSymbolInfo])))
 
 (defn subscribe-to-output [{:ex/keys [dispatch!]
                             :calva/keys [on-output]}]
@@ -214,21 +186,6 @@
                      :calva/keys [query-edn-str inputs]}]
   (dispatch! [[:app/ax.log :debug "[Server] Querying output log with:" query-edn-str]
               [:calva/ax.query-output query-edn-str inputs]]))
-
-(defn exists-on-output? [] (boolean (get-in calva/calva-api [:repl :onOutputLogged])))
-
-;; Version-gated features
-
-(defn calva-version-at-least?
-  "Returns true if the installed Calva version is >= the given version string."
-  [min-version]
-  (version/version>= (version/parse-version (calva/calva-version))
-                     (version/parse-version min-version)))
-
-(defn exists-load-file?
-  "Returns true if the connected Calva supports calva.loadFile with a path argument (> 2.0.575)"
-  []
-  (calva-version-at-least? "2.0.576"))
 
 (defn load-file+
   "Loads/evaluates a Clojure file through Calva's connected REPL.
