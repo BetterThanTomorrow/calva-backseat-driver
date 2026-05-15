@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- E2E test coverage for all MCP tools (added tests for `clojure_balance_brackets`, `clojure_symbol_info`, `clojuredocs_info`)
+
 ## [v0.0.33] - 2026-05-15
 
 - [Make editing tools headless](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/57)
