@@ -46,65 +46,86 @@
        (>= (:y pos) 0) (< (:y pos) height)))
 
 ;; Function to move the snake one step
+(defn next-head [head direction]
+  (case direction
+    :up    {:x (:x head) :y (dec (:y head))}
+    :down  {:x (:x head) :y (inc (:y head))}
+    :left  {:x (dec (:x head)) :y (:y head)}
+    :right {:x (inc (:x head)) :y (:y head)}))
+
 (defn move-snake []
   (when-not (:game-over @state)
     (let [{:keys [snake direction food score]} @state
-          head (first snake)
-          new-head (case direction
-                     :up    {:x (:x head) :y (dec (:y head))}
-                     :down  {:x (:x head) :y (inc (:y head))}
-                     :left  {:x (dec (:x head)) :y (:y head)}
-                     :right {:x (inc (:x head)) :y (:y head)})
-          ate-food? (collide? new-head food)
-          new-snake (if ate-food?
-                      (cons new-head snake)
-                      (cons new-head (butlast snake)))]
-
-      ;; Check for collisions and bounds
-      (if (or (not (in-bounds? new-head))
-              (self-collision? new-head (rest snake)))
+          new-head (next-head (first snake) direction)]
+      (cond
+        (dead? new-head snake)
         (swap! state assoc :game-over true)
+
+        (collide? new-head food)
         (swap! state assoc
-               :snake new-snake
-               :score (if ate-food? (inc score) score)
-               :food (if ate-food? (generate-food) food))))))
+               :snake (cons new-head snake)
+               :score (inc score)
+               :food (generate-food))
+
+        :else
+        (swap! state assoc
+               :snake (cons new-head (butlast snake)))))))
 
 ;; Create a panel for the game
+(defn draw-background [g]
+  (.setColor g Color/BLACK)
+  (.fillRect g 0 0 (* width cell-size) (* height cell-size)))
+
+(defn draw-food [g food]
+  (.setColor g Color/RED)
+  (.fillRect g (* (:x food) cell-size) (* (:y food) cell-size) cell-size cell-size))
+
+(defn draw-snake [g panel snake]
+  (let [custom-color (.getClientProperty panel "snake-color")]
+    (.setColor g (or custom-color Color/GREEN))
+    (doseq [segment snake]
+      (.fillRect g (* (:x segment) cell-size) (* (:y segment) cell-size) cell-size cell-size))))
+
+(defn draw-score [g score]
+  (.setColor g Color/WHITE)
+  (.setFont g (Font. "Arial" Font/BOLD 16))
+  (.drawString g (str "Score: " score) 10 20))
+
+(defn draw-game-over [g]
+  (.setColor g Color/RED)
+  (.setFont g (Font. "Arial" Font/BOLD 36))
+  (.drawString g "Game Over!"
+               (- (/ (* width cell-size) 2) 100)
+               (/ (* height cell-size) 2))
+  (.setFont g (Font. "Arial" Font/BOLD 18))
+  (.drawString g "Press SPACE to restart"
+               (- (/ (* width cell-size) 2) 100)
+               (+ (/ (* height cell-size) 2) 30)))
+
+(def opposite-direction
+  {:left :right, :right :left, :up :down, :down :up})
+
+(def key-code->direction
+  {37 :left, 38 :up, 39 :right, 40 :down})
+
+(defn handle-key-press [key-code]
+  (if-let [new-dir (key-code->direction key-code)]
+    (when-not (= (:direction @state) (opposite-direction new-dir))
+      (swap! state assoc :direction new-dir))
+    (when (and (= key-code 32) (:game-over @state))
+      (reset-game))))
+
 (defn game-panel []
   (proxy [JPanel ActionListener KeyListener] []
     (paintComponent [g]
       (proxy-super paintComponent g)
       (let [{:keys [snake food score game-over]} @state]
-        ;; Draw background
-        (.setColor g Color/BLACK)
-        (.fillRect g 0 0 (* width cell-size) (* height cell-size))
-
-        ;; Draw food
-        (.setColor g Color/RED)
-        (.fillRect g (* (:x food) cell-size) (* (:y food) cell-size) cell-size cell-size)
-
-        ;; Draw snake
-        (let [custom-color (.getClientProperty this "snake-color")]
-          (.setColor g (or custom-color Color/GREEN))
-          (doseq [segment snake]
-            (.fillRect g (* (:x segment) cell-size) (* (:y segment) cell-size) cell-size cell-size)))
-
-        ;; Draw score
-        (.setColor g Color/WHITE)
-        (.setFont g (Font. "Arial" Font/BOLD 16))
-        (.drawString g (str "Score: " score) 10 20)
-
-        ;; Game over message
+        (draw-background g)
+        (draw-food g food)
+        (draw-snake g this snake)
+        (draw-score g score)
         (when game-over
-          (.setColor g Color/RED)
-          (.setFont g (Font. "Arial" Font/BOLD 36))
-          (.drawString g "Game Over!"
-                       (- (/ (* width cell-size) 2) 100)
-                       (/ (* height cell-size) 2))
-          (.setFont g (Font. "Arial" Font/BOLD 18))
-          (.drawString g "Press SPACE to restart"
-                       (- (/ (* width cell-size) 2) 100)
-                       (+ (/ (* height cell-size) 2) 30)))))
+          (draw-game-over g))))
 
     (getPreferredSize []
       (Dimension. (* width cell-size) (* height cell-size)))
@@ -114,18 +135,7 @@
       (.repaint this))
 
     (keyPressed [e]
-      (case (.getKeyCode e)
-        37 (when-not (= (:direction @state) :right)
-             (swap! state assoc :direction :left))
-        38 (when-not (= (:direction @state) :down)
-             (swap! state assoc :direction :up))
-        39 (when-not (= (:direction @state) :left)
-             (swap! state assoc :direction :right))
-        40 (when-not (= (:direction @state) :up)
-             (swap! state assoc :direction :down))
-        32 (when (:game-over @state)
-             (reset-game))
-        nil))
+      (handle-key-press (.getKeyCode e)))
 
     (keyReleased [e])
     (keyTyped [e])))
