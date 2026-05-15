@@ -20,11 +20,14 @@
 
 (def ^:private reserved-whos #{"ui" "api"})
 
+(defn- blank-who? [who]
+  (or (nil? who) (and (string? who) (string/blank? who))))
+
 (defn validate-who
   "Returns nil if valid, error string if not. Pure function."
   [who]
   (cond
-    (or (nil? who) (and (string? who) (string/blank? who)))
+    (blank-who? who)
     "The `who` parameter is required. Provide a slug identifying your agent (e.g. \"copilot\")."
 
     (contains? reserved-whos who)
@@ -63,76 +66,85 @@
                                     :project-root (.-projectRoot s)})
                                  sessions)})))
 
+(defn- get-nrepl-eval-options [max-length max-depth]
+  (when (or max-length max-depth)
+    #js {:pprintOptions #js {:enabled true
+                             :printEngine "pprint"
+                             :maxLength max-length
+                             :maxDepth max-depth}}))
+
+(defn- handle-eval-error+ [dispatch! err]
+  (dispatch! [[:app/ax.log :debug "[Server] Evaluation failed:" err]])
+  (let [msg (str (.-message err))]
+    (if (re-find #"reserved" msg)
+      {:result "nil"
+       :error msg
+       :notes ["The `who` value you provided is reserved. Choose a different identifier."]}
+      {:result "nil"
+       :stderr (pr-str err)
+       :notes [error-result-note]})))
+
+(defn- validate-eval-inputs+ [code repl-session-key dispatch!]
+  (let [{:keys [valid? balanced-code] :as validation} (parinfer/validate-brackets code)]
+    (when-not valid?
+      (dispatch! [[:app/ax.log :debug "[Server] Code was unbalanced:" code "balanced-code:" balanced-code]]))
+    (if-not valid?
+      (p/resolved {:error validation})
+      (p/let [session-validation (validate-session-key+ repl-session-key)]
+        (if-not (:valid? session-validation)
+          {:error session-validation}
+          {:valid? true})))))
+
 (defn evaluate-code+
   "Returns a promise that resolves to the result of evaluating Clojure/ClojureScript code.
    Pre-validates session key against available sessions before evaluation."
   [{:ex/keys [dispatch!]
     :calva/keys [code repl-session-key ns who description]}]
-  (let [{:keys [valid? balanced-code]
-         :as validation} (parinfer/validate-brackets code)]
-    (when-not valid?
-      (dispatch! [[:app/ax.log :debug "[Server] Code was unbalanced:" code "balanced-code:" balanced-code]]))
-    (if-not valid?
-      (p/resolved validation)
-      (p/let [session-validation (validate-session-key+ repl-session-key)]
-        (if-not (:valid? session-validation)
-          session-validation
-          (let [evaluate-fn (get-in calva/calva-api [:repl :evaluate])]
-            (p/let [{:keys [max-length max-depth]} (get-eval-config)
-                    enabled? (or max-length max-depth)
-                    nrepl-eval-options (when enabled?
-                                         #js {:pprintOptions #js {:enabled true
-                                                                  :printEngine "pprint"
-                                                                  :maxLength max-length
-                                                                  :maxDepth max-depth}})
-                    result (-> (p/let [options-js (clj->js
-                                                   (cond-> {:sessionKey repl-session-key}
-                                                     ns (assoc :ns ns)
-                                                     who (assoc :who who)
-                                                     description (assoc :description description)
-                                                     nrepl-eval-options (assoc :nReplOptions nrepl-eval-options)))
-                                       ^js evaluation+ (evaluate-fn code options-js)]
-                                 (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
-                                 (let [other-whos (some-> (.-otherWhosSinceLast evaluation+)
-                                                          (js->clj))
-                                       notes (cond-> ["Remember to check the output tool now and then to see what's happening in the application."]
-                                               (not ns)
-                                               (conj no-ns-eval-note)
+  (p/let [input-validation (validate-eval-inputs+ code repl-session-key dispatch!)]
+    (if (:error input-validation)
+      (:error input-validation)
+      (let [evaluate-fn (get-in calva/calva-api [:repl :evaluate])]
+        (p/let [{:keys [max-length max-depth]} (get-eval-config)
+                nrepl-eval-options (get-nrepl-eval-options max-length max-depth)
+                result (-> (p/let [options-js (clj->js
+                                               (cond-> {:sessionKey repl-session-key}
+                                                 ns (assoc :ns ns)
+                                                 who (assoc :who who)
+                                                 description (assoc :description description)
+                                                 nrepl-eval-options (assoc :nReplOptions nrepl-eval-options)))
+                                   ^js evaluation+ (evaluate-fn code options-js)]
+                             (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
+                             (let [other-whos (some-> (.-otherWhosSinceLast evaluation+)
+                                                      (js->clj))
+                                   notes (cond-> ["Remember to check the output tool now and then to see what's happening in the application."]
+                                           (not ns)
+                                           (conj no-ns-eval-note)
 
-                                               (= "" (.-result evaluation+))
-                                               (conj empty-result-note)
+                                           (= "" (.-result evaluation+))
+                                           (conj empty-result-note)
 
-                                               (seq other-whos)
-                                               (conj (str "Other evaluators active since your last eval: "
-                                                          (string/join ", " other-whos)
-                                                          ". Check the output log.")))]
-                                   (cond-> {:result (.-result evaluation+)
-                                            :ns (.-ns evaluation+)
-                                            :stdout (.-output evaluation+)
-                                            :stderr (.-errorOutput evaluation+)
-                                            :session-key (.-sessionKey evaluation+)
-                                            :notes notes}
+                                           (seq other-whos)
+                                           (conj (str "Other evaluators active since your last eval: "
+                                                      (string/join ", " other-whos)
+                                                      ". Check the output log.")))]
+                               (cond-> {:result (.-result evaluation+)
+                                        :ns (.-ns evaluation+)
+                                        :stdout (.-output evaluation+)
+                                        :stderr (.-errorOutput evaluation+)
+                                        :session-key (.-sessionKey evaluation+)
+                                        :notes notes}
 
-                                     (.-who evaluation+)
-                                     (assoc :who (.-who evaluation+))
+                                 (.-who evaluation+)
+                                 (assoc :who (.-who evaluation+))
 
-                                     (seq other-whos)
-                                     (assoc :other-whos-since-last other-whos)
+                                 (seq other-whos)
+                                 (assoc :other-whos-since-last other-whos)
 
-                                     (.-error evaluation+)
-                                     (merge {:error (.-error evaluation+)
-                                             :stacktrace (.-stacktrace evaluation+)}))))
-                               (p/catch (fn [err]
-                                          (dispatch! [[:app/ax.log :debug "[Server] Evaluation failed:" err]])
-                                          (let [msg (str (.-message err))]
-                                            (if (re-find #"reserved" msg)
-                                              {:result "nil"
-                                               :error msg
-                                               :notes ["The `who` value you provided is reserved. Choose a different identifier."]}
-                                              {:result "nil"
-                                               :stderr (pr-str err)
-                                               :notes [error-result-note]})))))]
-              result)))))))
+                                 (.-error evaluation+)
+                                 (merge {:error (.-error evaluation+)
+                                         :stacktrace (.-stacktrace evaluation+)}))))
+                           (p/catch (fn [err] (handle-eval-error+ dispatch! err))))]
+          result)))))
 
 
 (defn get-clojuredocs+ [{:ex/keys [dispatch!]
@@ -179,35 +191,29 @@
 
 
 
-(defn replace-top-level-form+
-  "Replace a top-level form using text targeting and Calva's ranges API"
-  [{:ex/keys [dispatch!]
-    :calva/keys [file-path line target-line-text new-form]}]
+(defn- form-edit+ [{:ex/keys [dispatch!]
+                    :calva/keys [file-path line target-line-text new-form]
+                    :keys [ranges-fn-key log-verb]}]
   (let [{:keys [search-padding context-padding]} (get-editor-config)]
-    (dispatch! [[:app/ax.log :debug "[Editor] Replacing form at line" line "in" file-path]])
+    (dispatch! [[:app/ax.log :debug "[Editor]" log-verb "form at line" line "in" file-path]])
     (editor/apply-form-edit-by-line-with-text-targeting
      {:editor/file-path file-path
       :editor/line-number line
       :editor/target-line target-line-text
       :editor/new-form new-form
-      :editor/ranges-fn-key :currentTopLevelForm
+      :editor/ranges-fn-key ranges-fn-key
       :editor/search-padding search-padding
       :editor/context-padding context-padding})))
 
+(defn replace-top-level-form+
+  "Replace a top-level form using text targeting and Calva's ranges API"
+  [m]
+  (form-edit+ (assoc m :ranges-fn-key :currentTopLevelForm :log-verb "Replacing")))
+
 (defn insert-top-level-form+
   "Insert a top-level form using text targeting and Calva's ranges API"
-  [{:ex/keys [dispatch!]
-    :calva/keys [file-path line target-line-text new-form]}]
-  (let [{:keys [search-padding context-padding]} (get-editor-config)]
-    (dispatch! [[:app/ax.log :debug "[Editor] Inserting form at line" line "in" file-path]])
-    (editor/apply-form-edit-by-line-with-text-targeting
-     {:editor/file-path file-path
-      :editor/line-number line
-      :editor/target-line target-line-text
-      :editor/new-form new-form
-      :editor/ranges-fn-key :insertionPoint
-      :editor/search-padding search-padding
-      :editor/context-padding context-padding})))
+  [m]
+  (form-edit+ (assoc m :ranges-fn-key :insertionPoint :log-verb "Inserting")))
 
 (defn structural-create-file+
   "Create a new Clojure file with exact content using vscode/workspace.fs API"
