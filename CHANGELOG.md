@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- [Make editing tools headless](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/57)
+
 ## [v0.0.32] - 2026-05-10
 
 - MCP server: Fix `input` param schema for log tool
