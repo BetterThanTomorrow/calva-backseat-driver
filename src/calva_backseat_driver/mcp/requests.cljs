@@ -277,39 +277,19 @@
     (= method "tools/list")
     (let [response {:jsonrpc "2.0"
                     :id id
-                    :result {:tools (cond-> []
-                                      :always
-                                      (conj bracket-balance-tool-listing)
+                    :result {:tools (cond-> [bracket-balance-tool-listing
+                                             list-sessions-tool-listing
+                                             symbol-info-tool-listing
+                                             clojuredocs-tool-listing
+                                             output-log-tool-info
+                                             replace-top-level-form-tool-listing
+                                             insert-top-level-form-tool-listing
+                                             structural-create-file-tool-listing
+                                             append-code-tool-listing]
 
                                       (= true repl-enabled?)
-                                      (conj evaluate-code-tool-listing)
-
-                                      (calva/exists-list-sessions?)
-                                      (conj list-sessions-tool-listing)
-
-                                      (calva/exists-get-symbol-info?)
-                                      (conj symbol-info-tool-listing)
-
-                                      (calva/exists-get-clojuredocs?)
-                                      (conj clojuredocs-tool-listing)
-
-                                      (calva/exists-on-output?)
-                                      (conj output-log-tool-info)
-
-                                      true
-                                      (conj replace-top-level-form-tool-listing)
-
-                                      true
-                                      (conj insert-top-level-form-tool-listing)
-
-                                      true
-                                      (conj structural-create-file-tool-listing)
-
-                                      true
-                                      (conj append-code-tool-listing)
-
-                                      (and (= true repl-enabled?) (calva/exists-load-file?))
-                                      (conj load-file-tool-listing))}}]
+                                      (conj evaluate-code-tool-listing
+                                            load-file-tool-listing))}}]
       response)
 
     (= method "resources/list")
@@ -329,18 +309,14 @@
     (= method "resources/templates/list")
     (let [response {:jsonrpc "2.0"
                     :id id
-                    :result {:resourceTemplates (cond-> []
-                                                  (calva/exists-get-symbol-info?)
-                                                  (conj {:uriTemplate "/symbol-info/{symbol}@{session-key}@{namespace}"
-                                                         :name "symbol-info"
-                                                         :description (tool-description "clojure_symbol_info")
-                                                         :mimeType "application/json"})
-
-                                                  (calva/exists-get-clojuredocs?)
-                                                  (conj {:uriTemplate "/clojuredocs/{symbol}"
-                                                         :name "clojuredocs"
-                                                         :description (tool-description "clojuredocs_info")
-                                                         :mimeType "application/json"}))}}]
+                    :result {:resourceTemplates [{:uriTemplate "/symbol-info/{symbol}@{session-key}@{namespace}"
+                                                  :name "symbol-info"
+                                                  :description (tool-description "clojure_symbol_info")
+                                                  :mimeType "application/json"}
+                                                 {:uriTemplate "/clojuredocs/{symbol}"
+                                                  :name "clojuredocs"
+                                                  :description (tool-description "clojuredocs_info")
+                                                  :mimeType "application/json"}]}}]
       response)
 
     (= method "tools/call")

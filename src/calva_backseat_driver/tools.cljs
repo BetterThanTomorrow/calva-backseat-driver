@@ -287,64 +287,48 @@
                          (vscode/LanguageModelToolResult.
                           #js [(vscode/LanguageModelTextPart.
                                 (js/JSON.stringify (clj->js result)))]))))))})
+
 (defn register-language-model-tools [dispatch!]
-  ;; Set context for conditional tool visibility in UI
-  (dispatch! [[:app/ax.set-when-context :calva-backseat-driver/listSessionsAvailable
-               (calva/exists-list-sessions?)]
-              [:app/ax.set-when-context :calva-backseat-driver/loadFileAvailable
-               (calva/exists-load-file?)]])
-  (cond-> []
-    :always
-    (conj (vscode/lm.registerTool
-           "clojure_evaluate_code"
-           (#'EvaluateClojureCodeTool dispatch!)))
+  [(vscode/lm.registerTool
+    "clojure_evaluate_code"
+    (#'EvaluateClojureCodeTool dispatch!))
 
-    (calva/exists-list-sessions?)
-    (conj (vscode/lm.registerTool
-           "clojure_list_sessions"
-           (#'ListSessionsTool dispatch!)))
+   (vscode/lm.registerTool
+    "clojure_list_sessions"
+    (#'ListSessionsTool dispatch!))
 
-    (calva/exists-get-symbol-info?)
-    (conj (vscode/lm.registerTool
-           "clojure_symbol_info"
-           (#'GetSymbolInfoTool dispatch!)))
+   (vscode/lm.registerTool
+    "clojure_symbol_info"
+    (#'GetSymbolInfoTool dispatch!))
 
-    (calva/exists-get-clojuredocs?)
-    (conj (vscode/lm.registerTool
-           "clojuredocs_info"
-           (#'GetClojureDocsTool dispatch!)))
+   (vscode/lm.registerTool
+    "clojuredocs_info"
+    (#'GetClojureDocsTool dispatch!))
 
-    (calva/exists-on-output?)
-    (conj (vscode/lm.registerTool
-           "clojure_repl_output_log"
-           (#'GetOutputLogTool dispatch!)))
+   (vscode/lm.registerTool
+    "clojure_repl_output_log"
+    (#'GetOutputLogTool dispatch!))
 
-    :always
-    (conj (vscode/lm.registerTool
-           "clojure_balance_brackets"
-           (#'InferBracketsTool dispatch!)))
+   (vscode/lm.registerTool
+    "clojure_balance_brackets"
+    (#'InferBracketsTool dispatch!))
 
-    :always
-    (conj (vscode/lm.registerTool
-           "replace_top_level_form"
-           (#'ReplaceTopLevelFormTool dispatch!)))
+   (vscode/lm.registerTool
+    "replace_top_level_form"
+    (#'ReplaceTopLevelFormTool dispatch!))
 
-    :always
-    (conj (vscode/lm.registerTool
-           "insert_top_level_form"
-           (#'InsertTopLevelFormTool dispatch!)))
+   (vscode/lm.registerTool
+    "insert_top_level_form"
+    (#'InsertTopLevelFormTool dispatch!))
 
-    :always
-    (conj (vscode/lm.registerTool
-           "clojure_create_file"
-           (#'StructuralCreateFileTool dispatch!)))
+   (vscode/lm.registerTool
+    "clojure_create_file"
+    (#'StructuralCreateFileTool dispatch!))
 
-    :always
-    (conj (vscode/lm.registerTool
-           "clojure_append_code"
-           (#'AppendCodeTool dispatch!)))
+   (vscode/lm.registerTool
+    "clojure_append_code"
+    (#'AppendCodeTool dispatch!))
 
-    (calva/exists-load-file?)
-    (conj (vscode/lm.registerTool
-           "clojure_load_file"
-           (#'LoadFileTool dispatch!)))))
+   (vscode/lm.registerTool
+    "clojure_load_file"
+    (#'LoadFileTool dispatch!))])
