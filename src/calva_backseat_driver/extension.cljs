@@ -4,7 +4,9 @@
    ["path" :as path]
    ["vscode" :as vscode]
    [calva-backseat-driver.ex.ex :as ex]
-   [calva-backseat-driver.app.db :as db]))
+   [calva-backseat-driver.app.db :as db]
+   [calva-backseat-driver.integrations.calva.api :as calva-api]
+   [calva-backseat-driver.integrations.calva.version :as version]))
 
 (defn- extension-context []
   (:vscode/extension-context @db/!app-db))
@@ -18,9 +20,18 @@
    :calva/history-storage-uri (some-> (.-storageUri context)
                                       (vscode/Uri.joinPath "eval-history.transit.json"))})
 
+(def ^:private min-calva-version "2.0.588")
+
 (defn ^:export activate [^js context]
   (js/console.time "activation")
   (js/console.timeLog "activation" "Calva Backseat Driver activate START")
+  (let [calva-version (calva-api/calva-version)
+        parsed-calva (version/parse-version calva-version)
+        parsed-min (version/parse-version min-calva-version)]
+    (when-not (version/version>= parsed-calva parsed-min)
+      (throw (js/Error. (str "Backseat Driver requires Calva >= " min-calva-version
+                             ". Found: " (or calva-version "unknown")
+                             ". Please update Calva.")))))
 
   (when-not (extension-context)
     (swap! db/!app-db assoc

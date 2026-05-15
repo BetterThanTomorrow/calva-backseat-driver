@@ -162,6 +162,7 @@
         "userDescription": "Evaluate Clojure or ClojureScript code in the connected REPL.",
         "canBeReferencedInPrompt": true,
         "icon": "$(terminal-bash)",
+        "when": ":calva-mcp-extension/activated?",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -212,7 +213,7 @@
         "userDescription": "List available REPL sessions and their details.",
         "canBeReferencedInPrompt": true,
         "icon": "$(list-unordered)",
-        "when": ":calva-backseat-driver/listSessionsAvailable",
+        "when": ":calva-mcp-extension/activated?",
         "inputSchema": {
           "type": "object",
           "properties": {},
@@ -235,6 +236,7 @@
         "userDescription": "**Clojure Symbol Info** looks up documentation for a Clojure symbol.",
         "canBeReferencedInPrompt": true,
         "icon": "$(tag)",
+        "when": ":calva-mcp-extension/activated?",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -274,6 +276,7 @@
         "userDescription": "Get examples and usage from clojuredocs.org",
         "canBeReferencedInPrompt": true,
         "icon": "$(globe)",
+        "when": ":calva-mcp-extension/activated?",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -302,6 +305,7 @@
         "userDescription": "Query Calva's REPL output log with Datalog",
         "canBeReferencedInPrompt": true,
         "icon": "$(list-ordered)",
+        "when": ":calva-mcp-extension/activated?",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -339,6 +343,7 @@
         "userDescription": "Balance brackets in Clojure code",
         "canBeReferencedInPrompt": true,
         "icon": "$(bracket-error)",
+        "when": ":calva-mcp-extension/activated?",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -366,6 +371,7 @@
         "userDescription": "Edit Clojure files by replacing top level forms",
         "canBeReferencedInPrompt": true,
         "icon": "$(edit)",
+        "when": ":calva-mcp-extension/activated?",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -408,6 +414,7 @@
         "userDescription": "Edit Clojure files by inserting top level forms",
         "canBeReferencedInPrompt": true,
         "icon": "$(edit)",
+        "when": ":calva-mcp-extension/activated?",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -449,6 +456,7 @@
         "userDescription": "Create a new Clojure file",
         "canBeReferencedInPrompt": true,
         "icon": "$(file-add)",
+        "when": ":calva-mcp-extension/activated?",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -480,6 +488,7 @@
         "userDescription": "Append code to the end of a Clojure file",
         "canBeReferencedInPrompt": true,
         "icon": "$(add)",
+        "when": ":calva-mcp-extension/activated?",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -512,7 +521,7 @@
         "userDescription": "Load and evaluate a Clojure file in the connected REPL.",
         "canBeReferencedInPrompt": true,
         "icon": "$(file-code)",
-        "when": ":calva-backseat-driver/loadFileAvailable",
+        "when": ":calva-mcp-extension/activated?",
         "inputSchema": {
           "type": "object",
           "properties": {
