@@ -68,6 +68,15 @@
   (get-diagnostics-for-file "/Users/pez/Projects/calva-mcp-server/test-projects/example/src/mini/playground.clj")
   :rcf)
 
+(defn- poll-diagnostics+ [file-path diagnostics-before-edit]
+  (p/loop [attempts 0]
+    (p/let [_ (p/delay 10)
+            diags (get-diagnostics-for-file file-path)]
+      (if (or (not= diags diagnostics-before-edit)
+              (>= attempts 100))
+        diags
+        (p/recur (inc attempts))))))
+
 (defn- starts-with-comment?
   "Check if text starts with a comment character after trimming whitespace"
   [text]
@@ -115,102 +124,108 @@
       {:valid? false
        :validation-error "The target text does not match the first line of a top level form in the vicinity of the target line."})))
 
+(defn- targeting-error-result [{:keys [doc-text line-number context-padding target-line error-msg extra-keys]}]
+  (let [{:editor/keys [file-context matched-line-in-context]}
+        (util/get-context-lines doc-text line-number context-padding target-line)
+        remedy (util/get-remedy-for-targeting matched-line-in-context)]
+    (merge {:success false
+            :error error-msg
+            :remedy remedy
+            :file-context file-context}
+           extra-keys)))
+
+(defn- resolve-edit-target+
+  "Find target line by text and validate it matches a top-level form.
+   Returns {:resolved? true :line-number N} or {:resolved? false :result error-map}"
+  [{:editor/keys [file-path line-number target-line search-padding context-padding]}]
+  (p/let [^js vscode-document (get-document-from-path file-path)
+          doc-text (.getText vscode-document)
+          actual-line-number (find-target-line-by-text {:editor/vscode-document vscode-document
+                                                        :editor/line-number line-number
+                                                        :editor/target-text target-line
+                                                        :editor/search-padding search-padding})]
+    (if-not actual-line-number
+      {:resolved? false
+       :result (targeting-error-result
+                {:doc-text doc-text
+                 :line-number line-number
+                 :context-padding context-padding
+                 :target-line target-line
+                 :error-msg (str "Target line text not found. Expected: '" target-line "' near line " line-number)})}
+      (p/let [text-validation (validate-top-level-form-targeting
+                               {:editor/file-path file-path
+                                :editor/line-number actual-line-number
+                                :editor/target-text target-line})]
+        (if-not (:valid? text-validation)
+          {:resolved? false
+           :result (targeting-error-result
+                    {:doc-text doc-text
+                     :line-number line-number
+                     :context-padding context-padding
+                     :target-line target-line
+                     :error-msg (str "Target text validation failed near line: " line-number)
+                     :extra-keys {:validation-error (:validation-error text-validation)}})}
+          {:resolved? true
+           :line-number actual-line-number})))))
+
+(defn- compute-effective-range [^js vscode-document form-range ranges-fn-key trimmed-form]
+  (if (and (string/blank? trimmed-form)
+           (not= :insertionPoint ranges-fn-key))
+    (let [start-line (.. form-range -start -line)
+          end-line (.. form-range -end -line)
+          total-lines (.-lineCount vscode-document)
+          next-line (inc end-line)
+          effective-start (if (and (pos? start-line)
+                                   (string/blank? (.-text (.lineAt vscode-document (dec start-line)))))
+                            (vscode/Position. (dec start-line) 0)
+                            (.-start form-range))
+          effective-end (if (< next-line total-lines)
+                          (vscode/Position. next-line 0)
+                          (.-end form-range))]
+      (vscode/Range. effective-start effective-end))
+    form-range))
+
+(defn- apply-edit-and-report+
+  "Apply a form edit and report diagnostics. Assumes targeting is already validated."
+  [{:editor/keys [file-path line-number original-line-number new-form ranges-fn-key]}]
+  (let [validation-result (parinfer/validate-brackets new-form)]
+    (if-not (:valid? validation-result)
+      (p/resolved (assoc validation-result :success false))
+      (p/let [form-data (get-ranges-form-data-by-line file-path line-number ranges-fn-key)
+              diagnostics-before-edit (get-diagnostics-for-file file-path)
+              ^js vscode-document (get-document-from-path file-path)
+              trimmed-form (string/trim new-form)
+              text (if (= :insertionPoint ranges-fn-key) (str trimmed-form "\n\n") trimmed-form)
+              form-range (first (:ranges-object form-data))
+              effective-range (compute-effective-range vscode-document form-range ranges-fn-key trimmed-form)
+              edit-result (edit-replace-range file-path effective-range text)
+              _ (.save vscode-document)
+              diagnostics-after-edit (poll-diagnostics+ file-path diagnostics-before-edit)]
+        (if edit-result
+          (cond-> {:success true
+                   :diagnostics-before-edit diagnostics-before-edit
+                   :diagnostics-after-edit diagnostics-after-edit}
+            (not= line-number original-line-number)
+            (assoc :actual-line-used line-number))
+          {:success false
+           :diagnostics-before-edit diagnostics-before-edit})))))
+
 (defn apply-form-edit-by-line-with-text-targeting
   "Apply a form edit by line number with text-based targeting for better accuracy.
    Searches for target-line text within a configurable window around the specified line number.
    For insertions, the new form is inserted before the targeted form."
-  [{:editor/keys [file-path line-number target-line new-form ranges-fn-key search-padding context-padding]}]
-  (let [validation (validate-edit-inputs target-line new-form)]
-    (if (:valid? validation)
-      (-> (p/let [^js vscode-document (get-document-from-path file-path)
-                  doc-text (.getText vscode-document)
-                  actual-line-number (find-target-line-by-text {:editor/vscode-document vscode-document
-                                                                :editor/line-number line-number
-                                                                :editor/target-text target-line
-                                                                :editor/search-padding search-padding})]
-            (if-not actual-line-number
-              (let [{:editor/keys [file-context
-                                   matched-line-in-context]} (util/get-context-lines doc-text
-                                                                                     line-number
-                                                                                     context-padding
-                                                                                     target-line)
-                    remedy (util/get-remedy-for-targeting matched-line-in-context)]
-                {:success false
-                 :error (str "Target line text not found. Expected: '" target-line "' near line " line-number)
-                 :remedy remedy
-                 :file-context file-context})
-              (p/let [final-line-number actual-line-number
-                      text-validation (validate-top-level-form-targeting {:editor/file-path file-path
-                                                                          :editor/line-number final-line-number
-                                                                          :editor/target-text target-line})]
-                (if (not (:valid? text-validation))
-                  (let [{:editor/keys [file-context
-                                       matched-line-in-context]} (util/get-context-lines doc-text
-                                                                                         line-number
-                                                                                         context-padding
-                                                                                         target-line)
-                        remedy (util/get-remedy-for-targeting matched-line-in-context)]
-                    {:success false
-                     :error (str "Target text validation failed near line: " line-number)
-                     :validation-error (:validation-error text-validation)
-                     :remedy remedy
-                     :file-context file-context})
-
-                  ;; Validation done. Proceed with form editing
-                  (let [validation-result (parinfer/validate-brackets new-form)]
-                    (if-not (:valid? validation-result)
-                      ;; REFUSE to edit - return validation failure
-                      (p/resolved (assoc validation-result :success false))
-                      ;; Valid brackets - proceed with edit
-                      (p/let [form-data (get-ranges-form-data-by-line file-path final-line-number ranges-fn-key)
-                              diagnostics-before-edit (get-diagnostics-for-file file-path)]
-                        (p/let [trimmed-form (string/trim new-form)
-                                text (if (= :insertionPoint ranges-fn-key)
-                                       (str trimmed-form "\n\n")
-                                       trimmed-form)
-                                form-range (first (:ranges-object form-data))
-                                ;; For deletions, extend range to consume surrounding blank lines
-                                effective-range (if (and (string/blank? trimmed-form)
-                                                         (not= :insertionPoint ranges-fn-key))
-                                                  (let [start-line (.. form-range -start -line)
-                                                        end-line (.. form-range -end -line)
-                                                        total-lines (.-lineCount vscode-document)
-                                                        next-line (inc end-line)
-                                                        ;; Extend start to consume preceding blank line
-                                                        effective-start (if (and (pos? start-line)
-                                                                                 (string/blank? (.-text (.lineAt vscode-document (dec start-line)))))
-                                                                          (vscode/Position. (dec start-line) 0)
-                                                                          (.-start form-range))
-                                                        ;; Extend end to consume trailing newline
-                                                        effective-end (if (< next-line total-lines)
-                                                                        (vscode/Position. next-line 0)
-                                                                        (.-end form-range))]
-                                                    (vscode/Range. effective-start effective-end))
-                                                  form-range)
-                                edit-result (edit-replace-range file-path
-                                                                effective-range
-                                                                text)
-                                _ (.save vscode-document)
-                                diagnostics-after-edit (p/loop [attempts 0]
-                                                         (p/let [_ (p/delay 10)
-                                                                 diags (get-diagnostics-for-file file-path)]
-                                                           (if (or (not= diags diagnostics-before-edit)
-                                                                   (>= attempts 100))
-                                                             diags
-                                                             (p/recur (inc attempts)))))]
-                          (if edit-result
-                            (cond-> {:success true
-                                     :diagnostics-before-edit diagnostics-before-edit
-                                     :diagnostics-after-edit diagnostics-after-edit}
-                              (not= final-line-number line-number)
-                              (assoc :actual-line-used final-line-number))
-                            {:success false
-                             :diagnostics-before-edit diagnostics-before-edit})))))))))
-          (p/catch (fn [e]
-                     {:success false
-                      :error (.-message e)})))
-      {:success false
-       :error (:error validation)})))
+  [opts]
+  (let [validation (validate-edit-inputs (:editor/target-line opts) (:editor/new-form opts))]
+    (if-not (:valid? validation)
+      {:success false :error (:error validation)}
+      (-> (p/let [targeting (resolve-edit-target+ opts)]
+            (if-not (:resolved? targeting)
+              (:result targeting)
+              (apply-edit-and-report+
+               (assoc opts
+                      :editor/line-number (:line-number targeting)
+                      :editor/original-line-number (:editor/line-number opts)))))
+          (p/catch (fn [e] {:success false :error (.-message e)}))))))
 
 (comment
 
@@ -318,14 +333,7 @@
                   _ (.set workspace-edit uri #js [edit])
                   edit-result (vscode/workspace.applyEdit workspace-edit)
                   _ (.save vscode-document)
-                  diagnostics-after-edit (p/loop [attempts 0]
-                                           (p/let [_ (p/delay 10)
-                                                   diags (get-diagnostics-for-file file-path)]
-                                             (if (or (not= diags diagnostics-before-edit)
-                                                     (>= attempts 100))
-                                               diags
-                                               (p/recur (inc attempts)))))]
-
+                  diagnostics-after-edit (poll-diagnostics+ file-path diagnostics-before-edit)]
             (if edit-result
               {:success true
                :appended-at-end true
