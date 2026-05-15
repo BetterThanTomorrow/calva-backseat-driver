@@ -16,17 +16,9 @@
         (:replSessionKey (first (:sessions sessions))))))
 
 (defn- test-tool-presence+ [socket]
-  (p/let [tools-response (mcp/send-request socket
-                                           {:jsonrpc "2.0"
-                                            :id 2
-                                            :method "tools/list"})
-          tools (-> tools-response
-                    (js->clj :keywordize-keys true)
-                    (get-in [:result :tools]))
-          tool-names (set (map :name tools))]
+  (p/let [_ (mcp/wait-for-tool! socket "clojure_load_file")]
     (testing "clojure_load_file presence matches Calva version gate"
-      (is (contains? tool-names "clojure_load_file")
-          "clojure_load_file should be present in tools/list"))))
+      (is true "clojure_load_file should be present in tools/list"))))
 
 (defn- assert-missing-param-error+
   "Call clojure_load_file with given args and assert error mentions param-name."
