@@ -49,11 +49,11 @@
 (deftest-async clojuredocs-info-tests
   (let [backup-path (mcp/backup-settings! "clojuredocs-info-test-backup.json")]
     (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
-                {:keys [socket]} (mcp/start-mcp-session!)
-                _ (test-well-known-symbol+ socket)
-                _ (test-nonexistent-symbol+ socket)
-                _ (test-missing-symbol-param+ socket)
-                _ (mcp/stop-mcp-session! socket)])
+                {:keys [socket]} (mcp/start-mcp-session!)]
+          (p/do (test-well-known-symbol+ socket)
+                (test-nonexistent-symbol+ socket)
+                (test-missing-symbol-param+ socket)
+                (mcp/stop-mcp-session! socket)))
         (p/catch (fn [e]
                    (js/console.error "[clojuredocs-info] Test error:" (.-message e) e)
                    (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")

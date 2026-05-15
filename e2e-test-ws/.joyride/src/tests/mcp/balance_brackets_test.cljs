@@ -47,12 +47,12 @@
                 (:isError result)))))))
 
 (deftest-async balance-brackets-tests
-  (-> (p/let [{:keys [socket]} (mcp/start-mcp-session!)
-              _ (test-balanced-input+ socket)
-              _ (test-unbalanced-input+ socket)
-              _ (test-broken-brackets+ socket)
-              _ (test-missing-text-param+ socket)
-              _ (mcp/stop-mcp-session! socket)])
+  (-> (p/let [{:keys [socket]} (mcp/start-mcp-session!)]
+        (p/do (test-balanced-input+ socket)
+              (test-unbalanced-input+ socket)
+              (test-broken-brackets+ socket)
+              (test-missing-text-param+ socket)
+              (mcp/stop-mcp-session! socket)))
       (p/catch (fn [e]
                  (js/console.error "[balance-brackets] Test error:" (.-message e) e)
                  (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")

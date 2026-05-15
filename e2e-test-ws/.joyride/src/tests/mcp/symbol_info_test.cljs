@@ -73,12 +73,12 @@
   (let [backup-path (mcp/backup-settings! "symbol-info-test-backup.json")]
     (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
                 {:keys [socket]} (mcp/start-mcp-session!)
-                session-key (get-active-session-key+ socket)
-                _ (test-known-symbol+ socket session-key)
-                _ (test-unknown-symbol+ socket session-key)
-                _ (test-missing-session-key+ socket)
-                _ (test-invalid-session-key+ socket)
-                _ (mcp/stop-mcp-session! socket)])
+                session-key (get-active-session-key+ socket)]
+          (p/do (test-known-symbol+ socket session-key)
+                (test-unknown-symbol+ socket session-key)
+                (test-missing-session-key+ socket)
+                (test-invalid-session-key+ socket)
+                (mcp/stop-mcp-session! socket)))
         (p/catch (fn [e]
                    (js/console.error "[symbol-info] Test error:" (.-message e) e)
                    (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
