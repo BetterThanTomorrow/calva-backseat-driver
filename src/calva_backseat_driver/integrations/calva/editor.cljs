@@ -11,21 +11,6 @@
   (let [uri (vscode/Uri.file path)]
     (.openTextDocument vscode/workspace uri)))
 
-(defn get-editor-from-document [vscode-document]
-  (let [visible-editor (->> vscode/window.visibleTextEditors
-                            (filter (fn [doc] (= (.-document doc) vscode-document)))
-                            first)]
-    (if visible-editor
-      visible-editor
-      (.showTextDocument vscode/window
-                         vscode-document
-                         #js {:preserveFocus true
-                              :preview false}))))
-
-(defn- get-editor-from-file-path [file-path]
-  (p/let [vscode-document (get-document-from-path file-path)]
-    (get-editor-from-document vscode-document)))
-
 
 (defn- get-ranges-form-data-by-line
   "Returns the raw Calva API `ranges` object for `ranged-fn-key` at `line-number` (1-indexed),
