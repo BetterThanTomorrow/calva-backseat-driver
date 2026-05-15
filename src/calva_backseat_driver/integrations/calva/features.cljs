@@ -77,8 +77,7 @@
       (p/let [session-validation (validate-session-key+ repl-session-key)]
         (if-not (:valid? session-validation)
           session-validation
-          (let [evaluate-new (get-in calva/calva-api [:repl :evaluate])
-                evaluate-old (get-in calva/calva-api [:repl :evaluateCode])]
+          (let [evaluate-fn (get-in calva/calva-api [:repl :evaluate])]
             (p/let [{:keys [max-length max-depth]} (get-eval-config)
                     enabled? (or max-length max-depth)
                     nrepl-eval-options (when enabled?
@@ -86,83 +85,53 @@
                                                                   :printEngine "pprint"
                                                                   :maxLength max-length
                                                                   :maxDepth max-depth}})
-                    result (if evaluate-new
-                             ;; === NEW API PATH ===
-                             (-> (p/let [options-js (clj->js
-                                                     (cond-> {:sessionKey repl-session-key}
-                                                       ns (assoc :ns ns)
-                                                       who (assoc :who who)
-                                                       description (assoc :description description)
-                                                       nrepl-eval-options (assoc :nReplOptions nrepl-eval-options)))
-                                         ^js evaluation+ (evaluate-new code options-js)]
-                                   (dispatch! [[:app/ax.log :debug "[Server] Evaluating code (new API):" code]])
-                                   (let [other-whos (some-> (.-otherWhosSinceLast evaluation+)
-                                                            (js->clj))
-                                         notes (cond-> ["Remember to check the output tool now and then to see what's happening in the application."]
-                                                 (not ns)
-                                                 (conj no-ns-eval-note)
+                    result (-> (p/let [options-js (clj->js
+                                                   (cond-> {:sessionKey repl-session-key}
+                                                     ns (assoc :ns ns)
+                                                     who (assoc :who who)
+                                                     description (assoc :description description)
+                                                     nrepl-eval-options (assoc :nReplOptions nrepl-eval-options)))
+                                       ^js evaluation+ (evaluate-fn code options-js)]
+                                 (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
+                                 (let [other-whos (some-> (.-otherWhosSinceLast evaluation+)
+                                                          (js->clj))
+                                       notes (cond-> ["Remember to check the output tool now and then to see what's happening in the application."]
+                                               (not ns)
+                                               (conj no-ns-eval-note)
 
-                                                 (= "" (.-result evaluation+))
-                                                 (conj empty-result-note)
+                                               (= "" (.-result evaluation+))
+                                               (conj empty-result-note)
 
-                                                 (seq other-whos)
-                                                 (conj (str "Other evaluators active since your last eval: "
-                                                            (string/join ", " other-whos)
-                                                            ". Check the output log.")))]
-                                     (cond-> {:result (.-result evaluation+)
-                                              :ns (.-ns evaluation+)
-                                              :stdout (.-output evaluation+)
-                                              :stderr (.-errorOutput evaluation+)
-                                              :session-key (.-sessionKey evaluation+)
-                                              :notes notes}
+                                               (seq other-whos)
+                                               (conj (str "Other evaluators active since your last eval: "
+                                                          (string/join ", " other-whos)
+                                                          ". Check the output log.")))]
+                                   (cond-> {:result (.-result evaluation+)
+                                            :ns (.-ns evaluation+)
+                                            :stdout (.-output evaluation+)
+                                            :stderr (.-errorOutput evaluation+)
+                                            :session-key (.-sessionKey evaluation+)
+                                            :notes notes}
 
-                                       (.-who evaluation+)
-                                       (assoc :who (.-who evaluation+))
+                                     (.-who evaluation+)
+                                     (assoc :who (.-who evaluation+))
 
-                                       (seq other-whos)
-                                       (assoc :other-whos-since-last other-whos)
+                                     (seq other-whos)
+                                     (assoc :other-whos-since-last other-whos)
 
-                                       (.-error evaluation+)
-                                       (merge {:error (.-error evaluation+)
-                                               :stacktrace (.-stacktrace evaluation+)}))))
-                                 (p/catch (fn [err]
-                                            (dispatch! [[:app/ax.log :debug "[Server] Evaluation failed:" err]])
-                                            (let [msg (str (.-message err))]
-                                              (if (re-find #"reserved" msg)
-                                                {:result "nil"
-                                                 :error msg
-                                                 :notes ["The `who` value you provided is reserved. Choose a different identifier."]}
-                                                {:result "nil"
-                                                 :stderr (pr-str err)
-                                                 :notes [error-result-note]})))))
-
-                             ;; === FALLBACK PATH (old evaluateCode) ===
-                             (-> (p/let [^js evaluation+ (if ns
-                                                           (evaluate-old repl-session-key code ns nil nrepl-eval-options)
-                                                           (evaluate-old repl-session-key code js/undefined nil nrepl-eval-options))]
-                                   (dispatch! [[:app/ax.log :debug "[Server] Evaluating code (legacy API):" code]])
-                                   (let [notes (cond-> ["Legacy Calva API detected. The who and description parameters were not applied. The user needs to update Calva to enable evaluator/who tracking."
-                                                        "Remember to check the output tool now and then to see what's happening in the application."]
-                                                 (not ns)
-                                                 (conj no-ns-eval-note)
-
-                                                 (= "" (.-result evaluation+))
-                                                 (conj empty-result-note))]
-                                     (cond-> {:result (.-result evaluation+)
-                                              :ns (.-ns evaluation+)
-                                              :stdout (.-output evaluation+)
-                                              :stderr (.-errorOutput evaluation+)
-                                              :session-key (.-sessionKey evaluation+)
-                                              :notes notes}
-
-                                       (.-error evaluation+)
-                                       (merge {:error (.-error evaluation+)
-                                               :stacktrace (.-stacktrace evaluation+)}))))
-                                 (p/catch (fn [err]
-                                            (dispatch! [[:app/ax.log :debug "[Server] Evaluation failed:" err]])
-                                            {:result "nil"
-                                             :stderr (pr-str err)
-                                             :notes [error-result-note]}))))]
+                                     (.-error evaluation+)
+                                     (merge {:error (.-error evaluation+)
+                                             :stacktrace (.-stacktrace evaluation+)}))))
+                               (p/catch (fn [err]
+                                          (dispatch! [[:app/ax.log :debug "[Server] Evaluation failed:" err]])
+                                          (let [msg (str (.-message err))]
+                                            (if (re-find #"reserved" msg)
+                                              {:result "nil"
+                                               :error msg
+                                               :notes ["The `who` value you provided is reserved. Choose a different identifier."]}
+                                              {:result "nil"
+                                               :stderr (pr-str err)
+                                               :notes [error-result-note]})))))]
               result)))))))
 
 
