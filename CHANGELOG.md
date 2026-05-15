@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.33] - 2026-05-15
+
 - [Make editing tools headless](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/57)
 
 ## [v0.0.32] - 2026-05-10
