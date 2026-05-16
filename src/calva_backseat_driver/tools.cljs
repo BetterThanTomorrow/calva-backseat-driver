@@ -131,19 +131,31 @@
                                                          :calva/repl-session-key session-key})]
                    (text-tool-result result)))})
 
-(defn GetClojureDocsTool [dispatch!]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [symbol (-> options .-input .-clojureSymbol)]
-                              (prepare-invocation-messages
-                               "Looking up ClojureDocs"
-                               "Get ClojureDocs Info"
-                               (str "Look up docs for Clojure symbol: **" symbol "**"))))
+(defn- simple-tool
+  "Build a VS Code Language Model tool with one input field, simple messages, and a direct invoke function.
+   Returns a function that takes dispatch! and produces a JS tool object."
+  [{:keys [input-field invocation-msg confirm-title confirm-msg-fn invoke-fn result-fn]
+    :or {result-fn text-tool-result}}]
+  (fn [dispatch!]
+    #js {:prepareInvocation
+         (fn prepareInvocation [^js options _token]
+           (let [input (aget (.-input options) input-field)]
+             (prepare-invocation-messages invocation-msg confirm-title (confirm-msg-fn input))))
+         :invoke
+         (fn invoke [^js options _token]
+           (p/let [input (aget (.-input options) input-field)
+                   result (invoke-fn dispatch! input)]
+             (result-fn result)))}))
 
-       :invoke (fn invoke [^js options _token]
-                 (p/let [symbol (-> options .-input .-clojureSymbol)
-                         result (calva/get-clojuredocs+ {:ex/dispatch! dispatch!
-                                                         :calva/clojure-symbol symbol})]
-                   (text-tool-result result)))})
+(def GetClojureDocsTool
+  (simple-tool
+   {:input-field "clojureSymbol"
+    :invocation-msg "Looking up ClojureDocs"
+    :confirm-title "Get ClojureDocs Info"
+    :confirm-msg-fn #(str "Look up docs for Clojure symbol: **" % "**")
+    :invoke-fn (fn [dispatch! symbol]
+                 (calva/get-clojuredocs+ {:ex/dispatch! dispatch!
+                                          :calva/clojure-symbol symbol}))}))
 
 (defn GetOutputLogTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
@@ -163,88 +175,16 @@
                    (tool-result-with-images result :max-images (if (some? max-images) max-images 0))))})
 
 
-(defn InferBracketsTool [dispatch!]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [text (-> options .-input .-text)]
-                              (prepare-invocation-messages
-                               "Inferred brackets"
-                               "Infer brackets"
-                               (str "Infer from indents for: " text))))
-
-       :invoke (fn invoke [^js options _token]
-                 (let [text (-> options .-input .-text)
-                       result (balance/infer-parens-response {:ex/dispatch! dispatch!
-                                                              :calva/text text})]
-                   (text-tool-result-raw result)))})
-
-(defn- ReplaceOrInsertTopLevelFormTool [dispatch! ranges-fn-key confirm-prefix invoked-prefix]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [file-path (-> options .-input .-filePath)
-                                  line (-> options .-input .-line)
-                                  target-line (-> options .-input .-targetLineText)
-                                  new-form (-> options .-input .-newForm)
-                                  message (str confirm-prefix " form at line " line
-                                               (when target-line (str " (targeting: '" target-line "')"))
-                                               " in " file-path
-                                               " width:\n" new-form)]
-                              #js {:invocationMessage (str invoked-prefix " top-level form")
-                                   :confirmationMessages #js {:title (str confirm-prefix " Top-Level Form")
-                                                              :message message}}))
-
-       :invoke (fn invoke [^js options _token]
-                 (p/let [file-path (-> options .-input .-filePath)
-                         line (some-> options .-input .-line)
-                         target-line (-> options .-input .-targetLineText)
-                         new-form (-> options .-input .-newForm)
-                         result (if (= ranges-fn-key :currentTopLevelForm)
-                                  (calva/replace-top-level-form+ {:ex/dispatch! dispatch!
-                                                                  :calva/file-path file-path
-                                                                  :calva/line line
-                                                                  :calva/target-line-text target-line
-                                                                  :calva/new-form new-form})
-                                  (calva/insert-top-level-form+ {:ex/dispatch! dispatch!
-                                                                 :calva/file-path file-path
-                                                                 :calva/line line
-                                                                 :calva/target-line-text target-line
-                                                                 :calva/new-form new-form}))]
-                   (text-tool-result result)))})
-
-(defn ReplaceTopLevelFormTool [dispatch!]
-  (ReplaceOrInsertTopLevelFormTool dispatch! :currentTopLevelForm "Replace" "Replaced"))
-
-(defn InsertTopLevelFormTool [dispatch!]
-  (ReplaceOrInsertTopLevelFormTool dispatch! :insertionPoint "Insert" "Inserted"))
-
-(defn- FileEditTool [dispatch! {:keys [invocation-msg title msg-prefix input-key calva-fn]}]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [file-path (-> options .-input .-filePath)]
-                              (prepare-invocation-messages
-                               invocation-msg title (str msg-prefix file-path))))
-
-       :invoke (fn invoke [^js options _token]
-                 (p/let [file-path (-> options .-input .-filePath)
-                         input-val (aget (.-input options) input-key)
-                         args {:ex/dispatch! dispatch!
-                               :calva/file-path file-path
-                               (keyword "calva" input-key) input-val}
-                         result (calva-fn args)]
-                   (text-tool-result result)))})
-
-(defn StructuralCreateFileTool [dispatch!]
-  (FileEditTool dispatch!
-                {:invocation-msg "Creating Clojure file"
-                 :title "Create Clojure File"
-                 :msg-prefix "Create file: "
-                 :input-key "content"
-                 :calva-fn calva/structural-create-file+}))
-
-(defn AppendCodeTool [dispatch!]
-  (FileEditTool dispatch!
-                {:invocation-msg "Appending code"
-                 :title "Append code"
-                 :msg-prefix "Append form to: "
-                 :input-key "code"
-                 :calva-fn calva/append-code+}))
+(def InferBracketsTool
+  (simple-tool
+   {:input-field "text"
+    :invocation-msg "Inferred brackets"
+    :confirm-title "Infer brackets"
+    :confirm-msg-fn #(str "Infer from indents for: " %)
+    :invoke-fn (fn [dispatch! text]
+                 (balance/infer-parens-response {:ex/dispatch! dispatch!
+                                                 :calva/text text}))
+    :result-fn text-tool-result-raw}))
 
 (defn ListSessionsTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js _options _token]
@@ -281,6 +221,22 @@
                          (text-tool-result {:error (:error result)})
                          (text-tool-result result))))))})
 
+(defn EditFilesTool [dispatch!]
+  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
+                            (let [edits (js->clj (-> options .-input .-edits) :keywordize-keys true)
+                                  file-count (count (distinct (map :filePath edits)))
+                                  edit-count (count edits)]
+                              #js {:invocationMessage "Editing Clojure files"
+                                   :confirmationMessages #js {:title "Edit Clojure Files"
+                                                              :message (str edit-count " edit" (when (not= 1 edit-count) "s")
+                                                                            " across " file-count " file" (when (not= 1 file-count) "s"))}}))
+
+       :invoke (fn invoke [^js options _token]
+                 (p/let [edits (js->clj (-> options .-input .-edits) :keywordize-keys true)
+                         result (calva/edit-files+ {:ex/dispatch! dispatch!
+                                                    :calva/edits edits})]
+                   (text-tool-result result)))})
+
 (defn register-language-model-tools [dispatch!]
   [(vscode/lm.registerTool
     "clojure_evaluate_code"
@@ -307,20 +263,8 @@
     (#'InferBracketsTool dispatch!))
 
    (vscode/lm.registerTool
-    "replace_top_level_form"
-    (#'ReplaceTopLevelFormTool dispatch!))
-
-   (vscode/lm.registerTool
-    "insert_top_level_form"
-    (#'InsertTopLevelFormTool dispatch!))
-
-   (vscode/lm.registerTool
-    "clojure_create_file"
-    (#'StructuralCreateFileTool dispatch!))
-
-   (vscode/lm.registerTool
-    "clojure_append_code"
-    (#'AppendCodeTool dispatch!))
+    "clojure_edit_files"
+    (#'EditFilesTool dispatch!))
 
    (vscode/lm.registerTool
     "clojure_load_file"

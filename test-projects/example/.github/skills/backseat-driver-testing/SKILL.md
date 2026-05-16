@@ -189,35 +189,60 @@ The `clojure_load_file` tool loads and evaluates an entire Clojure file through 
 
 Prerequisites: REPL Session Listing (for the REPL reload step).
 
-Test the complete file editing lifecycle:
+The `clojure_edit_files` tool performs batch structural editing across one or more files in a single call. It supports four edit types: `create`, `replace`, `insert`, and `append`.
 
-**Create Clojure File** → **Append Code** → **Insert Top Level Form** → **Replace Top Level Form** → **Delete Form** → **REPL Reload** → **Cleanup**
+### Basic Lifecycle Test
+
+Test the complete file editing lifecycle in batch calls:
+
+**Create** → **Append** → **Insert** → **Replace** → **Delete** → **REPL Reload** → **Cleanup**
 
 **Workflow**:
-1. Create a new file with namespace and one simple function
-2. Append multiple functions to demonstrate accumulation
-3. Insert a data definition before an existing function to test positioning
-4. Replace an existing function to test modification
-5. Delete a form using `replace_top_level_form` with empty `newForm`
-6. Fix definition order if inserts created forward references (definitions must precede their call sites in Clojure)
+1. Create a new file with namespace and one simple function (type: `create`)
+2. Append multiple functions to demonstrate accumulation (type: `append`)
+3. Insert a data definition before an existing function (type: `insert`)
+4. Replace an existing function to test modification (type: `replace`)
+5. Delete a form using type `replace` with empty `newForm`
+6. Fix definition order if inserts created forward references
 7. Load the namespace in the REPL and evaluate functions with test data
 8. Clean up: delete the test file after verification
 
 **Validation points**:
 - After creation: File exists with proper namespace form and snake_case filename
-- After append: New forms appear at end, diagnostics show all definitions
+- After append: New forms appear at end
 - After insert: New form appears before target, line numbers shift correctly
 - After replace: Updated form replaces old one, preserving surrounding code
-- After delete: Form removed, blank lines may remain
+- After delete: Form removed, no excessive blank lines
 - After REPL reload: All functions evaluate correctly — no compilation errors
+- Response contains `summary` field (e.g., `"1/1 edits applied across 1 files"`)
+- Response contains `files` map with per-file results
 
-**Definition order**: Inserting forms can create forward references. If the REPL reload fails with "Unable to resolve symbol," reorder definitions so every symbol is defined before its first use. This is expected behavior, not a tool bug.
+### Batch Operation Goals
 
-**Error scenario testing**:
+These tests validate the specific design goals of the batch tool:
+
+**Multi-edit in single call**: Send multiple edits across two files in one `clojure_edit_files` call. Verify all edits applied and the summary reflects total count.
+
+**Bottom-to-top ordering**: Send replace edits for lines 3 and 8 (in that order — low line first). Verify both succeed — the tool should sort them high-to-low internally so line numbers remain valid.
+
+**Schema validation**: Send an edit with `type: "replace"` but missing `targetLineText`. Verify the response contains `validation-errors` and `error` field indicating no edits were applied.
+
+**Continue-on-failure**: Send a batch with one valid edit and one invalid edit (e.g., wrong `targetLineText`). Verify the valid edit succeeded and the invalid one has `success: false` with an error message — the tool did not abort the entire batch.
+
+**Per-file diagnostics**: After a successful edit, verify the response includes diagnostics for the modified file (showing current definitions/forms).
+
+**Create constraint**: Send two `create` edits for the same file in one batch. Verify schema validation rejects it ("at most one create per file").
+
+**Append constraint**: Send two `append` edits for the same file. Verify schema validation rejects it ("at most one append per file").
+
+### Error Scenario Testing
+
 - Provide wrong `targetLineText` — verify clear error message with file context
 - Target line beyond fuzzy window — verify failure with helpful context
 - Test on tiny files (3-4 lines) smaller than context window — verify clean display
 - Test with similar/duplicate code patterns — verify correct line matching
+
+**Definition order**: Inserting forms can create forward references. If the REPL reload fails with "Unable to resolve symbol," reorder definitions so every symbol is defined before its first use. This is expected behavior, not a tool bug.
 
 ## Output Log Queries
 

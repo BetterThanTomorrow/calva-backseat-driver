@@ -124,13 +124,14 @@ Implemented in `integrations/calva/editor-util.cljs`:
 ## Structural Editing Tools
 
 ### Text Targeting
-Tools use `targetLineText` (first line of target form) + line number ±2:
+The `clojure_edit_files` tool uses `targetLineText` (first line of target form) + line number ±2:
 ```clojure
-;; replace_top_level_form or insert_top_level_form
-{:filePath "/absolute/path.clj"
- :line 23
- :targetLineText "(defn multiply-numbers"
- :newForm "(defn multiply-numbers\n  [x y]\n  (* x y))"}
+;; clojure_edit_files batch with replace/insert edits
+{:edits [{:type "replace"
+          :filePath "/absolute/path.clj"
+          :line 23
+          :targetLineText "(defn multiply-numbers"
+          :newForm "(defn multiply-numbers\n  [x y]\n  (* x y))"}]}
 ```
 
 ### Automatic Features

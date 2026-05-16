@@ -94,14 +94,8 @@
           ;; Always-registered tools
           (is (contains? tool-names "clojure_balance_brackets")
               "Bracket balancer should always be registered")
-          (is (contains? tool-names "replace_top_level_form")
-              "Replace form tool should always be registered")
-          (is (contains? tool-names "insert_top_level_form")
-              "Insert form tool should always be registered")
-          (is (contains? tool-names "clojure_create_file")
-              "Create file tool should always be registered")
-          (is (contains? tool-names "clojure_append_code")
-              "Append code tool should always be registered")
+          (is (contains? tool-names "clojure_edit_files")
+              "Edit files tool should always be registered")
 
           ;; Conditional tools - would be registered IF Calva APIs are available
           ;; For now, just log whether they're present

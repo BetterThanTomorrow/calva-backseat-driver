@@ -59,8 +59,24 @@
                 ""]))
 
 (defn- expect-tool-failure [result expected-fragment]
-  (and (false? (:success result))
-       (string/includes? (or (:error result) "") expected-fragment)))
+  (let [error-text (or (:error result)
+                       ;; Check per-file edit errors in the new batch format
+                       (some (fn [[_path file-result]]
+                               (some (fn [edit]
+                                       (when (false? (:success edit))
+                                         (:error edit)))
+                                     (:edits file-result)))
+                             (:files result))
+                       "")]
+    (string/includes? error-text expected-fragment)))
+
+(defn- batch-success?
+  "Check if a batch edit result indicates all edits succeeded.
+   Summary format: 'N/M edits applied across K files' — success when N equals M."
+  [result]
+  (when-let [summary (:summary result)]
+    (let [[_ applied total] (re-find #"(\d+)/(\d+)" summary)]
+      (= applied total))))
 
 (def ^:private tiny-file-name "structural_edit_tiny_target.clj")
 (defn- tiny-file-path []
@@ -91,11 +107,12 @@
 ;; --- Test scenario helpers ---
 
 (defn- test-create-file+ [socket file-path]
-  (p/let [result (mcp/call-tool socket 100 "clojure_create_file"
-                                {:filePath file-path
-                                 :content (initial-file-content)})]
+  (p/let [result (mcp/call-tool socket 100 "clojure_edit_files"
+                                {:edits [{:type "create"
+                                          :filePath file-path
+                                          :content (initial-file-content)}]})]
     (testing "create_file creates file successfully"
-      (is (:success result) "File creation should succeed"))))
+      (is (batch-success? result) "File creation should succeed"))))
 
 (defn- edit-with-decoy-and-verify+
   "Activate decoy editor, perform edit, verify active editor unchanged and file not visible."
@@ -116,32 +133,39 @@
   (is (= active-after active-before)
       "Active editor should remain unchanged"))
 
+(defn- assert-invisible-spacing-edit
+  "Common assertions for invisible edit tests: invisible, success, proper spacing."
+  [{:keys [result content] :as ctx} file-path]
+  (assert-invisible-edit ctx file-path)
+  (is (batch-success? result) "Edit should succeed")
+  (is (<= (count-consecutive-blank-lines content) 1)
+      "Edit should not leave more than 1 consecutive blank line"))
+
 (defn- test-replace-trims-whitespace+ [socket file-path]
   (p/let [{:keys [result content] :as ctx}
           (edit-with-decoy-and-verify+
            socket file-path
-           #(mcp/call-tool socket 101 "replace_top_level_form"
-                           {:filePath file-path
-                            :line 3
-                            :targetLineText "(defn add-numbers"
-                            :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b))\n\n\n"})
+           #(mcp/call-tool socket 101 "clojure_edit_files"
+                           {:edits [{:type "replace"
+                                     :filePath file-path
+                                     :line 3
+                                     :targetLineText "(defn add-numbers"
+                                     :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b))\n\n\n"}]})
            nil)]
-    (testing "replace_top_level_form trims trailing whitespace"
-      (assert-invisible-edit ctx file-path)
-      (is (:success result) "Replace should succeed")
-      (is (<= (count-consecutive-blank-lines content) 1)
-          "Replace should not leave more than 1 consecutive blank line"))))
+    (testing "replace trims trailing whitespace"
+      (assert-invisible-spacing-edit ctx file-path))))
 
 (defn- test-replace-idempotent+ [socket file-path]
   (p/let [content-before (read-test-file+ nil)
-          result (mcp/call-tool socket 102 "replace_top_level_form"
-                                {:filePath file-path
-                                 :line 3
-                                 :targetLineText "(defn add-numbers"
-                                 :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b))\n\n"})
+          result (mcp/call-tool socket 102 "clojure_edit_files"
+                                {:edits [{:type "replace"
+                                          :filePath file-path
+                                          :line 3
+                                          :targetLineText "(defn add-numbers"
+                                          :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b))\n\n"}]})
           content-after (read-test-file+ nil)]
-    (testing "replace_top_level_form is idempotent for whitespace"
-      (is (:success result) "Second replace should succeed")
+    (testing "replace is idempotent for whitespace"
+      (is (batch-success? result) "Second replace should succeed")
       (is (<= (count-consecutive-blank-lines content-after) 1)
           "Repeated replace should not accumulate blank lines")
       (is (= content-before content-after)
@@ -152,30 +176,29 @@
           {:keys [result content] :as ctx}
           (edit-with-decoy-and-verify+
            socket file-path
-           #(mcp/call-tool socket 103 "insert_top_level_form"
-                           {:filePath file-path
-                            :line 3
-                            :targetLineText "(defn add-numbers"
-                            :newForm "(defn multiply-numbers\n  \"Multiplies a and b\"\n  [a b]\n  (* a b))\n\n"})
+           #(mcp/call-tool socket 103 "clojure_edit_files"
+                           {:edits [{:type "insert"
+                                     :filePath file-path
+                                     :line 3
+                                     :targetLineText "(defn add-numbers"
+                                     :newForm "(defn multiply-numbers\n  \"Multiplies a and b\"\n  [a b]\n  (* a b))\n\n"}]})
            content-before)]
-    (testing "insert_top_level_form produces proper spacing"
-      (assert-invisible-edit ctx file-path)
-      (is (:success result) "Insert should succeed")
-      (is (<= (count-consecutive-blank-lines content) 1)
-          "Insert should not leave more than 1 consecutive blank line")
+    (testing "insert produces proper spacing"
+      (assert-invisible-spacing-edit ctx file-path)
       (is (string/includes? content "(defn multiply-numbers")
           "Inserted form should appear in file"))))
 
 (defn- test-append-trims-whitespace+ [socket file-path]
   (p/let [content-before (read-test-file+ nil)
           active-before (active-editor-path)
-          result (mcp/call-tool socket 104 "clojure_append_code"
-                                {:filePath file-path
-                                 :code "(defn divide-numbers\n  \"Divides a by b\"\n  [a b]\n  (/ a b))\n\n\n"})
+          result (mcp/call-tool socket 104 "clojure_edit_files"
+                                {:edits [{:type "append"
+                                          :filePath file-path
+                                          :code "(defn divide-numbers\n  \"Divides a by b\"\n  [a b]\n  (/ a b))\n\n\n"}]})
           content (read-test-file+ content-before)
           active-after (active-editor-path)]
-    (testing "clojure_append_code trims trailing whitespace"
-      (is (:success result) "Append should succeed")
+    (testing "append trims trailing whitespace"
+      (is (batch-success? result) "Append should succeed")
       (is (<= (count-consecutive-blank-lines content) 1)
           "Append should not leave more than 1 consecutive blank line")
       (is (string/includes? content "(defn divide-numbers")
@@ -188,15 +211,16 @@
 (defn- test-delete-form+ [socket file-path]
   (p/let [content-before (read-test-file+ nil)
           active-before (active-editor-path)
-          result (mcp/call-tool socket 105 "replace_top_level_form"
-                                {:filePath file-path
-                                 :line 8
-                                 :targetLineText "(defn add-numbers"
-                                 :newForm ""})
+          result (mcp/call-tool socket 105 "clojure_edit_files"
+                                {:edits [{:type "replace"
+                                          :filePath file-path
+                                          :line 8
+                                          :targetLineText "(defn add-numbers"
+                                          :newForm ""}]})
           content (read-test-file+ content-before)
           active-after (active-editor-path)]
-    (testing "replace_top_level_form with empty string deletes form"
-      (is (:success result) "Delete should succeed")
+    (testing "replace with empty string deletes form"
+      (is (batch-success? result) "Delete should succeed")
       (is (not (string/includes? content "(defn add-numbers"))
           "Deleted form should not appear in file")
       (is (<= (count-consecutive-blank-lines content) 1)
@@ -214,14 +238,15 @@
   "Delete a form by replacing with empty string and verify it's gone from file."
   [socket file-path {:keys [id line target-text form-name test-label]}]
   (p/let [content-before (read-test-file+ nil)
-          result (mcp/call-tool socket id "replace_top_level_form"
-                                {:filePath file-path
-                                 :line line
-                                 :targetLineText target-text
-                                 :newForm ""})
+          result (mcp/call-tool socket id "clojure_edit_files"
+                                {:edits [{:type "replace"
+                                          :filePath file-path
+                                          :line line
+                                          :targetLineText target-text
+                                          :newForm ""}]})
           content (read-test-file+ content-before)]
     (testing test-label
-      (is (:success result))
+      (is (batch-success? result))
       (is (<= (count-consecutive-blank-lines content) 1))
       (is (not (string/includes? content form-name))))))
 
@@ -238,41 +263,106 @@
      :test-label "delete last form keeps spacing stable"}))
 
 (defn- test-wrong-target-text+ [socket file-path]
-  (p/let [result (mcp/call-tool socket 108 "insert_top_level_form"
-                                {:filePath file-path
-                                 :line 3
-                                 :targetLineText "(defn does-not-exist [x]"
-                                 :newForm "(defn nope [] :nope)"})]
+  (p/let [result (mcp/call-tool socket 108 "clojure_edit_files"
+                                {:edits [{:type "insert"
+                                          :filePath file-path
+                                          :line 3
+                                          :targetLineText "(defn does-not-exist [x]"
+                                          :newForm "(defn nope [] :nope)"}]})]
     (testing "wrong targetLineText returns clear error"
       (is (expect-tool-failure result "Target line text not found")))))
 
 (defn- test-fuzzy-window-miss+ [socket file-path]
-  (p/let [result (mcp/call-tool socket 109 "replace_top_level_form"
-                                {:filePath file-path
-                                 :line 999
-                                 :targetLineText "(defn subtract-numbers"
-                                 :newForm "(defn subtract-numbers [a b] (- a b))"})]
+  (p/let [result (mcp/call-tool socket 109 "clojure_edit_files"
+                                {:edits [{:type "replace"
+                                          :filePath file-path
+                                          :line 999
+                                          :targetLineText "(defn subtract-numbers"
+                                          :newForm "(defn subtract-numbers [a b] (- a b))"}]})]
     (testing "line outside fuzzy window fails even with matching text"
       (is (expect-tool-failure result "Target line text not found")))))
 
 (defn- test-tiny-file+ [socket]
-  (p/let [create-result (mcp/call-tool socket 110 "clojure_create_file"
-                                       {:filePath (tiny-file-path)
-                                        :content "(ns structural-edit-tiny-target)\n(def x 1)\n"})
-          replace-result (mcp/call-tool socket 111 "replace_top_level_form"
-                                        {:filePath (tiny-file-path)
-                                         :line 2
-                                         :targetLineText "(def x 1)"
-                                         :newForm "(def x 2)"})
+  (p/let [create-result (mcp/call-tool socket 110 "clojure_edit_files"
+                                       {:edits [{:type "create"
+                                                 :filePath (tiny-file-path)
+                                                 :content "(ns structural-edit-tiny-target)\n(def x 1)\n"}]})
+          replace-result (mcp/call-tool socket 111 "clojure_edit_files"
+                                        {:edits [{:type "replace"
+                                                  :filePath (tiny-file-path)
+                                                  :line 2
+                                                  :targetLineText "(def x 1)"
+                                                  :newForm "(def x 2)"}]})
           content (wait-for+ #(let [c (fs/readFileSync (tiny-file-path) "utf8")]
                                 (when (string/includes? c "(def x 2)") c))
                              :interval 10
                              :timeout 5000
                              :message "Tiny file content did not update within 5s")]
     (testing "tiny file replace works"
-      (is (:success create-result))
-      (is (:success replace-result))
+      (is (batch-success? create-result))
+      (is (batch-success? replace-result))
       (is (string/includes? content "(def x 2)")))))
+
+(def ^:private continue-file-name "structural_edit_continue_target.clj")
+(defn- continue-file-path []
+  (path/join (.-fsPath mcp/workspace-uri) continue-file-name))
+
+(defn- delete-continue-file! []
+  (when (fs/existsSync (continue-file-path))
+    (fs/unlinkSync (continue-file-path))))
+
+(defn- test-continue-on-failure+
+  "Test that a batch with one valid and one invalid edit applies the valid one."
+  [socket {:keys [test-label id-create id-batch valid-edit invalid-edit
+                  expected-content expected-error]}]
+  (p/let [file-path (continue-file-path)
+          _ (do (delete-continue-file!)
+                (mcp/call-tool socket id-create "clojure_edit_files"
+                               {:edits [{:type "create"
+                                         :filePath file-path
+                                         :content (initial-file-content)}]}))
+          result (mcp/call-tool socket id-batch "clojure_edit_files"
+                                {:edits [valid-edit invalid-edit]})
+          content (fs/readFileSync file-path "utf8")]
+    (testing test-label
+      (is (not (batch-success? result))
+          "Summary should show partial success (1/2)")
+      (is (string/includes? (:summary result) "1/2")
+          "Summary should report 1 of 2 edits applied")
+      (is (string/includes? content expected-content)
+          "Valid edit should have been applied")
+      (let [file-result (get (:files result) (keyword file-path))
+            edit-results (:edits file-result)
+            failed (first (filter #(false? (:success %)) edit-results))]
+        (is (some? failed) "Failed edit should be in results")
+        (is (string/includes? (str (:error failed)) expected-error)
+            "Failed edit should report clear error")))))
+
+(defn- test-continue-on-runtime-failure+ [socket]
+  (test-continue-on-failure+ socket
+    {:test-label "batch continues past runtime failure"
+     :id-create 120 :id-batch 121
+     :valid-edit {:type "replace" :filePath (continue-file-path)
+                  :line 3 :targetLineText "(defn add-numbers"
+                  :newForm "(defn add-numbers\n  \"Adds two numbers\"\n  [a b]\n  (+ a b))"}
+     :invalid-edit {:type "replace" :filePath (continue-file-path)
+                    :line 8 :targetLineText "(defn nonexistent-function"
+                    :newForm "(defn replaced [] :replaced)"}
+     :expected-content "Adds two numbers"
+     :expected-error "Target line text not found"}))
+
+(defn- test-continue-on-edit-validation-failure+ [socket]
+  (test-continue-on-failure+ socket
+    {:test-label "batch continues past edit-level validation failure"
+     :id-create 122 :id-batch 123
+     :valid-edit {:type "replace" :filePath (continue-file-path)
+                  :line 3 :targetLineText "(defn add-numbers"
+                  :newForm "(defn add-numbers\n  \"Modified\"\n  [a b]\n  (+ a b))"}
+     :invalid-edit {:type "replace" :filePath (continue-file-path)
+                    :line 8 :targetLineText "; this is a comment"
+                    :newForm "(defn replaced [] :replaced)"}
+     :expected-content "\"Modified\""
+     :expected-error "comment"}))
 
 ;; --- Test orchestrator ---
 
@@ -290,6 +380,8 @@
               (test-wrong-target-text+ socket file-path)
               (test-fuzzy-window-miss+ socket file-path)
               (test-tiny-file+ socket)
+              (test-continue-on-runtime-failure+ socket)
+              (test-continue-on-edit-validation-failure+ socket)
               (mcp/stop-mcp-session! socket)))
       (p/catch (fn [e]
                  (js/console.error "[structural-edit] Error:" (.-message e) e)
@@ -297,4 +389,5 @@
                  (throw e)))
       (p/finally (fn []
                    (delete-test-file!)
-                   (delete-tiny-file!)))))
+                   (delete-tiny-file!)
+                   (delete-continue-file!)))))

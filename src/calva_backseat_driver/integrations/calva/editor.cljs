@@ -54,7 +54,7 @@
   (when diagnostics
     (mapv diagnostic->clj diagnostics)))
 
-(defn- get-diagnostics-for-file
+(defn get-diagnostics-for-file
   "Get clj-kondo diagnostics for a file and convert to Clojure data structures"
   [file-path]
   (p/let [uri (vscode/Uri.file file-path)
@@ -68,7 +68,7 @@
   (get-diagnostics-for-file "/Users/pez/Projects/calva-mcp-server/test-projects/example/src/mini/playground.clj")
   :rcf)
 
-(defn- poll-diagnostics+ [file-path diagnostics-before-edit]
+(defn poll-diagnostics+ [file-path diagnostics-before-edit]
   (p/loop [attempts 0]
     (p/let [_ (p/delay 10)
             diags (get-diagnostics-for-file file-path)]
@@ -185,30 +185,38 @@
       (vscode/Range. effective-start effective-end))
     form-range))
 
-(defn- apply-edit-and-report+
-  "Apply a form edit and report diagnostics. Assumes targeting is already validated."
+(defn apply-form-edit+
+  "Apply a form edit without diagnostics polling. Assumes targeting is already validated."
   [{:editor/keys [file-path line-number original-line-number new-form ranges-fn-key]}]
   (let [validation-result (parinfer/validate-brackets new-form)]
     (if-not (:valid? validation-result)
       (p/resolved (assoc validation-result :success false))
       (p/let [form-data (get-ranges-form-data-by-line file-path line-number ranges-fn-key)
-              diagnostics-before-edit (get-diagnostics-for-file file-path)
               ^js vscode-document (get-document-from-path file-path)
               trimmed-form (string/trim new-form)
               text (if (= :insertionPoint ranges-fn-key) (str trimmed-form "\n\n") trimmed-form)
               form-range (first (:ranges-object form-data))
               effective-range (compute-effective-range vscode-document form-range ranges-fn-key trimmed-form)
               edit-result (edit-replace-range file-path effective-range text)
-              _ (.save vscode-document)
-              diagnostics-after-edit (poll-diagnostics+ file-path diagnostics-before-edit)]
+              _ (.save vscode-document)]
         (if edit-result
-          (cond-> {:success true
-                   :diagnostics-before-edit diagnostics-before-edit
-                   :diagnostics-after-edit diagnostics-after-edit}
+          (cond-> {:success true}
             (not= line-number original-line-number)
             (assoc :actual-line-used line-number))
           {:success false
-           :diagnostics-before-edit diagnostics-before-edit})))))
+           :error "Failed to apply edit"})))))
+
+(defn- apply-edit-and-report+
+  "Apply a form edit and report diagnostics. Assumes targeting is already validated."
+  [{:editor/keys [file-path] :as opts}]
+  (p/let [diagnostics-before-edit (get-diagnostics-for-file file-path)
+          result (apply-form-edit+ opts)]
+    (if (:success result)
+      (p/let [diagnostics-after-edit (poll-diagnostics+ file-path diagnostics-before-edit)]
+        (assoc result
+               :diagnostics-before-edit diagnostics-before-edit
+               :diagnostics-after-edit diagnostics-after-edit))
+      result)))
 
 (defn apply-form-edit-by-line-with-text-targeting
   "Apply a form edit by line number with text-based targeting for better accuracy.
@@ -278,15 +286,13 @@
   (let [path-parts (string/split file-path #"/")]
     (string/join "/" (butlast path-parts))))
 
-(defn structural-create-file+
-  "Create a new Clojure file with exact content using vscode/workspace.fs API"
+(defn create-file-core+
+  "Create a new Clojure file with exact content. Returns {:success true :file-path ...} or {:success false ...}"
   [file-path content]
   (let [validation-result (parinfer/validate-brackets content)]
     (if-not (:valid? validation-result)
-      ;; REFUSE to create - return validation failure
       (p/resolved (assoc validation-result
                          :file-path file-path))
-      ;; Valid brackets - proceed with file creation
       (p/let [uri (vscode/Uri.file file-path)
               normalized-content (normalize-file-content content)
               content-bytes (.encode (js/TextEncoder.) normalized-content)
@@ -297,28 +303,33 @@
               (p/then (fn [_]
                         (vscode/workspace.fs.writeFile uri content-bytes)))
               (p/then (fn [_]
-                        (p/let [_ (p/delay 1000)
-                                diagnostics-after-edit (get-diagnostics-for-file file-path)]
-                          {:success true
-                           :file-path file-path
-                           :message "File created successfully"
-                           :diagnostics-after-edit diagnostics-after-edit})))
+                        {:success true
+                         :file-path file-path}))
               (p/catch (fn [error]
                          {:success false
                           :error (.-message error)
                           :file-path file-path})))))))
 
-(defn append-code+
-  "Append a top-level form to the end of a file at guaranteed top level"
+(defn structural-create-file+
+  "Create a new Clojure file with exact content using vscode/workspace.fs API"
+  [file-path content]
+  (p/let [result (create-file-core+ file-path content)]
+    (if (:success result)
+      (p/let [_ (p/delay 1000)
+              diagnostics-after-edit (get-diagnostics-for-file file-path)]
+        (assoc result
+               :message "File created successfully"
+               :diagnostics-after-edit diagnostics-after-edit))
+      result)))
+
+(defn append-code-core+
+  "Append a top-level form to the end of a file. Returns {:success true :appended-at-end true} or {:success false ...}"
   [file-path code]
   (let [validation-result (parinfer/validate-brackets code)]
     (if-not (:valid? validation-result)
-      ;; REFUSE to append - return validation failure
       (p/resolved validation-result)
-      ;; Valid brackets - proceed with append
       (-> (p/let [uri (vscode/Uri.file file-path)
                   ^js vscode-document (vscode/workspace.openTextDocument uri)
-                  diagnostics-before-edit (get-diagnostics-for-file file-path)
                   last-line-number (.-lineCount vscode-document)
                   end-position (vscode/Position. last-line-number 0)
                   last-line-text (if (pos? last-line-number)
@@ -332,16 +343,24 @@
                   workspace-edit (vscode/WorkspaceEdit.)
                   _ (.set workspace-edit uri #js [edit])
                   edit-result (vscode/workspace.applyEdit workspace-edit)
-                  _ (.save vscode-document)
-                  diagnostics-after-edit (poll-diagnostics+ file-path diagnostics-before-edit)]
+                  _ (.save vscode-document)]
             (if edit-result
               {:success true
-               :appended-at-end true
-               :diagnostics-before-edit diagnostics-before-edit
-               :diagnostics-after-edit diagnostics-after-edit}
+               :appended-at-end true}
               {:success false
-               :diagnostics-before-edit diagnostics-before-edit
                :error "Failed to apply workspace edit"}))
           (p/catch (fn [error]
                      {:success false
                       :error (.-message error)}))))))
+
+(defn append-code+
+  "Append a top-level form to the end of a file at guaranteed top level"
+  [file-path code]
+  (p/let [diagnostics-before-edit (get-diagnostics-for-file file-path)
+          result (append-code-core+ file-path code)]
+    (if (:success result)
+      (p/let [diagnostics-after-edit (poll-diagnostics+ file-path diagnostics-before-edit)]
+        (assoc result
+               :diagnostics-before-edit diagnostics-before-edit
+               :diagnostics-after-edit diagnostics-after-edit))
+      result)))
