@@ -4,6 +4,11 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- [Replace four structural editing tools with single batch `clojure_edit_files` tool](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/58)
+  - Supports replace, insert, append, and create operations in one call
+  - Schema pre-validation, automatic sort order, per-file diagnostics
+  - Removes: `replace_top_level_form`, `insert_top_level_form`, `clojure_create_file`, `clojure_append_code`
+
 ## [v0.0.33] - 2026-05-15
 
 - [Make editing tools headless](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/57)

@@ -198,7 +198,7 @@ Test the complete file editing lifecycle:
 2. Append multiple functions to demonstrate accumulation
 3. Insert a data definition before an existing function to test positioning
 4. Replace an existing function to test modification
-5. Delete a form using `replace_top_level_form` with empty `newForm`
+5. Delete a form using `clojure_edit_files` with type `replace` and empty `newForm`
 6. Fix definition order if inserts created forward references (definitions must precede their call sites in Clojure)
 7. Load the namespace in the REPL and evaluate functions with test data
 8. Clean up: delete the test file after verification

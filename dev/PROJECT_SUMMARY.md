@@ -8,11 +8,11 @@ Calva Backseat Driver (v0.0.27) is a VS Code extension that transforms AI coding
 
 ## Key Features
 
-### 11 Tools (VS Code Language Model API + MCP)
+### 8 Tools (VS Code Language Model API + MCP)
 
 **REPL Exploration & Understanding**: `clojure_evaluate_code` (opt-in for MCP, enabled by default for Copilot), `clojure_load_file` (requires Calva >= 2.0.576), `clojure_list_sessions`, `clojure_repl_output_log`, `clojure_symbol_info`, `clojuredocs_info`
 
-**Structural Editing**: `clojure_create_file`, `clojure_append_code`, `replace_top_level_form`, `insert_top_level_form`, `clojure_balance_brackets`
+**Structural Editing**: `clojure_edit_files`, `clojure_balance_brackets`
 
 ### 2 Skills, 2 Instructions
 
@@ -146,23 +146,12 @@ The tools are exposed as VS Code Language Model API (for Copilot) and MCP (for e
 
 **Structural Editing:**
 
-6. **clojure_create_file**
-   - Create a new Clojure file with automatic bracket balancing
-   - Parameters: `filePath`, `content`
+6. **clojure_edit_files**
+   - Batch structural editing: replace, insert, append, create in one call
+   - Parameters: `edits` (array of edit objects with `type`, `filePath`, and type-specific fields)
+   - Auto-sorts within each file, continues on failure, per-file diagnostics
 
-7. **clojure_append_code**
-   - Append top-level forms to an existing file with bracket balancing
-   - Parameters: `filePath`, `code`
-
-8. **replace_top_level_form**
-   - Form-aware editing with text targeting, bracket balancing, rich comment support
-   - Parameters: `filePath`, `line`, `targetLineText`, `newForm`
-
-9. **insert_top_level_form**
-   - Form-aware insertion of new forms before an existing form
-   - Parameters: `filePath`, `line`, `targetLineText`, `newForm`
-
-10. **clojure_balance_brackets**
+7. **clojure_balance_brackets**
     - Fix bracket imbalances in Clojure code using Parinfer
     - Parameters: `text`
 

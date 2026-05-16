@@ -1,103 +1,94 @@
-# Form-Aware Edit Tool - Calva Backseat Driver
+# Batch Structural Edit Tool - Calva Backseat Driver
 
 ## Overview
 
-Form-aware editing tools that leverage Calva's ranges API for semantic Clojure editing. Enables AI agents to edit Clojure code by operating on forms rather than lines, with automatic bracket balancing and structural awareness.
+`clojure_edit_files` is a batch structural editing tool that handles create, replace, insert, and append operations across multiple files in a single call. It leverages Calva's ranges API for semantic Clojure editing, with automatic bracket balancing via Parinfer.
 
 ## Design Evolution
 
-The current line-based approach with text targeting evolved through several iterations:
+The current batch approach consolidates four individual tools:
+- `replace_top_level_form` → `type: "replace"`
+- `insert_top_level_form` → `type: "insert"`
+- `clojure_create_file` → `type: "create"`
+- `clojure_append_code` → `type: "append"`
 
-1. **Character positions**: AI agents couldn't reliably determine character indices
-2. **Simple line numbers**: File metadata (e.g., `; filepath:` comments) caused offset issues
-3. **Auto-offsetting**: Failed when agents had accurate line info (e.g., from selections)
-4. **Text targeting** (current): Scans ±2 lines around target for validation
+Text targeting (scan ±2 lines around target) remains the core positioning mechanism for replace/insert.
 
-**Future Direction**: Move to explicit range-based tools (`read-forms`/`replace-range`) to mirror built-in AI tools and eliminate positioning ambiguity.
+## Architecture
 
-## Status
-
-| Tool | VS Code | MCP | Description |
-|------|---------|-----|-------------|
-| `replace_top_level_form` | ✅ | ✅ | Replace structural forms with text targeting |
-| `insert_top_level_form` | ✅ | ✅ | Insert structural forms with text targeting |
-
-**Key Limitations**:
-- Non-structural edits (top-level comments) handled via error messages directing AI to use built-in line-oriented tools
-- Text targeting scan window may miss large line offsets
-- Post-edit diagnostics often ignored by AI agents
-
-## Tool APIs
-
-Both tools use line-based positioning with text targeting for accuracy:
-
-### `replace_top_level_form`
-```clojure
-(defn apply-form-edit-by-line-with-text-targeting
-  [file-path line-number target-line-text new-form])
+```
+Input: [{type, filePath, ...params}]
+       ↓
+Schema Validation (blocks all on error)
+       ↓
+Index edits (preserve original order)
+       ↓
+Group by filePath
+       ↓
+Per file: sort → apply sequentially → poll diagnostics once
+       ↓
+Output: {summary, files: {path: {edits, diagnostics}}}
 ```
 
-### `insert_top_level_form`
-```clojure
-(defn apply-form-edit-by-line-with-text-targeting
-  [file-path line-number target-line-text new-form])
-```
+### Sort Order Within a File
+1. `create` first
+2. `replace`/`insert` by line descending (highest first)
+3. `append` last
 
-**Common Parameters:**
-- `file-path`: Absolute path to Clojure file
-- `line-number`: Line number (1-indexed) to identify target
-- `target-line-text`: Exact text content for validation (searches ±2 lines)
-- `new-form`: Form content to replace or insert
+### Failure Handling
+- Schema errors: block entire batch
+- Edit failures: continue within file, report per-edit success/failure
+- Cross-file: files processed sequentially, all attempted regardless of failures
 
-**Common Features:**
-- Text targeting with fuzzy line matching (±2 lines, may need expansion for large offsets)
-- Automatic Parinfer bracket balancing (forms only)
-- Rich comment form support (forms inside `(comment ...)` treated as top-level)
-- Post-edit diagnostics (often ignored by AI agents - considering lint diffs instead)
-- Error messages guide AI agents to use built-in tools for non-structural edits (comments)
+## Tool API
 
-
-## Usage Examples
-
-### Basic Usage
-```clojure
-;; Replace form
-replace_top_level_form({
-  filePath: "/path/to/file.clj",
-  line: 23,
-  targetLineText: "(defn old-function [x]",
-  newForm: "(defn new-function [x y] (+ x y))"
-})
-
-;; Insert top-level form
-insert_top_level_form({
-  filePath: "/path/to/file.clj",
-  line: 45,
-  targetLineText: "(defn process-data",
-  newForm: ";; Helper functions for data processing\n\n(defn helper-fn [x] x)"
-})
-```
-
-### Error Handling
-```clojure
-// When target text is not found
+### Input Schema
+```json
 {
-  success: false,
-  error: "Target line text not found. Expected: '(defn wrong-function [x]' near line 23"
-}
-
-// When attempting to use structural tools for comments
-{
-  success: false,
-  error: "Target line text cannot start with a comment (;). You can only target forms/sexpressions. (To edit line comments, use your line based editing tools.)"
-}
-
-// Line offset exceeds scan window
-{
-  success: false,
-  error: "Target text found outside scan window. Line offset: 5, Window: ±2"
+  "edits": [
+    {"type": "replace", "filePath": "/abs/path.clj", "line": 23, "targetLineText": "(defn foo", "newForm": "(defn foo [x] x)"},
+    {"type": "insert", "filePath": "/abs/path.clj", "line": 10, "targetLineText": "(defn bar", "newForm": "(defn helper [] nil)"},
+    {"type": "append", "filePath": "/abs/path.clj", "code": "(defn new-fn [] :ok)"},
+    {"type": "create", "filePath": "/abs/new.clj", "content": "(ns my.new)\n\n(defn init [] :ok)"}
+  ]
 }
 ```
+
+### Constraints
+- At most one `create` per filePath
+- At most one `append` per filePath
+- `filePath` must be absolute (starts with `/`)
+- `replace`/`insert` require: `line` (integer), `targetLineText` (string), `newForm` (string)
+
+### Response Shape
+```clojure
+{:summary "3/4 edits applied across 2 files"
+ :files {"/path/a.clj" {:file-path "/path/a.clj"
+                         :edits [{:success true :index 0} {:success false :error "..." :index 1}]
+                         :diagnostics-before-edit [...]
+                         :diagnostics-after-edit [...]}
+         "/path/b.clj" {:file-path "/path/b.clj"
+                         :edits [{:success true :index 2}]
+                         :diagnostics-before-edit [...]
+                         :diagnostics-after-edit [...]}}}
+```
+
+## Implementation
+
+### Key Files
+- `src/calva_backseat_driver/integrations/calva/batch_edit.cljs` — pure validation and sorting
+- `src/calva_backseat_driver/integrations/calva/features.cljs` — orchestration (`edit-files+`)
+- `src/calva_backseat_driver/integrations/calva/editor.cljs` — core edit primitives
+- `src/calva_backseat_driver/mcp/requests.cljs` — MCP handler
+- `src/calva_backseat_driver/tools.cljs` — VS Code Language Model tool registration
+
+### Core Functions
+- `batch-edit/validate-edit-schema` — pure pre-validation
+- `batch-edit/sort-edits-for-file` — pure sort for safe application order
+- `features/edit-files+` — orchestration entry point
+- `editor/apply-form-edit+` — single form edit without diagnostics
+- `editor/create-file-core+` — file creation without diagnostics
+- `editor/append-code-core+` — append without diagnostics
 
 ## Known Issues & Workarounds
 
