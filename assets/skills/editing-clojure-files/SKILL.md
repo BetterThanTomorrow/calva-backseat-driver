@@ -1,6 +1,6 @@
 ---
 name: editing-clojure-files
-description: 'Structural editing of Clojure files using Backseat Driver tools. Use when: creating/adding/inserting/replacing/deleting top-level forms, fixing bracket balance, resolving indentation issues, planning multi-edit sequences, recovering from failed edits, or working with Rich Comment Forms in Clojure files, regardless of dialect or runtime. Use whenever you consider any of these tools: clojure_create_file, clojure_append_code, insert_top_level_form, replace_top_level_form, clojure_balance_brackets. Use when editing Clojure and unsure which tool to pick. Use this skill when PLANNING or DISCUSSING Clojure file edits — not only at the moment of editing.'
+description: 'Structural editing of Clojure files using Backseat Driver tools. Use when: creating/adding/inserting/replacing/deleting top-level forms, fixing bracket balance, resolving indentation issues, planning multi-edit sequences, recovering from failed edits, or working with Rich Comment Forms in Clojure files, regardless of dialect or runtime. Use whenever you consider any of these tools: clojure_edit_files, clojure_balance_brackets. Use when editing Clojure and unsure which tool to pick. Use this skill when PLANNING or DISCUSSING Clojure file edits — not only at the moment of editing.'
 ---
 
 # Editing Clojure Files
@@ -23,40 +23,58 @@ Smaller, simpler forms mean less code to get right in a single edit, fewer inden
 
 When a function you need to modify is already long or deeply nested, improve its structure first, then make the requested change. Structural edits on bloated forms are error-prone.
 
-## Tool Selection
+## The Tool: `clojure_edit_files`
 
-```
-What are you doing?
-├── Creating a new file?
-│   → clojure_create_file
-│     Include all known content at creation time.
-│     Namespace kebab-case → filename snake_case.
-│
-├── Adding forms to end of existing file?
-│   → clojure_append_code
-│
-├── Inserting a form before an existing form?
-│   → insert_top_level_form
-│
-├── Modifying an existing form?
-│   → replace_top_level_form
-│
-├── Deleting a form?
-│   → replace_top_level_form with empty newForm
-│
-├── Fixing broken brackets?
-│   → clojure_balance_brackets
-│     Accept its output as authoritative. NEVER modify it.
-│
-└── Editing line comments (; ...)?
-    → Use built-in text editing tools (not structural tools)
+One tool handles all structural editing operations. It accepts a batch of edits, validates them up front, groups by file, sorts for safe application order, and applies them sequentially.
+
+### Edit Types
+
+| Type | Purpose | Required fields |
+|------|---------|-----------------|
+| `create` | Create a new file with content | `filePath`, `content` |
+| `append` | Append forms to end of file | `filePath`, `code` |
+| `replace` | Replace an existing top-level form | `filePath`, `line`, `targetLineText`, `newForm` |
+| `insert` | Insert a form before an existing form | `filePath`, `line`, `targetLineText`, `newForm` |
+
+### Constraints
+
+- At most one `create` per file per call
+- At most one `append` per file per call
+- All edits are schema-validated before any are applied — one invalid edit blocks the entire batch
+- Within a file: creates run first, then replace/insert (highest line first), then appends
+- Across files: files are processed sequentially
+
+### Usage Pattern
+
+```json
+{
+  "edits": [
+    {"type": "replace", "filePath": "/path/to/file.clj", "line": 23, "targetLineText": "(defn process-data", "newForm": "(defn process-data\n  [items]\n  (map transform items))"},
+    {"type": "insert", "filePath": "/path/to/file.clj", "line": 10, "targetLineText": "(defn helper", "newForm": "(defn new-fn\n  [x]\n  (inc x))"},
+    {"type": "append", "filePath": "/path/to/other.clj", "code": "(defn added-fn\n  []\n  :done)"},
+    {"type": "create", "filePath": "/path/to/new_file.clj", "content": "(ns my.new-file)\n\n(defn init []\n  :ok)"}
+  ]
+}
 ```
 
-When brackets are broken, structural top-level edits are not possible. Use `clojure_balance_brackets` to analyse the breakage, then fall back to regular text editing tools if needed. If repeated attempts fail, escalate to the human via the #askQuestions tool.
+### Deleting a Form
+
+Use `replace` with an empty `newForm`:
+```json
+{"type": "replace", "filePath": "/path/file.clj", "line": 15, "targetLineText": "(defn obsolete-fn", "newForm": ""}
+```
+
+### When Brackets Are Broken
+
+Structural top-level edits are not possible when brackets are unbalanced. Use `clojure_balance_brackets` to analyse the breakage, then fall back to regular text editing tools if needed. If repeated attempts fail, escalate to the human via the #askQuestions tool.
+
+### Line Comments
+
+Structural tools operate on forms, not line comments (`;`). Use built-in text editing tools for line comments.
 
 ## Targeting Forms
 
-The `replace_top_level_form` and `insert_top_level_form` tools locate forms using two parameters: `line` (1-based line number) and `targetLineText` (the exact first line of the target form). Accuracy here is critical.
+The `replace` and `insert` edit types locate forms using two parameters: `line` (1-based line number) and `targetLineText` (the exact first line of the target form). Accuracy here is critical.
 
 Read the file immediately before editing to get accurate line numbers and exact text.
 
@@ -102,27 +120,20 @@ Definitions must precede their call sites in the file. When edits would create a
 
 ## Edit Process
 
-Verification is mandatory after every edit:
+Verification is mandatory after every batch:
 
 1. **Check problems first** — review current diagnostics; fix existing compilation problems before introducing new edits
-2. **Edit the file** — use the structural tool with REPL-verified code
-3. **Check diagnostics** — read post-edit linting info; act on unexpected problems before the next edit
+2. **Batch edits** — assemble all edits for the call with REPL-verified code
+3. **Check diagnostics** — read post-edit diagnostics from the response; act on unexpected problems before the next batch
 4. **Reload** — `clojure_load_file` to load the file, or `(require 'the.namespace :reload)` to confirm the file loads cleanly
 
 In a hot-reload environment, the REPL output log shows compile errors and warnings immediately after the edit. Read and act on them before proceeding.
 
-## Multiple Edits: Bottom-to-Top
+## Multiple Edits Are Automatic
 
-Always edit from highest line number to lowest. Each edit shifts line numbers below it — working bottom-up keeps planned numbers accurate.
+The tool automatically sorts edits within each file for safe application order (highest line number first for replace/insert). You do not need to manually sort — just provide all edits in a single call and the tool handles ordering.
 
-1. Read the file — identify all edit targets with line numbers
-2. Sort edits by line number, **descending**
-3. Apply each edit (highest line first)
-4. Read the file afterward to verify final state
-
-Example: editing forms at lines 10, 25, 40 → edit order: 40 → 25 → 10.
-
-Expect temporary linter warnings about undefined symbols during a multi-edit sequence — they resolve once the full sequence completes.
+Expect temporary linter warnings about undefined symbols during a multi-edit sequence — they resolve once the full batch completes.
 
 ## Error Recovery
 
@@ -140,17 +151,13 @@ Target line text not found. Expected: '(defn wrong-function [x]' near line 23
 ```
 Fix: Use `grep_search` scoped to the file to find the target text's current line number — cheaper than reading the whole file. Plain text mode for exact matches; in regex mode, escape parens as `\(`.
 
-### Comment Targeting
+### Partial Batch Failure
 
-Structural tools operate on forms, not line comments:
-```
-Target line text cannot start with a comment (;). You can only target forms/sexpressions.
-```
-Fix: Use `replace_string_in_file` or equivalent text tool for line comments.
+The tool continues on failure within a file. The response shows which edits succeeded and which failed. For failed edits, re-read the file, get updated line numbers, and retry in a new batch.
 
 ### Scan Window Miss
 
-The text exists but outside the ±2 window — most commonly because previous edits shifted line numbers. Search the file for the target text to get its current line number.
+The text exists but outside the ±2 window — most commonly because a prior edit in the same batch shifted line numbers beyond the ±2 tolerance. Re-read the file and retry with updated targeting.
 
 ## Extensibility
 
@@ -160,9 +167,8 @@ When this skill is loaded, also load any corresponding `clojure-coding` or `cloj
 
 ## Invariants
 
-- Clojure file edits use structural tools; line comments use text editing tools
-- New `.clj`/`.cljs`/`.cljc`/`.bb` files are created with `clojure_create_file`
-- Multi-edit sequences proceed bottom-to-top (highest line number first)
+- Clojure file edits use `clojure_edit_files`; line comments use text editing tools
+- New `.clj`/`.cljs`/`.cljc`/`.bb` files are created with `clojure_edit_files` type `create`
 - Indentation is verified before every structural edit — Parinfer depends on it
 - Post-edit diagnostics are read and acted on before proceeding
 - `targetLineText` is always the exact first line of the target form
