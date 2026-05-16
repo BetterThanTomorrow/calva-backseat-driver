@@ -102,43 +102,11 @@
                  :required ["clojureSymbol"]
                  :priority 8}))
 
-(def replace-top-level-form-tool-listing
-  (tool-listing {:tool-name "replace_top_level_form"
-                 :properties {"filePath" {:type "string"}
-                              "line" {:type "integer"}
-                              "targetLineText" {:type "string"}
-                              "newForm" {:type "string"}}
-                 :required ["filePath" "line" "targetLineText" "newForm"]
-                 :priority 7}))
-
-(def insert-top-level-form-tool-listing
-  (tool-listing {:tool-name "insert_top_level_form"
-                 :properties {"filePath" {:type "string"}
-                              "line" {:type "integer"}
-                              "targetLineText" {:type "string"}
-                              "newForm" {:type "string"}}
-                 :required ["filePath" "line" "targetLineText" "newForm"]
-                 :priority 7}))
-
 (def bracket-balance-tool-listing
   (tool-listing {:tool-name "clojure_balance_brackets"
                  :properties {"text" {:type "string"}}
                  :required ["text"]
                  :priority 10}))
-
-(def structural-create-file-tool-listing
-  (tool-listing {:tool-name "clojure_create_file"
-                 :properties {"filePath" {:type "string"}
-                              "content" {:type "string"}}
-                 :required ["filePath" "content"]
-                 :priority 7}))
-
-(def append-code-tool-listing
-  (tool-listing {:tool-name "clojure_append_code"
-                 :properties {"filePath" {:type "string"}
-                              "code" {:type "string"}}
-                 :required ["filePath" "code"]
-                 :priority 7}))
 
 (def edit-files-tool-listing
   (tool-listing {:tool-name "clojure_edit_files"
@@ -282,38 +250,6 @@
         result (bracket-balance/infer-parens-response (merge options {:calva/text text}))]
     (text-response id result)))
 
-(defn- handle-replace-top-level-form [options id arguments]
-  (p/let [{:keys [filePath line targetLineText newForm]} arguments
-          result (calva/replace-top-level-form+ (merge options
-                                                       {:calva/file-path filePath
-                                                        :calva/line line
-                                                        :calva/target-line-text targetLineText
-                                                        :calva/new-form newForm}))]
-    (clj-response id result)))
-
-(defn- handle-insert-top-level-form [options id arguments]
-  (p/let [{:keys [filePath line targetLineText newForm]} arguments
-          result (calva/insert-top-level-form+ (merge options
-                                                      {:calva/file-path filePath
-                                                       :calva/line line
-                                                       :calva/target-line-text targetLineText
-                                                       :calva/new-form newForm}))]
-    (clj-response id result)))
-
-(defn- handle-create-file [options id arguments]
-  (p/let [{:keys [filePath content]} arguments
-          result (calva/structural-create-file+ (merge options
-                                                       {:calva/file-path filePath
-                                                        :calva/content content}))]
-    (clj-response id result)))
-
-(defn- handle-append-code [options id arguments]
-  (p/let [{:keys [filePath code]} arguments
-          result (calva/append-code+ (merge options
-                                            {:calva/file-path filePath
-                                             :calva/code code}))]
-    (clj-response id result)))
-
 (defn- blank-session-key? [k]
   (or (nil? k) (and (string? k) (string/blank? k))))
 
@@ -352,10 +288,6 @@
    "clojuredocs_info"         {:handler handle-clojuredocs}
    "clojure_repl_output_log"  {:handler handle-output-log}
    "clojure_balance_brackets" {:handler handle-balance-brackets}
-   "replace_top_level_form"   {:handler handle-replace-top-level-form}
-   "insert_top_level_form"    {:handler handle-insert-top-level-form}
-   "clojure_create_file"      {:handler handle-create-file}
-   "clojure_append_code"      {:handler handle-append-code}
    "clojure_edit_files"       {:handler handle-edit-files}
    "clojure_load_file"        {:handler handle-load-file :repl-required? true}})
 
@@ -438,10 +370,6 @@
                               symbol-info-tool-listing
                               clojuredocs-tool-listing
                               output-log-tool-info
-                              replace-top-level-form-tool-listing
-                              insert-top-level-form-tool-listing
-                              structural-create-file-tool-listing
-                              append-code-tool-listing
                               edit-files-tool-listing]
                        (true? repl-enabled?)
                        (conj evaluate-code-tool-listing

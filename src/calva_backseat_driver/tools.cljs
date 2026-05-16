@@ -177,75 +177,6 @@
                                                               :calva/text text})]
                    (text-tool-result-raw result)))})
 
-(defn- ReplaceOrInsertTopLevelFormTool [dispatch! ranges-fn-key confirm-prefix invoked-prefix]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [file-path (-> options .-input .-filePath)
-                                  line (-> options .-input .-line)
-                                  target-line (-> options .-input .-targetLineText)
-                                  new-form (-> options .-input .-newForm)
-                                  message (str confirm-prefix " form at line " line
-                                               (when target-line (str " (targeting: '" target-line "')"))
-                                               " in " file-path
-                                               " width:\n" new-form)]
-                              #js {:invocationMessage (str invoked-prefix " top-level form")
-                                   :confirmationMessages #js {:title (str confirm-prefix " Top-Level Form")
-                                                              :message message}}))
-
-       :invoke (fn invoke [^js options _token]
-                 (p/let [file-path (-> options .-input .-filePath)
-                         line (some-> options .-input .-line)
-                         target-line (-> options .-input .-targetLineText)
-                         new-form (-> options .-input .-newForm)
-                         result (if (= ranges-fn-key :currentTopLevelForm)
-                                  (calva/replace-top-level-form+ {:ex/dispatch! dispatch!
-                                                                  :calva/file-path file-path
-                                                                  :calva/line line
-                                                                  :calva/target-line-text target-line
-                                                                  :calva/new-form new-form})
-                                  (calva/insert-top-level-form+ {:ex/dispatch! dispatch!
-                                                                 :calva/file-path file-path
-                                                                 :calva/line line
-                                                                 :calva/target-line-text target-line
-                                                                 :calva/new-form new-form}))]
-                   (text-tool-result result)))})
-
-(defn ReplaceTopLevelFormTool [dispatch!]
-  (ReplaceOrInsertTopLevelFormTool dispatch! :currentTopLevelForm "Replace" "Replaced"))
-
-(defn InsertTopLevelFormTool [dispatch!]
-  (ReplaceOrInsertTopLevelFormTool dispatch! :insertionPoint "Insert" "Inserted"))
-
-(defn- FileEditTool [dispatch! {:keys [invocation-msg title msg-prefix input-key calva-fn]}]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [file-path (-> options .-input .-filePath)]
-                              (prepare-invocation-messages
-                               invocation-msg title (str msg-prefix file-path))))
-
-       :invoke (fn invoke [^js options _token]
-                 (p/let [file-path (-> options .-input .-filePath)
-                         input-val (aget (.-input options) input-key)
-                         args {:ex/dispatch! dispatch!
-                               :calva/file-path file-path
-                               (keyword "calva" input-key) input-val}
-                         result (calva-fn args)]
-                   (text-tool-result result)))})
-
-(defn StructuralCreateFileTool [dispatch!]
-  (FileEditTool dispatch!
-                {:invocation-msg "Creating Clojure file"
-                 :title "Create Clojure File"
-                 :msg-prefix "Create file: "
-                 :input-key "content"
-                 :calva-fn calva/structural-create-file+}))
-
-(defn AppendCodeTool [dispatch!]
-  (FileEditTool dispatch!
-                {:invocation-msg "Appending code"
-                 :title "Append code"
-                 :msg-prefix "Append form to: "
-                 :input-key "code"
-                 :calva-fn calva/append-code+}))
-
 (defn ListSessionsTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js _options _token]
                             #js {:invocationMessage "Listing REPL sessions"
@@ -321,22 +252,6 @@
    (vscode/lm.registerTool
     "clojure_balance_brackets"
     (#'InferBracketsTool dispatch!))
-
-   (vscode/lm.registerTool
-    "replace_top_level_form"
-    (#'ReplaceTopLevelFormTool dispatch!))
-
-   (vscode/lm.registerTool
-    "insert_top_level_form"
-    (#'InsertTopLevelFormTool dispatch!))
-
-   (vscode/lm.registerTool
-    "clojure_create_file"
-    (#'StructuralCreateFileTool dispatch!))
-
-   (vscode/lm.registerTool
-    "clojure_append_code"
-    (#'AppendCodeTool dispatch!))
 
    (vscode/lm.registerTool
     "clojure_edit_files"
