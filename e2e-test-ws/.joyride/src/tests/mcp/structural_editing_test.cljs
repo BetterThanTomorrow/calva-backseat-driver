@@ -133,6 +133,14 @@
   (is (= active-after active-before)
       "Active editor should remain unchanged"))
 
+(defn- assert-invisible-spacing-edit
+  "Common assertions for invisible edit tests: invisible, success, proper spacing."
+  [{:keys [result content] :as ctx} file-path]
+  (assert-invisible-edit ctx file-path)
+  (is (batch-success? result) "Edit should succeed")
+  (is (<= (count-consecutive-blank-lines content) 1)
+      "Edit should not leave more than 1 consecutive blank line"))
+
 (defn- test-replace-trims-whitespace+ [socket file-path]
   (p/let [{:keys [result content] :as ctx}
           (edit-with-decoy-and-verify+
@@ -145,10 +153,7 @@
                                      :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b))\n\n\n"}]})
            nil)]
     (testing "replace trims trailing whitespace"
-      (assert-invisible-edit ctx file-path)
-      (is (batch-success? result) "Replace should succeed")
-      (is (<= (count-consecutive-blank-lines content) 1)
-          "Replace should not leave more than 1 consecutive blank line"))))
+      (assert-invisible-spacing-edit ctx file-path))))
 
 (defn- test-replace-idempotent+ [socket file-path]
   (p/let [content-before (read-test-file+ nil)
@@ -179,10 +184,7 @@
                                      :newForm "(defn multiply-numbers\n  \"Multiplies a and b\"\n  [a b]\n  (* a b))\n\n"}]})
            content-before)]
     (testing "insert produces proper spacing"
-      (assert-invisible-edit ctx file-path)
-      (is (batch-success? result) "Insert should succeed")
-      (is (<= (count-consecutive-blank-lines content) 1)
-          "Insert should not leave more than 1 consecutive blank line")
+      (assert-invisible-spacing-edit ctx file-path)
       (is (string/includes? content "(defn multiply-numbers")
           "Inserted form should appear in file"))))
 
@@ -309,78 +311,58 @@
   (when (fs/existsSync (continue-file-path))
     (fs/unlinkSync (continue-file-path))))
 
-(defn- test-continue-on-runtime-failure+ [socket]
+(defn- test-continue-on-failure+
+  "Test that a batch with one valid and one invalid edit applies the valid one."
+  [socket {:keys [test-label id-create id-batch valid-edit invalid-edit
+                  expected-content expected-error]}]
   (p/let [file-path (continue-file-path)
-          ;; Create test file
-          _ (mcp/call-tool socket 120 "clojure_edit_files"
-                           {:edits [{:type "create"
-                                     :filePath file-path
-                                     :content (initial-file-content)}]})
-          ;; Send batch: one valid replace + one invalid (wrong targetLineText)
-          result (mcp/call-tool socket 121 "clojure_edit_files"
-                                {:edits [{:type "replace"
-                                          :filePath file-path
-                                          :line 3
-                                          :targetLineText "(defn add-numbers"
-                                          :newForm "(defn add-numbers\n  \"Adds two numbers\"\n  [a b]\n  (+ a b))"}
-                                         {:type "replace"
-                                          :filePath file-path
-                                          :line 8
-                                          :targetLineText "(defn nonexistent-function"
-                                          :newForm "(defn replaced [] :replaced)"}]})
-          content (fs/readFileSync file-path "utf8")]
-    (testing "batch continues past runtime failure"
-      (is (not (batch-success? result))
-          "Summary should show partial success (1/2)")
-      (is (string/includes? (:summary result) "1/2")
-          "Summary should report 1 of 2 edits applied")
-      ;; Valid edit was applied
-      (is (string/includes? content "Adds two numbers")
-          "Valid edit should have been applied")
-      ;; Failed edit reported per-file (keys are keywords after JSON round-trip)
-      (let [file-result (get (:files result) (keyword file-path))
-            edit-results (:edits file-result)
-            failed (first (filter #(false? (:success %)) edit-results))]
-        (is (some? failed) "Failed edit should be in results")
-        (is (string/includes? (str (:error failed)) "Target line text not found")
-            "Failed edit should report clear error")))))
-
-(defn- test-continue-on-edit-validation-failure+ [socket]
-  (p/let [file-path (continue-file-path)
-          ;; File already exists from prior test — re-create fresh
           _ (do (delete-continue-file!)
-                (mcp/call-tool socket 122 "clojure_edit_files"
+                (mcp/call-tool socket id-create "clojure_edit_files"
                                {:edits [{:type "create"
                                          :filePath file-path
                                          :content (initial-file-content)}]}))
-          ;; Send batch: one valid replace + one with comment in targetLineText
-          result (mcp/call-tool socket 123 "clojure_edit_files"
-                                {:edits [{:type "replace"
-                                          :filePath file-path
-                                          :line 3
-                                          :targetLineText "(defn add-numbers"
-                                          :newForm "(defn add-numbers\n  \"Modified\"\n  [a b]\n  (+ a b))"}
-                                         {:type "replace"
-                                          :filePath file-path
-                                          :line 8
-                                          :targetLineText "; this is a comment"
-                                          :newForm "(defn replaced [] :replaced)"}]})
+          result (mcp/call-tool socket id-batch "clojure_edit_files"
+                                {:edits [valid-edit invalid-edit]})
           content (fs/readFileSync file-path "utf8")]
-    (testing "batch continues past edit-level validation failure"
+    (testing test-label
       (is (not (batch-success? result))
           "Summary should show partial success (1/2)")
       (is (string/includes? (:summary result) "1/2")
           "Summary should report 1 of 2 edits applied")
-      ;; Valid edit was applied
-      (is (string/includes? content "\"Modified\"")
+      (is (string/includes? content expected-content)
           "Valid edit should have been applied")
-      ;; Failed edit reported per-file (keys are keywords after JSON round-trip)
       (let [file-result (get (:files result) (keyword file-path))
             edit-results (:edits file-result)
             failed (first (filter #(false? (:success %)) edit-results))]
         (is (some? failed) "Failed edit should be in results")
-        (is (string/includes? (str (:error failed)) "comment")
-            "Failed edit should mention comment validation")))))
+        (is (string/includes? (str (:error failed)) expected-error)
+            "Failed edit should report clear error")))))
+
+(defn- test-continue-on-runtime-failure+ [socket]
+  (test-continue-on-failure+ socket
+    {:test-label "batch continues past runtime failure"
+     :id-create 120 :id-batch 121
+     :valid-edit {:type "replace" :filePath (continue-file-path)
+                  :line 3 :targetLineText "(defn add-numbers"
+                  :newForm "(defn add-numbers\n  \"Adds two numbers\"\n  [a b]\n  (+ a b))"}
+     :invalid-edit {:type "replace" :filePath (continue-file-path)
+                    :line 8 :targetLineText "(defn nonexistent-function"
+                    :newForm "(defn replaced [] :replaced)"}
+     :expected-content "Adds two numbers"
+     :expected-error "Target line text not found"}))
+
+(defn- test-continue-on-edit-validation-failure+ [socket]
+  (test-continue-on-failure+ socket
+    {:test-label "batch continues past edit-level validation failure"
+     :id-create 122 :id-batch 123
+     :valid-edit {:type "replace" :filePath (continue-file-path)
+                  :line 3 :targetLineText "(defn add-numbers"
+                  :newForm "(defn add-numbers\n  \"Modified\"\n  [a b]\n  (+ a b))"}
+     :invalid-edit {:type "replace" :filePath (continue-file-path)
+                    :line 8 :targetLineText "; this is a comment"
+                    :newForm "(defn replaced [] :replaced)"}
+     :expected-content "\"Modified\""
+     :expected-error "comment"}))
 
 ;; --- Test orchestrator ---
 

@@ -131,21 +131,33 @@
                                                          :calva/repl-session-key session-key})]
                    (text-tool-result result)))})
 
-(defn GetClojureDocsTool [dispatch!]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [symbol (-> options .-input .-clojureSymbol)]
-                              (prepare-invocation-messages
-                               "Looking up ClojureDocs"
-                               "Get ClojureDocs Info"
-                               (str "Look up docs for Clojure symbol: **" symbol "**"))))
+(defn- simple-tool
+  "Build a VS Code Language Model tool with one input field, simple messages, and a direct invoke function.
+   Returns a function that takes dispatch! and produces a JS tool object."
+  [{:keys [input-field invocation-msg confirm-title confirm-msg-fn invoke-fn result-fn]
+    :or {result-fn text-tool-result}}]
+  (fn [dispatch!]
+    #js {:prepareInvocation
+         (fn prepareInvocation [^js options _token]
+           (let [input (aget (.-input options) input-field)]
+             (prepare-invocation-messages invocation-msg confirm-title (confirm-msg-fn input))))
+         :invoke
+         (fn invoke [^js options _token]
+           (p/let [input (aget (.-input options) input-field)
+                   result (invoke-fn dispatch! input)]
+             (result-fn result)))}))
 
-       :invoke (fn invoke [^js options _token]
-                 (p/let [symbol (-> options .-input .-clojureSymbol)
-                         result (calva/get-clojuredocs+ {:ex/dispatch! dispatch!
-                                                         :calva/clojure-symbol symbol})]
-                   (text-tool-result result)))})
+(def GetClojureDocsTool
+  (simple-tool
+   {:input-field "clojureSymbol"
+    :invocation-msg "Looking up ClojureDocs"
+    :confirm-title "Get ClojureDocs Info"
+    :confirm-msg-fn #(str "Look up docs for Clojure symbol: **" % "**")
+    :invoke-fn (fn [dispatch! symbol]
+                 (calva/get-clojuredocs+ {:ex/dispatch! dispatch!
+                                          :calva/clojure-symbol symbol}))}))
 
-(defn GetOutputLogTool [dispatch!]
+(def GetOutputLogTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
                             (let [query (-> options .-input .-query)
                                   message (str "Query REPL output log: " query)]
@@ -163,19 +175,16 @@
                    (tool-result-with-images result :max-images (if (some? max-images) max-images 0))))})
 
 
-(defn InferBracketsTool [dispatch!]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [text (-> options .-input .-text)]
-                              (prepare-invocation-messages
-                               "Inferred brackets"
-                               "Infer brackets"
-                               (str "Infer from indents for: " text))))
-
-       :invoke (fn invoke [^js options _token]
-                 (let [text (-> options .-input .-text)
-                       result (balance/infer-parens-response {:ex/dispatch! dispatch!
-                                                              :calva/text text})]
-                   (text-tool-result-raw result)))})
+(def InferBracketsTool
+  (simple-tool
+   {:input-field "text"
+    :invocation-msg "Inferred brackets"
+    :confirm-title "Infer brackets"
+    :confirm-msg-fn #(str "Infer from indents for: " %)
+    :invoke-fn (fn [dispatch! text]
+                 (balance/infer-parens-response {:ex/dispatch! dispatch!
+                                                  :calva/text text}))
+    :result-fn text-tool-result-raw}))
 
 (defn ListSessionsTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js _options _token]

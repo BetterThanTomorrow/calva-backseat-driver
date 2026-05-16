@@ -2,27 +2,30 @@
   (:require [cljs.test :refer [deftest testing is]]
             [calva-backseat-driver.integrations.calva.batch-edit :as batch-edit]))
 
-(deftest validate-edit-schema-test
-  (testing "valid edits return nil"
-    (testing "replace edit"
-      (is (nil? (batch-edit/validate-edit-schema
-                 [{:type "replace" :filePath "/foo/bar.clj" :line 5 :targetLineText "(defn foo" :newForm "(defn foo\n  [])"}]))))
-    (testing "insert edit"
-      (is (nil? (batch-edit/validate-edit-schema
-                 [{:type "insert" :filePath "/foo/bar.clj" :line 10 :targetLineText "(defn bar" :newForm "(defn baz\n  [])"}]))))
-    (testing "append edit"
-      (is (nil? (batch-edit/validate-edit-schema
-                 [{:type "append" :filePath "/foo/bar.clj" :code "(defn qux [])"}]))))
-    (testing "create edit"
-      (is (nil? (batch-edit/validate-edit-schema
-                 [{:type "create" :filePath "/foo/new.clj" :content "(ns foo.new)"}]))))
-    (testing "mixed valid edits"
-      (is (nil? (batch-edit/validate-edit-schema
-                 [{:type "replace" :filePath "/a.clj" :line 1 :targetLineText "(ns a)" :newForm "(ns a)"}
-                  {:type "insert" :filePath "/a.clj" :line 5 :targetLineText "(defn x" :newForm "(defn y [])"}
-                  {:type "append" :filePath "/b.clj" :code "(defn z [])"}
-                  {:type "create" :filePath "/c.clj" :content "(ns c)"}])))))
+(deftest validate-edit-schema-valid-edits-test
+  (testing "replace edit"
+    (is (nil? (batch-edit/validate-edit-schema
+               [{:type "replace" :filePath "/foo/bar.clj" :line 5 :targetLineText "(defn foo" :newForm "(defn foo\n  [])"}]))))
+  (testing "insert edit"
+    (is (nil? (batch-edit/validate-edit-schema
+               [{:type "insert" :filePath "/foo/bar.clj" :line 10 :targetLineText "(defn bar" :newForm "(defn baz\n  [])"}]))))
+  (testing "append edit"
+    (is (nil? (batch-edit/validate-edit-schema
+               [{:type "append" :filePath "/foo/bar.clj" :code "(defn qux [])"}]))))
+  (testing "create edit"
+    (is (nil? (batch-edit/validate-edit-schema
+               [{:type "create" :filePath "/foo/new.clj" :content "(ns foo.new)"}]))))
+  (testing "mixed valid edits"
+    (is (nil? (batch-edit/validate-edit-schema
+               [{:type "replace" :filePath "/a.clj" :line 1 :targetLineText "(ns a)" :newForm "(ns a)"}
+                {:type "insert" :filePath "/a.clj" :line 5 :targetLineText "(defn x" :newForm "(defn y [])"}
+                {:type "append" :filePath "/b.clj" :code "(defn z [])"}
+                {:type "create" :filePath "/c.clj" :content "(ns c)"}]))))
+  (testing "one create + one append per file is fine"
+    (is (nil? (batch-edit/validate-edit-schema [{:type "create" :filePath "/a.clj" :content "(ns a)"}
+                                                {:type "append" :filePath "/a.clj" :code "(defn x [])"}])))))
 
+(deftest validate-edit-schema-error-cases-test
   (testing "missing type returns error"
     (let [result (batch-edit/validate-edit-schema [{:filePath "/foo/bar.clj"}])]
       (is (some? result))
@@ -74,11 +77,7 @@
     (let [result (batch-edit/validate-edit-schema [{:type "append" :filePath "/a.clj" :code "(defn x [])"}
                                                    {:type "append" :filePath "/a.clj" :code "(defn y [])"}])]
       (is (some? result))
-      (is (some #(re-find #"Multiple append" (:error %)) result))))
-
-  (testing "one create + one append per file is fine"
-    (is (nil? (batch-edit/validate-edit-schema [{:type "create" :filePath "/a.clj" :content "(ns a)"}
-                                                {:type "append" :filePath "/a.clj" :code "(defn x [])"}])))))
+      (is (some #(re-find #"Multiple append" (:error %)) result)))))
 
 (deftest sort-edits-for-file-test
   (testing "creates come first"
