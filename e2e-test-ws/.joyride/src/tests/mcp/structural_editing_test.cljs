@@ -301,6 +301,87 @@
       (is (batch-success? replace-result))
       (is (string/includes? content "(def x 2)")))))
 
+(def ^:private continue-file-name "structural_edit_continue_target.clj")
+(defn- continue-file-path []
+  (path/join (.-fsPath mcp/workspace-uri) continue-file-name))
+
+(defn- delete-continue-file! []
+  (when (fs/existsSync (continue-file-path))
+    (fs/unlinkSync (continue-file-path))))
+
+(defn- test-continue-on-runtime-failure+ [socket]
+  (p/let [file-path (continue-file-path)
+          ;; Create test file
+          _ (mcp/call-tool socket 120 "clojure_edit_files"
+                           {:edits [{:type "create"
+                                     :filePath file-path
+                                     :content (initial-file-content)}]})
+          ;; Send batch: one valid replace + one invalid (wrong targetLineText)
+          result (mcp/call-tool socket 121 "clojure_edit_files"
+                                {:edits [{:type "replace"
+                                          :filePath file-path
+                                          :line 3
+                                          :targetLineText "(defn add-numbers"
+                                          :newForm "(defn add-numbers\n  \"Adds two numbers\"\n  [a b]\n  (+ a b))"}
+                                         {:type "replace"
+                                          :filePath file-path
+                                          :line 8
+                                          :targetLineText "(defn nonexistent-function"
+                                          :newForm "(defn replaced [] :replaced)"}]})
+          content (fs/readFileSync file-path "utf8")]
+    (testing "batch continues past runtime failure"
+      (is (not (batch-success? result))
+          "Summary should show partial success (1/2)")
+      (is (string/includes? (:summary result) "1/2")
+          "Summary should report 1 of 2 edits applied")
+      ;; Valid edit was applied
+      (is (string/includes? content "Adds two numbers")
+          "Valid edit should have been applied")
+      ;; Failed edit reported per-file (keys are keywords after JSON round-trip)
+      (let [file-result (get (:files result) (keyword file-path))
+            edit-results (:edits file-result)
+            failed (first (filter #(false? (:success %)) edit-results))]
+        (is (some? failed) "Failed edit should be in results")
+        (is (string/includes? (str (:error failed)) "Target line text not found")
+            "Failed edit should report clear error")))))
+
+(defn- test-continue-on-edit-validation-failure+ [socket]
+  (p/let [file-path (continue-file-path)
+          ;; File already exists from prior test — re-create fresh
+          _ (do (delete-continue-file!)
+                (mcp/call-tool socket 122 "clojure_edit_files"
+                               {:edits [{:type "create"
+                                         :filePath file-path
+                                         :content (initial-file-content)}]}))
+          ;; Send batch: one valid replace + one with comment in targetLineText
+          result (mcp/call-tool socket 123 "clojure_edit_files"
+                                {:edits [{:type "replace"
+                                          :filePath file-path
+                                          :line 3
+                                          :targetLineText "(defn add-numbers"
+                                          :newForm "(defn add-numbers\n  \"Modified\"\n  [a b]\n  (+ a b))"}
+                                         {:type "replace"
+                                          :filePath file-path
+                                          :line 8
+                                          :targetLineText "; this is a comment"
+                                          :newForm "(defn replaced [] :replaced)"}]})
+          content (fs/readFileSync file-path "utf8")]
+    (testing "batch continues past edit-level validation failure"
+      (is (not (batch-success? result))
+          "Summary should show partial success (1/2)")
+      (is (string/includes? (:summary result) "1/2")
+          "Summary should report 1 of 2 edits applied")
+      ;; Valid edit was applied
+      (is (string/includes? content "\"Modified\"")
+          "Valid edit should have been applied")
+      ;; Failed edit reported per-file (keys are keywords after JSON round-trip)
+      (let [file-result (get (:files result) (keyword file-path))
+            edit-results (:edits file-result)
+            failed (first (filter #(false? (:success %)) edit-results))]
+        (is (some? failed) "Failed edit should be in results")
+        (is (string/includes? (str (:error failed)) "comment")
+            "Failed edit should mention comment validation")))))
+
 ;; --- Test orchestrator ---
 
 (deftest-async structural-editing-tests
@@ -317,6 +398,8 @@
               (test-wrong-target-text+ socket file-path)
               (test-fuzzy-window-miss+ socket file-path)
               (test-tiny-file+ socket)
+              (test-continue-on-runtime-failure+ socket)
+              (test-continue-on-edit-validation-failure+ socket)
               (mcp/stop-mcp-session! socket)))
       (p/catch (fn [e]
                  (js/console.error "[structural-edit] Error:" (.-message e) e)
@@ -324,4 +407,5 @@
                  (throw e)))
       (p/finally (fn []
                    (delete-test-file!)
-                   (delete-tiny-file!)))))
+                   (delete-tiny-file!)
+                   (delete-continue-file!)))))
