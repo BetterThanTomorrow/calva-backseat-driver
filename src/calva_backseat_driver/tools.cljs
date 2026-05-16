@@ -183,7 +183,7 @@
     :confirm-msg-fn #(str "Infer from indents for: " %)
     :invoke-fn (fn [dispatch! text]
                  (balance/infer-parens-response {:ex/dispatch! dispatch!
-                                                  :calva/text text}))
+                                                 :calva/text text}))
     :result-fn text-tool-result-raw}))
 
 (defn ListSessionsTool [dispatch!]
@@ -229,7 +229,7 @@
                               #js {:invocationMessage "Editing Clojure files"
                                    :confirmationMessages #js {:title "Edit Clojure Files"
                                                               :message (str edit-count " edit" (when (not= 1 edit-count) "s")
-                                                                           " across " file-count " file" (when (not= 1 file-count) "s"))}}))
+                                                                            " across " file-count " file" (when (not= 1 file-count) "s"))}}))
 
        :invoke (fn invoke [^js options _token]
                  (p/let [edits (js->clj (-> options .-input .-edits) :keywordize-keys true)
