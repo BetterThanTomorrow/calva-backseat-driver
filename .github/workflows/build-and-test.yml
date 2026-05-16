@@ -163,15 +163,12 @@ jobs:
         with:
           bb: latest
 
-      - name: Run E2E Tests Unix
-        if: runner.os != 'Windows'
-        uses: coactions/setup-xvfb@v1
-        with:
-          run: bb run-e2e-tests-vsix ${{ env.VSIX_NAME }}
+      - name: Run E2E Tests Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run bb run-e2e-tests-vsix ${{ env.VSIX_NAME }}
 
-      - name: Run E2E Tests Windows
-        if: runner.os == 'Windows'
-        shell: bash
+      - name: Run E2E Tests macOS/Windows
+        if: runner.os != 'Linux'
         run: bb run-e2e-tests-vsix ${{ env.VSIX_NAME }}
 
   lint:
