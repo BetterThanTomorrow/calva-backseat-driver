@@ -157,7 +157,7 @@
                  (calva/get-clojuredocs+ {:ex/dispatch! dispatch!
                                           :calva/clojure-symbol symbol}))}))
 
-(def GetOutputLogTool [dispatch!]
+(defn GetOutputLogTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
                             (let [query (-> options .-input .-query)
                                   message (str "Query REPL output log: " query)]
