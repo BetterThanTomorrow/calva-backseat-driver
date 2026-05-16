@@ -140,6 +140,21 @@
                  :required ["filePath" "code"]
                  :priority 7}))
 
+(def edit-files-tool-listing
+  (tool-listing {:tool-name "clojure_edit_files"
+                 :properties {"edits" {:type "array"
+                                       :items {:type "object"
+                                               :properties {"type" {:type "string"}
+                                                            "filePath" {:type "string"}
+                                                            "line" {:type "integer"}
+                                                            "targetLineText" {:type "string"}
+                                                            "newForm" {:type "string"}
+                                                            "code" {:type "string"}
+                                                            "content" {:type "string"}}
+                                               :required ["type" "filePath"]}}}
+                 :required ["edits"]
+                 :priority 7}))
+
 (def load-file-tool-listing
   (tool-listing {:tool-name "clojure_load_file"
                  :properties {"filePath" {:type "string"}
@@ -325,6 +340,11 @@
                     :isError true}}
           (clj-response id result))))))
 
+(defn- handle-edit-files [options id arguments]
+  (p/let [{:keys [edits]} arguments
+          result (calva/edit-files+ (merge options {:calva/edits edits}))]
+    (clj-response id result)))
+
 (def ^:private tool-handlers
   {"clojure_evaluate_code"    {:handler handle-evaluate-code :repl-required? true}
    "clojure_list_sessions"    {:handler handle-list-sessions}
@@ -336,6 +356,7 @@
    "insert_top_level_form"    {:handler handle-insert-top-level-form}
    "clojure_create_file"      {:handler handle-create-file}
    "clojure_append_code"      {:handler handle-append-code}
+   "clojure_edit_files"       {:handler handle-edit-files}
    "clojure_load_file"        {:handler handle-load-file :repl-required? true}})
 
 (defn- handle-tools-call [{:keys [id params] :as _request}
@@ -420,7 +441,8 @@
                               replace-top-level-form-tool-listing
                               insert-top-level-form-tool-listing
                               structural-create-file-tool-listing
-                              append-code-tool-listing]
+                              append-code-tool-listing
+                              edit-files-tool-listing]
                        (true? repl-enabled?)
                        (conj evaluate-code-tool-listing
                              load-file-tool-listing))}}))

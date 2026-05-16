@@ -281,6 +281,22 @@
                          (text-tool-result {:error (:error result)})
                          (text-tool-result result))))))})
 
+(defn EditFilesTool [dispatch!]
+  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
+                            (let [edits (js->clj (-> options .-input .-edits) :keywordize-keys true)
+                                  file-count (count (distinct (map :filePath edits)))
+                                  edit-count (count edits)]
+                              #js {:invocationMessage "Editing Clojure files"
+                                   :confirmationMessages #js {:title "Edit Clojure Files"
+                                                              :message (str edit-count " edit" (when (not= 1 edit-count) "s")
+                                                                           " across " file-count " file" (when (not= 1 file-count) "s"))}}))
+
+       :invoke (fn invoke [^js options _token]
+                 (p/let [edits (js->clj (-> options .-input .-edits) :keywordize-keys true)
+                         result (calva/edit-files+ {:ex/dispatch! dispatch!
+                                                    :calva/edits edits})]
+                   (text-tool-result result)))})
+
 (defn register-language-model-tools [dispatch!]
   [(vscode/lm.registerTool
     "clojure_evaluate_code"
@@ -321,6 +337,10 @@
    (vscode/lm.registerTool
     "clojure_append_code"
     (#'AppendCodeTool dispatch!))
+
+   (vscode/lm.registerTool
+    "clojure_edit_files"
+    (#'EditFilesTool dispatch!))
 
    (vscode/lm.registerTool
     "clojure_load_file"
