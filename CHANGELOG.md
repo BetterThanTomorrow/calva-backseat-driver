@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.34] - 2026-05-17
+
 - [One (multi-)edit tool to rule them all](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/58)
   - Adds `clojure_edit_files` tool, replacing: `replace_top_level_form`, `insert_top_level_form`, `clojure_create_file`, `clojure_append_code`
   - Supports multiple edits over multiple files in one batch
