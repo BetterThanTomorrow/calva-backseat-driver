@@ -2,7 +2,7 @@
   "name": "calva-backseat-driver",
   "displayName": "Calva Backseat Driver",
   "description": "Make Copilot an Interactive Programmer, tools for VS Code Copilot. Can also be run as an MCP server",
-  "version": "0.0.34",
+  "version": "0.0.35",
   "publisher": "betterthantomorrow",
   "author": {
     "name": "Better Than Tomorrow",
@@ -383,7 +383,12 @@
                 "properties": {
                   "type": {
                     "type": "string",
-                    "enum": ["replace", "insert", "append", "create"],
+                    "enum": [
+                      "replace",
+                      "insert",
+                      "append",
+                      "create"
+                    ],
                     "description": "The edit operation type"
                   },
                   "filePath": {
@@ -411,7 +416,10 @@
                     "description": "Full file content (required for create)"
                   }
                 },
-                "required": ["type", "filePath"]
+                "required": [
+                  "type",
+                  "filePath"
+                ]
               }
             }
           },
