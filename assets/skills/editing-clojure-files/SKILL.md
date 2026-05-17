@@ -1,11 +1,11 @@
 ---
 name: editing-clojure-files
-description: 'Structural editing of Clojure files using Backseat Driver tools. Use when: creating/adding/inserting/replacing/deleting top-level forms, fixing bracket balance, resolving indentation issues, planning multi-edit sequences, recovering from failed edits, or working with Rich Comment Forms in Clojure files, regardless of dialect or runtime. Use whenever you consider any of these tools: clojure_edit_files, clojure_balance_brackets. Use when editing Clojure and unsure which tool to pick. Use this skill when PLANNING or DISCUSSING Clojure file edits — not only at the moment of editing.'
+description: 'Structural editing of Clojure files using Backseat Driver tools. Use when editing or planning edits: creating/adding/inserting/replacing/deleting top-level forms, fixing bracket balance, resolving indentation issues, planning multi-edit sequences, recovering from failed edits, or working with Rich Comment Forms in Clojure files, regardless of dialect or runtime. Use whenever you consider any of these tools: clojure_edit_files, clojure_balance_brackets. Use when editing Clojure and unsure which tool to pick. Use this skill when PLANNING or DISCUSSING Clojure file edits — not only at the moment of editing.'
 ---
 
 # Editing Clojure Files
 
-Clojure code is a tree of forms, not lines of text. The unit of editing is the top-level form: `ns`, `defn`, `def`, `(comment ...)`, etc. The structural editing tools understand this structure, auto-balance brackets via Parinfer, and return post-edit diagnostics. Whenever a structural edit is possible, prefer these tools over generic text editing (`replace_string_in_file`, `create_file`).
+Clojure code is a tree of forms, not lines of text. The unit of editing is the top-level form: `ns`, `defn`, `def`, `(comment ...)`, etc. The structural editing tool `clojure_edit_files` understands this structure, auto-balances brackets via Parinfer, and returns post-edit diagnostics. Use `clojure_edit_files` whenever a structural edit is possible.
 
 ## Delegation
 
@@ -15,13 +15,27 @@ Unless you have been specifically tasked with editing files yourself, always del
 
 ## Code Shape for Tool Success
 
-Smaller, simpler forms mean less code to get right in a single edit, fewer indentation levels to manage, lower chance of Parinfer misinterpreting structure, and easier error recovery when edits fail.
+Structural editing tools operate on whole top-level forms — they read, transform, and rewrite the entire form in one pass. Smaller, simpler forms have higher success rates.
 
-- Keep functions focused — one responsibility, appropriate abstraction level
-- Prefer shallow nesting over deeply nested `let`/`if`/`when`/`loop` chains — extract named helpers
-- Keep `case`/`cond`/`condp` branches lean — complex bodies belong in named functions
+### Thresholds
 
-When a function you need to modify is already long or deeply nested, improve its structure first, then make the requested change. Structural edits on bloated forms are error-prone.
+| Metric | Target |
+|--------|--------|
+| Function length |
+| Nesting depth | **Under 4 levels** |
+| Cyclomatic complexity | **Under 9 branches** |
+
+### Code smells that break structural edits
+
+1. **Large Method** — Over ~25 lines. Split at responsibility boundaries; use `defn-` helpers so each is an independently editable top-level form.
+2. **Deep Nested Complexity** — 3+ levels of `let`/`when`/`if`/`cond` inside each other. Use threading macros (`->`, `->>`) to flatten transformations. Extract inner bodies into named functions.
+3. **Bumpy Road** — Alternating simple and complex sections in one function. Each bump is a misalignment point. One responsibility per function.
+4. **Complex Method** — Many conditional branches in one function. Keep `case`/`cond`/`condp` branch bodies to one-liners or calls. Prefer data-driven dispatch (`defmethod`, maps of keyword → handler) over deep conditional trees.
+5. **Code Duplication** — Repeated structure across functions. Extract once; each duplicate doubles the chance of structural mismatch during edits.
+
+### The refactor-first rule
+
+When a function you need to modify already violates these thresholds, improve its structure first in a separate edit, verify the refactoring, then make the requested change. Structural edits on bloated forms are error-prone — the tool is fighting the shape of the code instead of focusing on the change.
 
 ## The Tool: `clojure_edit_files`
 
@@ -66,7 +80,7 @@ Use `replace` with an empty `newForm`:
 
 ### When Brackets Are Broken
 
-Structural top-level edits are not possible when brackets are unbalanced. Use `clojure_balance_brackets` to analyse the breakage, then fall back to regular text editing tools if needed. If repeated attempts fail, escalate to the human via the #askQuestions tool.
+Structural top-level edits are not possible when brackets are unbalanced. Use `clojure_balance_brackets` to fix brackets — it runs Parinfer and returns corrected text. Fall back to regular text editing tools if needed. If repeated attempts fail, ask the human for help.
 
 ### Line Comments
 
@@ -76,18 +90,7 @@ Structural tools operate on forms, not line comments (`;`). Use built-in text ed
 
 The `replace` and `insert` edit types locate forms using two parameters: `line` (1-based line number) and `targetLineText` (the exact first line of the target form). Accuracy here is critical.
 
-Read the file immediately before editing to get accurate line numbers and exact text.
-
-```
-File at line 23:
-  (defn process-data
-    [items]
-    (map transform items))
-
-Parameters:
-  line: 23
-  targetLineText: "(defn process-data"
-```
+Read the file immediately before editing to get accurate line numbers and exact text. Example — if line 23 starts with `(defn process-data`, use `line: 23` and `targetLineText: "(defn process-data"`.
 
 **Scan window**: The tool searches for `targetLineText` within ±2 lines of the given `line` number. If the offset is greater than 2, the tool fails even if the text exists elsewhere in the file. Previous edits shift line numbers — always re-read before editing.
 
@@ -122,48 +125,17 @@ Definitions must precede their call sites in the file. When edits would create a
 
 Verification is mandatory after every batch:
 
-1. **Check problems first** — review current diagnostics; fix existing compilation problems before introducing new edits
+1. **Check problems first** — review current diagnostics (`get_errors` or REPL output); fix existing compilation problems before introducing new edits
 2. **Batch edits** — assemble all edits for the call with REPL-verified code
-3. **Check diagnostics** — read post-edit diagnostics from the response; act on unexpected problems before the next batch
-4. **Reload** — `clojure_load_file` to load the file, or `(require 'the.namespace :reload)` to confirm the file loads cleanly
-
-In a hot-reload environment, the REPL output log shows compile errors and warnings immediately after the edit. Read and act on them before proceeding.
-
-## Multiple Edits Are Automatic
-
-The tool automatically sorts edits within each file for safe application order (highest line number first for replace/insert). You do not need to manually sort — just provide all edits in a single call and the tool handles ordering.
-
-Expect temporary linter warnings about undefined symbols during a multi-edit sequence — they resolve once the full batch completes.
+3. **Check diagnostics** — read post-edit diagnostics from the response; in a hot-reload environment, also check the REPL output log for compile errors
+4. **Reload** — `clojure_load_file` to confirm the file loads cleanly
 
 ## Error Recovery
 
-### Broken Bracket Balance
-
-1. Pass the complete file content to `clojure_balance_brackets`
-2. Accept the output as authoritative — do not analyze or modify it
-3. If unresolved, ask the human for help using the #askQuestions tool
-
-### Target Text Not Found
-
-The `targetLineText` does not match any line in the ±2 scan window:
-```
-Target line text not found. Expected: '(defn wrong-function [x]' near line 23
-```
-Fix: Use `grep_search` scoped to the file to find the target text's current line number — cheaper than reading the whole file. Plain text mode for exact matches; in regex mode, escape parens as `\(`.
-
-### Partial Batch Failure
-
-The tool continues on failure within a file. The response shows which edits succeeded and which failed. For failed edits, re-read the file, get updated line numbers, and retry in a new batch.
-
-### Scan Window Miss
-
-The text exists but outside the ±2 window — most commonly because a prior edit in the same batch shifted line numbers beyond the ±2 tolerance. Re-read the file and retry with updated targeting.
-
-## Extensibility
-
-This skill provides the shared baseline for structural editing mechanics. User-level and workspace-level skills extend it with editing workflow preferences, delegation patterns, and project conventions.
-
-When this skill is loaded, also load any corresponding `clojure-coding` or `clojure-editor` skills from the user profile or workspace — they carry workflow preferences that complement this baseline.
+- **Broken brackets** — Pass the complete file content to `clojure_balance_brackets`. Accept the output as authoritative. If unresolved, ask the human for help.
+- **Target text not found** — Use `grep_search` scoped to the file to find the target text's current line number (cheaper than reading the whole file). Plain text mode for exact matches; in regex mode, escape parens as `\(`.
+- **Partial batch failure** — The tool continues on failure. The response shows which edits succeeded and which failed. Re-read the file, get updated line numbers, retry failed edits in a new batch.
+- **Scan window miss** — The text exists but outside the ±2 window, most commonly because a prior edit shifted line numbers. Re-read the file and retry with updated targeting.
 
 ## Invariants
 
@@ -172,4 +144,4 @@ When this skill is loaded, also load any corresponding `clojure-coding` or `cloj
 - Indentation is verified before every structural edit — Parinfer depends on it
 - Post-edit diagnostics are read and acted on before proceeding
 - `targetLineText` is always the exact first line of the target form
-- After 5 failed retries on the same edit, escalate to the human via #askQuestions
+- After 5 failed retries on the same edit, ask the human for help
