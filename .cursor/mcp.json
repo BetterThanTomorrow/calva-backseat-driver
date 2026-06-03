@@ -3,8 +3,8 @@
     "backseat-driver": {
       "command": "node",
       "args": [
-        "/Users/pez/.cursor/extensions/betterthantomorrow.calva-backseat-driver-0.0.6-master-a96cc10-sa/dist/calva-mcp-server.js",
-        "/Users/pez/Projects/calva-mcp-server/.calva/mcp-server/port"
+        "/Users/pez/.config/calva/backseat-driver/calva-mcp-server.js",
+        "1667"
       ]
     }
   }
