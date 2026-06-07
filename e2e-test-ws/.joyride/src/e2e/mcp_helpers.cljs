@@ -1,5 +1,6 @@
 (ns e2e.mcp-helpers
   (:require
+   ["child_process" :as child-process]
    ["fs" :as fs]
    ["net" :as net]
    ["path" :as path]
@@ -140,6 +141,98 @@
       (when (fs/existsSync backup-path)
         (fs/unlinkSync backup-path))
       nil)))
+
+(defn wrapper-script-path
+  "Absolute path to the stdio MCP wrapper script bundled with the extension."
+  []
+  (let [^js ext (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver")
+        script (path/join (.. ext -extensionUri -fsPath) "dist" "calva-mcp-server.js")]
+    (when-not (.existsSync fs script)
+      (throw (js/Error. (str "Stdio wrapper script not found at " script))))
+    script))
+
+(defn spawn-stdio-wrapper!
+  "Spawn the stdio MCP wrapper relay connected to port. Returns a client map."
+  [port]
+  (p/create
+   (fn [resolve reject]
+     (try
+       (let [script (wrapper-script-path)
+             proc (.spawn child-process "node" #js [script (str port)] #js {:stdio #js ["pipe" "pipe" "pipe"]})
+             stdin (.-stdin proc)
+             stdout (.-stdout proc)
+             stderr (.-stderr proc)
+             buffer (atom "")]
+         (.setEncoding stdout "utf8")
+         (.setEncoding stderr "utf8")
+         (.on stderr "data"
+              (fn [chunk]
+                (js/console.error "[stdio wrapper stderr]" chunk)))
+         (.on proc "error" reject)
+         (resolve {:proc proc :stdin stdin :stdout stdout :buffer buffer}))
+       (catch :default err
+         (reject err))))))
+
+(defn send-stdio-request!
+  "Send a JSON-RPC request through the stdio wrapper and wait for a matching id."
+  [{:keys [stdin stdout buffer] :as _client} request & {:keys [timeout] :or {timeout 10000}}]
+  (let [request-id (.-id (clj->js request))
+        request-str (str (.stringify js/JSON (clj->js request)) "\n")]
+    (p/race
+     [(p/create
+       (fn [resolve _reject]
+         (let [on-data (fn on-data [data]
+                         (swap! buffer str data)
+                         (let [lines (.split @buffer "\n")
+                               match (->> lines
+                                          (keep try-parse-json)
+                                          (filter #(= request-id (.-id %)))
+                                          first)]
+                           (when match
+                             (.removeListener stdout "data" on-data)
+                             (resolve match))))]
+           (.on stdout "data" on-data)
+           (.write stdin request-str))))
+      (p/let [_ (p/delay timeout)]
+        (p/rejected
+         (js/Error.
+          (str "Stdio request " request-id " timed out after " timeout "ms"))))])))
+
+(defn stop-stdio-wrapper! [{:keys [proc]}]
+  (when proc
+    (.kill proc)))
+
+(defn start-chunked-response-server!
+  "Start a fake TCP server that replies to the first request by splitting
+   response-json across two socket writes. Used to simulate TCP chunking."
+  [response-obj & {:keys [chunk-size] :or {chunk-size 1024}}]
+  (p/create
+   (fn [resolve _reject]
+     (let [full-response (str (.stringify js/JSON (clj->js response-obj)) "\n")
+           responded? (atom false)
+           server (.createServer
+                   net
+                   (fn [^js socket]
+                     (.setEncoding socket "utf8")
+                     (.on socket "data"
+                          (fn [_data]
+                            (when-not @responded?
+                              (reset! responded? true)
+                              (let [split-at (min chunk-size (.-length full-response))
+                                    part1 (subs full-response 0 split-at)
+                                    part2 (subs full-response split-at)]
+                                (.write socket part1)
+                                (.write socket part2)))))))]
+       (.listen server 0 "127.0.0.1"
+                (fn []
+                  (let [^js address (.address server)]
+                    (resolve {:server server
+                              :port (.-port address)
+                              :response-length (.-length full-response)}))))))))
+
+(defn stop-chunked-response-server! [{:keys [server]}]
+  (when server
+    (.close server)))
 
 (defn ensure-repl-and-eval-enabled!
   []
