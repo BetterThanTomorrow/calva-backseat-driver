@@ -56,8 +56,21 @@
           (recur))
         nil))))
 
+(defn- flush-newline-buffer!
+  "On graceful stream end, emit any remaining buffered content as a final
+   message. A well-behaved peer terminates messages with a newline, but the
+   last message may arrive without one; this avoids silently dropping it."
+  [buffer on-line]
+  (let [remaining (string/trim @buffer)]
+    (vreset! buffer "")
+    (when-not (string/blank? remaining)
+      (on-line remaining))))
+
 (defn handle-stdin [^js stdin ^js socket]
-  (let [stdin-buffer (volatile! "")]
+  (let [stdin-buffer (volatile! "")
+        forward! (fn [message]
+                   (log-stderr :info "Complete message segment from stdin, sending to socket:" message)
+                   (.write socket (str message "\n")))]
     (.setEncoding stdin "utf8")
 
     ;; Handle stdin data
@@ -65,14 +78,13 @@
          (fn [chunk]
            (log-stderr :debug "Raw stdin chunk received:" chunk)
            (vswap! stdin-buffer str chunk)
-           (process-newline-buffer!
-            stdin-buffer
-            (fn [message]
-              (log-stderr :info "Complete message segment from stdin, sending to socket:" message)
-              (.write socket (str message "\n"))))))
+           (process-newline-buffer! stdin-buffer forward!)))
 
     ;; Handle stdin errors
     (.on stdin "error" (fn [err] (log-stderr :error "stdin error:" err)))
+
+    ;; Flush a trailing newline-less message on graceful end
+    (.on stdin "end" (fn [] (flush-newline-buffer! stdin-buffer forward!)))
 
     ;; Handle stdin close
     (.on stdin "close" (fn [] (log-stderr :info "stdin closed.")))))
@@ -86,41 +98,43 @@
 (defn handle-socket [^js socket]
   (.setEncoding socket "utf8")
 
-  (let [socket-buffer (volatile! "")]
+  (let [socket-buffer (volatile! "")
+        forward! (fn [message]
+                   (if (json-message? message)
+                     (do
+                       (log-stderr :info "Sending to stdout:" message)
+                       (.write original-stdout (str message "\n")))
+                     (log-stderr :warn "Filtered potential non-JSON output from socket:" message)))]
     ;; Forward socket server responses to stdout
     (.on socket "data"
          (fn [data]
            (log-stderr :debug "Received from socket:" data)
            (vswap! socket-buffer str data)
-           (process-newline-buffer!
-            socket-buffer
-            (fn [message]
-              (if (json-message? message)
-                (do
-                  (log-stderr :info "Sending to stdout:" message)
-                  (.write original-stdout (str message "\n")))
-                (log-stderr :warn "Filtered potential non-JSON output from socket:" message)))))))
+           (process-newline-buffer! socket-buffer forward!)))
 
-  ;; Handle socket errors
-  (.on socket "error"
-       (fn [err]
-         (log-stderr :error "Socket error:" err)
-         (.write original-stdout
-                 (str (js/JSON.stringify
-                       #js {:jsonrpc "2.0"
-                            :error #js {:code -32000
-                                        :message (str "Server connection error: "
-                                                      (.-message err))}})
-                      "\n"))
-         (.exit process 1)))
+    ;; Flush a trailing newline-less message on graceful end
+    (.on socket "end" (fn [] (flush-newline-buffer! socket-buffer forward!)))
 
-  ;; Handle socket close
-  (.on socket "close"
-       (fn [had-error?]
-         (log-stderr :info (if had-error?
-                             "Socket closed due to transmission error."
-                             "Socket connection closed cleanly."))
-         (.exit process (if had-error? 1 0)))))
+    ;; Handle socket errors
+    (.on socket "error"
+         (fn [err]
+           (log-stderr :error "Socket error:" err)
+           (.write original-stdout
+                   (str (js/JSON.stringify
+                         #js {:jsonrpc "2.0"
+                              :error #js {:code -32000
+                                          :message (str "Server connection error: "
+                                                        (.-message err))}})
+                        "\n"))
+           (.exit process 1)))
+
+    ;; Handle socket close
+    (.on socket "close"
+         (fn [had-error?]
+           (log-stderr :info (if had-error?
+                               "Socket closed due to transmission error."
+                               "Socket connection closed cleanly."))
+           (.exit process (if had-error? 1 0))))))
 
 (defn ^:export main [port-or-port-file & _]
 
