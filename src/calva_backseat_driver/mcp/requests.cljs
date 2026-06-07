@@ -205,6 +205,11 @@
    :id id
    :error {:code code :message message}})
 
+(defn- exception-message
+  "Best-effort message for any thrown/rejected value, not just js/Error."
+  [e]
+  (or (ex-message e) (str e)))
+
 (defn- handle-evaluate-code [options id arguments]
   (let [{:keys [code replSessionKey who description maxImages]
          ns :namespace} arguments
@@ -304,9 +309,16 @@
 
       :else
       (try
-        (handler options id arguments)
+        (let [result (handler options id arguments)]
+          (if (p/promise? result)
+            ;; Async handlers reject asynchronously, so the synchronous catch
+            ;; below won't see it; recover here to keep the request's id.
+            (p/catch result
+                     (fn [e]
+                       (error-response id -32603 (exception-message e))))
+            result))
         (catch :default e
-          (error-response id -32603 (.-message e)))))))
+          (error-response id -32603 (exception-message e)))))))
 
 (defn- handle-resources-read [{:keys [id params] :as _request}
                               {:mcp/keys [provide-bd-skill? provide-edit-skill?] :as options}]
