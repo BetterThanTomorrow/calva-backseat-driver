@@ -6,14 +6,20 @@
    [clojure.string :as string]))
 
 (defn init!+ [{:app/keys [log-file-uri]
-               :ex/keys [dispatch! uri-action]}]
-  (let [uri (vscode/Uri.joinPath log-file-uri "..")]
-    (dispatch! [(conj uri-action
-                      (-> (vscode/workspace.fs.createDirectory uri)
-                          (p/then (fn []
-                                    uri))
-                          (p/catch (fn [err]
-                                     (js/console.error "logging/init+ failed creating log file directory:" err)))))])))
+               :ex/keys [dispatch! uri-action then]}]
+  (let [dir-uri (vscode/Uri.joinPath log-file-uri "..")
+        init-promise (-> (vscode/workspace.fs.createDirectory dir-uri)
+                         (p/then (fn [] dir-uri))
+                         (p/catch (fn [err]
+                                    (js/console.error
+                                     "logging/init+ failed creating log file directory:" err)
+                                    (p/rejected err))))]
+    (dispatch! [(conj uri-action init-promise)])
+    (when (seq then)
+      (-> init-promise
+          (p/finally (fn [_]
+                       (dispatch! then)))
+          (p/catch (fn [_]))))))
 
 (defn append-file+ [path data]
   (p/create

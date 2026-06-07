@@ -8,8 +8,9 @@
     [:app/ax.activate initial-state]
     (let [new-state (merge state initial-state)]
       {:ex/db new-state
-       :ex/dxs [[:app/ax.init :vscode/config.autoStartMCPServer]] ;; Give the init-logging a chance to save the promise
-       :ex/fxs [[:app/fx.init-logging (assoc new-state :ex/uri-action [:db/ax.assoc-in [:app/log-dir-initialized+]])]
+       :ex/fxs [[:app/fx.init-logging {:app/log-file-uri (:app/log-file-uri new-state)
+                                       :ex/uri-action [:db/ax.assoc-in [:app/log-dir-initialized+]]
+                                       :ex/then [[:app/ax.init :vscode/config.autoStartMCPServer]]}]
                 [:mcp/fx.copy-wrapper-script-to-config-dir (:mcp/wrapper-config-path new-state)]]})
 
     [:app/ax.init autostart-mcp-server?]
