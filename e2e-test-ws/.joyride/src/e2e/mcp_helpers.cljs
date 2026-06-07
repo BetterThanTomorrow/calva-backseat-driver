@@ -77,6 +77,12 @@
   (p/let [_ (wait-for+ #(.-isActive (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver"))
                        :timeout 15000
                        :message "[MCP helpers] Extension not active within 15s")
+          ;; Commands register via an async effect chain after activation, so
+          ;; isActive can be true before the command exists. Wait for it.
+          _ (wait-for+ #(p/let [cmds (vscode/commands.getCommands true)]
+                          (.includes cmds "calva-backseat-driver.startMcpServer"))
+                       :timeout 15000
+                       :message "[MCP helpers] startMcpServer command not registered within 15s")
           server-info+ (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer")
           server-info (js->clj server-info+ :keywordize-keys true)
           port (:port server-info)
