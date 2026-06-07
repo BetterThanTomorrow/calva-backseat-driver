@@ -1,6 +1,6 @@
 ---
 name: bd-tester
-description: Testing Backseat Driver tools. Use when: You want to delegate some part of testing to a subagent.
+description: Agent for testing Backseat Driver tools.
 argument-hint: A specific test task to execute and report results on.
 model: Auto (copilot)
 ---
