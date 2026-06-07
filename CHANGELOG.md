@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- Fix MCP request hanging on errors downstream
+
 ## [v0.0.34] - 2026-05-17
 
 - [One (multi-)edit tool to rule them all](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/58)
