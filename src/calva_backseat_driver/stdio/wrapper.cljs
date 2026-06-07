@@ -43,6 +43,19 @@
                             (resolve nil))
                         (resolve port-num)))))))))
 
+(defn- process-newline-buffer! [buffer on-line]
+  (loop []
+    (let [buffer-val @buffer
+          newline-pos (.indexOf buffer-val "\n")]
+      (if (>= newline-pos 0)
+        (let [message-part (subs buffer-val 0 newline-pos)
+              _ (vreset! buffer (subs buffer-val (inc newline-pos)))
+              message (string/trim message-part)]
+          (when-not (string/blank? message)
+            (on-line message))
+          (recur))
+        nil))))
+
 (defn handle-stdin [^js stdin ^js socket]
   (let [stdin-buffer (volatile! "")]
     (.setEncoding stdin "utf8")
@@ -52,22 +65,11 @@
          (fn [chunk]
            (log-stderr :debug "Raw stdin chunk received:" chunk)
            (vswap! stdin-buffer str chunk)
-           ;; Process buffer, splitting by newline
-           (loop []
-             (let [buffer-val @stdin-buffer
-                   newline-pos (.indexOf buffer-val "\n")]
-               (if (>= newline-pos 0) ; Found a newline
-                 (let [message-part (subs buffer-val 0 newline-pos)
-                       ;; Update buffer *before* processing message
-                       _ (vreset! stdin-buffer (subs buffer-val (inc newline-pos)))
-                       message (string/trim message-part)]
-                   (if (not (string/blank? message))
-                     (do
-                       (log-stderr :info "Complete message segment from stdin, sending to socket:" message)
-                       (.write socket (str message "\n"))) ; Send message + newline
-                     (log-stderr :warn "Blank line segment received, ignoring."))
-                   (recur)) ; Check buffer again for more complete messages
-                 false))))) ; No more newlines in the buffer, wait for more data
+           (process-newline-buffer!
+            stdin-buffer
+            (fn [message]
+              (log-stderr :info "Complete message segment from stdin, sending to socket:" message)
+              (.write socket (str message "\n"))))))
 
     ;; Handle stdin errors
     (.on stdin "error" (fn [err] (log-stderr :error "stdin error:" err)))
@@ -84,16 +86,20 @@
 (defn handle-socket [^js socket]
   (.setEncoding socket "utf8")
 
-  ;; Forward socket server responses to stdout
-  (.on socket "data"
-       (fn [data]
-         (log-stderr :debug "Received from socket:" data)
-         (let [message-str (string/trim data)]
-           (if (json-message? message-str)
-             (do
-               (log-stderr :info "Sending to stdout:" message-str)
-               (.write original-stdout (str message-str "\n")))
-             (log-stderr :warn "Filtered potential non-JSON output from socket:" message-str)))))
+  (let [socket-buffer (volatile! "")]
+    ;; Forward socket server responses to stdout
+    (.on socket "data"
+         (fn [data]
+           (log-stderr :debug "Received from socket:" data)
+           (vswap! socket-buffer str data)
+           (process-newline-buffer!
+            socket-buffer
+            (fn [message]
+              (if (json-message? message)
+                (do
+                  (log-stderr :info "Sending to stdout:" message)
+                  (.write original-stdout (str message "\n")))
+                (log-stderr :warn "Filtered potential non-JSON output from socket:" message)))))))
 
   ;; Handle socket errors
   (.on socket "error"
