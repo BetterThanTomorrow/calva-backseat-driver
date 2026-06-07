@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.35] - 2026-06-07
+
 - Fix MCP request hanging on errors downstream
 - Fix MCP server occasionally hanging on large responses or when several requests arrive at once
 
