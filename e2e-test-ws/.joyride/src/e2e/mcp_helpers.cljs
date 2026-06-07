@@ -47,6 +47,17 @@
        (.on socket "data" on-data)
        (.write socket request-str)))))
 
+(defn send-request-with-timeout
+  "Send a JSON-RPC request and reject if no matching response within timeout-ms."
+  [socket request-obj timeout-ms]
+  (let [request-id (.-id (clj->js request-obj))]
+    (p/race
+     [(send-request socket request-obj)
+      (p/let [_ (p/delay timeout-ms)]
+        (p/rejected
+         (js/Error.
+          (str "Request " request-id " timed out after " timeout-ms "ms"))))])))
+
 (defn call-tool
   "Send a tools/call request and return the parsed text content."
   [socket id tool-name arguments]

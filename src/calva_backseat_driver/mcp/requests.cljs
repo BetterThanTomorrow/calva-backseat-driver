@@ -303,7 +303,10 @@
       (error-response id -32601 "Unknown tool")
 
       :else
-      (handler options id arguments))))
+      (try
+        (handler options id arguments)
+        (catch :default e
+          (error-response id -32603 (.-message e)))))))
 
 (defn- handle-resources-read [{:keys [id params] :as _request}
                               {:mcp/keys [provide-bd-skill? provide-edit-skill?] :as options}]
