@@ -117,7 +117,7 @@
                              (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
                              (let [other-whos (some-> (.-otherWhosSinceLast evaluation+)
                                                       (js->clj))
-                                   notes (cond-> ["Remember to check the output tool now and then to see what's happening in the application."]
+                                   notes (cond-> []
                                            (not ns)
                                            (conj no-ns-eval-note)
 
