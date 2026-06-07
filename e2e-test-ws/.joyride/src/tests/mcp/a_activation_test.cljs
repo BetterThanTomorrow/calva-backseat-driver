@@ -3,6 +3,7 @@
    ["vscode" :as vscode]
    [cljs.test :refer [deftest is testing]]
    [e2e.macros :refer [deftest-async]]
+   [e2e.utils :refer [wait-for+]]
    [promesa.core :as p]))
 
 (deftest-async command-registration
@@ -18,7 +19,15 @@
           (is (= false
                  (.includes pre-activation "calva-backseat-driver.stopMcpServer"))
               "there is no stop server command before activation"))
+        ;; Activation dispatches command registration through an async effect
+        ;; chain (init-logging → :app/ax.init), so the commands appear shortly
+        ;; after `activate` resolves. Poll instead of asserting synchronously.
         (p/let [_ (.activate extension)
+                _ (wait-for+ #(p/let [cmds (vscode/commands.getCommands true)]
+                                (and (.includes cmds "calva-backseat-driver.startMcpServer")
+                                     (.includes cmds "calva-backseat-driver.stopMcpServer")))
+                             :timeout 15000
+                             :message "MCP server commands not registered within 15s")
                 post-activation (vscode/commands.getCommands true)]
           (is (= true
                  (.includes post-activation "calva-backseat-driver.startMcpServer"))
