@@ -1,18 +1,15 @@
-# Make Copilot an Interactive Programmer
+# Enabling Native AI Interactive Programming in VS Code
 
-Clojure Tools for Copilot
-
-> (It is also an MCP Server, for users of other AI harnesses)
-
-See also [Awesome Backseat Driver](https://github.com/BetterThanTomorrow/awesome-backseat-driver) for a repository hosting Clojure related Copilot plugins, skills, agents, instructions, hooks, prompts, etcetera.
+Clojure Tools for VS Code Agent harnesses. (Such as Copilot and Cursor.)
 
 [![VS Code Extension](https://img.shields.io/visual-studio-marketplace/v/betterthantomorrow.calva-backseat-driver)](https://marketplace.visualstudio.com/items?itemName=betterthantomorrow.calva-backseat-driver)
 [![Issues](https://img.shields.io/github/issues/BetterThanTomorrow/calva-backseat-driver)](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues)
 [![License](https://img.shields.io/github/license/BetterThanTomorrow/calva-backseat-driver)](https://github.com/BetterThanTomorrow/calva-backseat-driver/blob/master/LICENSE.txt)
 
-A VS Code language model extension for [Calva](https://calva.io), the Clojure/ClojureScript extension for VS Code, enabling AI assistants to harness the power of the REPL.
+Backseat Driver gives VS Code AI harnesses access to [Calva](https://calva.io)'s Clojure tools via two interfaces:
 
-This extension exposes the AI tools both to Copilot directly, using the VS Code Language Model API, and via an optional MCP server for any AI assistants/agents.
+1. **VS Code LM Tools.** For Copilot. Zero config.
+2. **MCP**. For other AI harnesses. Requires [some configuration](MCP-CONFIGURATION.md) per project.
 
 ## Features
 
@@ -30,15 +27,18 @@ This extension exposes the AI tools both to Copilot directly, using the VS Code 
 * Resource: **Skills**, specialized instructions discoverable via `resources/list` and readable via `resources/read`
 
 Please note that for the editing tools there is no UI for reviewing the edits. I suggest using the source
-control tools for reviewing AI editing activity.
+control tools, and VS Codes's **Timeline** view, for this.
 
-## Copilot Instructions: Leveraging Backseat Driver
+## Agent Instructions: Leveraging Backseat Driver
 
-Backseat Driver gives Copilot the tools for Clojure Interactive Programming and the skills for using the tools. To allow you to keep the control of how Copilot holds Clojure and the REPL, the extension does not provide much in the way of Clojure knowledge, philosophy, nor for REPL methodology.
+Backseat Driver gives the AI agent the tools for Clojure Interactive Programming and the skills for using the tools. To allow you to keep the control of how your agents hold Clojure and the REPL, the extension does not provide much in the way of Clojure knowledge, philosophy, nor for REPL methodology.
 
-For Copilot to be truly effective it needs to know how you prefer Clojure to be written and how to use the REPL effectively.
+For truly effective agent Clojure work to happen, it needs to know how you prefer Clojure to be written and how to use the REPL effectively.
 
-To avoid starting with a blank slate, where bad training data and hallucinations about Clojure ruin the day, consider installing the **clojure** Copilot plugin from the [Awesome Backseat Driver](https://github.com/BetterThanTomorrow/awesome-backseat-driver) repository. There are some instructions in the README for that repository.
+To avoid starting with a blank slate, where bad training data and hallucinations about Clojure ruin the day, consider installing the **clojure**, and other plugins from the [Awesome Backseat Driver](https://github.com/BetterThanTomorrow/awesome-backseat-driver) repository.
+
+> [!NOTE]
+> **Awesome Backseat Driver** has plugins for Copilot and Cursor (so far). But if you are using some other haress, you can still copy the skills, custom agents, etc from there. (Or ask your agent to do it for you.)
 
 ## Configuring Backseat Driver
 
@@ -77,7 +77,7 @@ See: [Configure Backseat Driver as an MCP server](MCP-CONFIGURATION.md)
 
 ### Using
 
-0. Teach the AI Clojure and REPL discipline, e.g. See: [Copilot Instructions](#copilot-instructions-leveraging-backseat-driver)
+0. Teach the AI Clojure and REPL discipline, e.g. See: [Agent Instructions](#agentt-instructions-leveraging-backseat-driver)
 1. Connect Calva to your Clojure/ClojureScript project
 1. Ask Copilot to help you with things. It will know what you mean when you say: "Please use the REPL to investigate ...".
   * It will know how to find the right REPL session and how to use it.
@@ -98,6 +98,8 @@ All tools can be referenced in the chat by prepending the tool name with a `#`, 
 
 Copilot doesn't need MCP, but for other AI harnesses Calva Backseat Driver implements the [Model Context Protocol](https://modelcontextprotocol.io) (MCP), creating a bridge between AI assistants and your REPL.
 
+See [MCP-CONFIGURATION.md](MCP-CONFIGURATION.md) for how to configure your harness.
+
 ## Alternatives
 
 Some projects/tools to look to complement Backseat Driver, or use instead of it:
@@ -110,7 +112,7 @@ Some projects/tools to look to complement Backseat Driver, or use instead of it:
 
 As we all are, I am learning to use AI and figuring out one thing at a time. All while the whole space is moving faster than I can learn. Backseat Driver is my very best effort to provide Clojure developers with powerful AI tools that can be used with zero configuration.
 
-The basic design of Backseat Driver has proven to work and be useful over time. But I have also been improving it incrementally as I have learnt new things. A lot of these things I have learnt from users.
+The basic design of Backseat Driver has proven to work and be useful over time. But I have also been improving it incrementally as I have learnt new things. **A lot of these things I have learnt from users.**
 
 Please, please let me know how you fare with Backseat Driver, and what features you would like to see. 🙏
 
