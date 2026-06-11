@@ -23,7 +23,7 @@ node_modules
 
 # MCP server
 dist/
-**/.calva/mcp-server/port
+**/.calva/mcp-server
 
 # Portal
 **/.portal/vs-code.edn

@@ -1,10 +1,10 @@
 {
   "mcpServers": {
-    "backseat-driver": {
+    "backseat-driver-dev": {
       "command": "node",
       "args": [
         "/Users/pez/.config/calva/backseat-driver/calva-mcp-server.js",
-        "../backseat-driver-dev/.calva/mcp-server/port"
+        ".calva/mcp-server/port"
       ]
     }
   }
