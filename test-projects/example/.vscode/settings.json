@@ -18,14 +18,14 @@
       }
     },
     {
-      "name": "Shadow CLJS (browser + server)",
+      "name": "Shadow CLJS (browser + tui)",
       "autoSelectForConnect": true,
       "projectRootPath": ["."],
       "cljsType": "shadow-cljs",
       "projectType": "shadow-cljs",
       "menuSelections": {
         "cljAliases": ["dev"],
-        "cljsLaunchBuilds": [":app", ":server"],
+        "cljsLaunchBuilds": [":app", ":tui"],
         "cljsDefaultBuild": ":app"
       }
     }

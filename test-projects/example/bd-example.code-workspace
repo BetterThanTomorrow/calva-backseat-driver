@@ -21,7 +21,7 @@
 				}
 			},
 			{
-				"name": "Shadow CLJS (browser + server)",
+				"name": "Shadow CLJS (browser + tui)",
 				"autoSelectForConnect": true,
 				"projectRootPath": [
 					"."
@@ -34,7 +34,7 @@
 					],
 					"cljsLaunchBuilds": [
 						":app",
-						":server"
+						":tui"
 					],
 					"cljsDefaultBuild": ":app"
 				}
