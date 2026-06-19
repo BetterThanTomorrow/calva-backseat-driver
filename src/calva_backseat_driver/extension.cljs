@@ -21,7 +21,7 @@
                                       (vscode/Uri.joinPath "eval-history.transit.json"))})
 
 (def ^:private min-backseat-driver-version "0.0.33")
-(def ^:private min-calva-version "2.0.588")
+(def ^:private min-calva-version "2.0.592")
 
 (defn ^:export activate [^js context]
   (js/console.time "activation")

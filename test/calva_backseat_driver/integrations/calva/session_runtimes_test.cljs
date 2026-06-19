@@ -124,4 +124,12 @@
   (testing "supportsRuntimes true with nil builds — empty vector"
     (let [session {:supportsRuntimes true :builds nil}
           result (session-runtimes/project-session session false)]
-      (is (= [] (:builds result))))))
+      (is (= [] (:builds result)))))
+  (testing "currentRoutedTarget maps to isActiveSession when absent"
+    (let [session {:replSessionKey "cljs" :supportsRuntimes false :currentRoutedTarget true}
+          result (session-runtimes/project-session session false)]
+      (is (= true (:isActiveSession result)))))
+  (testing "missing isActiveSession and currentRoutedTarget defaults to false"
+    (let [session {:replSessionKey "clj" :supportsRuntimes false}
+          result (session-runtimes/project-session session false)]
+      (is (= false (:isActiveSession result))))))
