@@ -9,6 +9,13 @@ const {
   runTests,
 } = require('@vscode/test-electron');
 
+// Cursor sets ELECTRON_RUN_AS_NODE=1. @vscode/test-electron
+// spawns the VS Code Electron binary directly; with that env var, the workspace path
+// is treated as a Node entry script → "Cannot find module '<test-workspace>'".
+delete process.env.ELECTRON_RUN_AS_NODE;
+
+const minCalvaVersion = '2.0.592';
+
 function init() {
   return new Promise((resolve, reject) => {
     try {
@@ -35,7 +42,9 @@ async function main(vsixPathOrLabel, testWorkspace, calvaVsix) {
     const vscodeExecutablePath = await downloadAndUnzipVSCode('insiders');
     const [cliPath, ...args] = resolveCliArgsFromVSCodeExecutablePath(vscodeExecutablePath);
 
-    const calvaExtension = calvaVsix ? calvaVsix : 'betterthantomorrow.calva';
+    const calvaExtension = calvaVsix
+      ? calvaVsix
+      : `betterthantomorrow.calva@${minCalvaVersion}`;
 
     const launchArgs = [
       testWorkspace,
@@ -97,7 +106,7 @@ const calvaVsix = args['calva-vsix'] ? path.resolve(args['calva-vsix']) : undefi
 const testWorkspace = args['test-workspace']
   ? path.resolve(args['test-workspace'])
   : path.resolve(__dirname);
-console.info(`Using:\n  ${vsix}\n  Calva: ${calvaVsix || 'marketplace'}\n  Test workspace: ${testWorkspace}`);
+console.info(`Using:\n  ${vsix}\n  Calva: ${calvaVsix || `marketplace@${minCalvaVersion}`}\n  Test workspace: ${testWorkspace}`);
 
 void init()
   .then(() => main(vsix, testWorkspace, calvaVsix))
