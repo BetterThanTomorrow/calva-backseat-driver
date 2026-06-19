@@ -51,6 +51,18 @@ Call `clojure_list_sessions` first. It tells you:
 
 You don't need to re-check sessions for every evaluation, but do re-check when switching file types or when evaluations fail unexpectedly.
 
+### Shadow-cljs runtimes
+
+When `clojure_list_sessions` shows `supportsRuntimes: true` on a session:
+
+- Sessions report `builds[]` per shadow-cljs build. Each build includes `runtimeCount` and `mostRecentRuntime` by default (first runtime in Calva's pre-sorted list = most recently active).
+- User-defined builds use keyword names (e.g. `:app`); infrastructure builds use bare names (e.g. `node-repl`, `browser-repl`). Both are listed.
+- Optional `includeAllRuntimes: true` on `clojure_list_sessions` adds full `runtimes[]` per build when you need every connected tab/process description.
+- Optional `targetRuntimeId` on `clojure_evaluate_code` evaluates on a specific runtime without changing the editor's connected runtime. Get IDs from `clojure_list_sessions`.
+- `lastActivity: null` means no Calva evaluation on that runtime this session yet.
+- When the user must choose among similar runtimes, present each runtime's `description`.
+- Default (editor-selected runtime) and explicit targeting are both valid — choose based on context.
+
 ### The `who` parameter
 
 Every evaluation requires a `who` identifier. Choose a handle that reflects your role:

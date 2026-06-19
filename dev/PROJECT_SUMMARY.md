@@ -126,11 +126,11 @@ The tools are exposed as VS Code Language Model API (for Copilot) and MCP (for e
 
 1. **clojure_evaluate_code** (opt-in for MCP, enabled by default for Copilot)
    - Execute Clojure/ClojureScript code in connected REPL
-   - Parameters: `code`, `namespace`, `replSessionKey`, `who`, `description`
+   - Parameters: `code`, `namespace`, `replSessionKey`, `who`, `description`, optional `targetRuntimeId` (shadow-cljs)
 
 2. **clojure_list_sessions**
    - Discover available REPL sessions and their details
-   - Returns session keys, project roots, file glob patterns, active session
+   - Returns session keys, project roots, file glob patterns, active session; shadow-cljs sessions include compact per-build runtime info (`runtimeCount`, `mostRecentRuntime`); optional `includeAllRuntimes` lists every runtime
 
 3. **clojure_symbol_info**
    - Retrieve symbol documentation and metadata

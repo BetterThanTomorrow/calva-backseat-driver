@@ -87,9 +87,13 @@
                                   ns (-> options .-input .-namespace)
                                   session-key (-> options .-input .-replSessionKey)
                                   who (-> options .-input .-who)
-                                  message (str "Evaluate?\n```clojure\n(in-ns " ns ")\n\n" code "\n```")]
+                                  target-runtime-id (-> options .-input .-targetRuntimeId)
+                                  message (str "Evaluate?\n```clojure\n(in-ns " ns ")\n\n" code "\n```")
+                                  title (cond-> (str "Evaluate as **" (or who "unknown") "** in the **" session-key "** REPL")
+                                          target-runtime-id
+                                          (str " (runtime " target-runtime-id ")"))]
                               #js {:invocationMessage "Evaluating code"
-                                   :confirmationMessages #js {:title (str "Evaluate as **" (or who "unknown") "** in the **" session-key "** REPL")
+                                   :confirmationMessages #js {:title title
                                                               :message message}}))
 
        :invoke (fn invoke [^js options _token]
@@ -104,12 +108,14 @@
                              ns (-> options .-input .-namespace)
                              session-key (-> options .-input .-replSessionKey)
                              description (-> options .-input .-description)
+                             target-runtime-id (-> options .-input .-targetRuntimeId)
                              result (calva/evaluate-code+ {:ex/dispatch! dispatch!
                                                            :calva/code code
                                                            :calva/ns ns
                                                            :calva/repl-session-key session-key
                                                            :calva/who who
-                                                           :calva/description description})]
+                                                           :calva/description description
+                                                           :calva/target-runtime-id target-runtime-id})]
                        (tool-result-with-images result :max-images (if (some? max-images) max-images 10))))))})
 
 
@@ -192,9 +198,11 @@
                                  :confirmationMessages #js {:title "List REPL Sessions"
                                                             :message "List available REPL sessions"}})
 
-       :invoke (fn invoke [^js _options _token]
-                 (p/let [result (calva/list-sessions+ {:ex/dispatch! dispatch!})]
-                   (text-tool-result-raw result)))})
+       :invoke (fn invoke [^js options _token]
+                 (let [include-all-runtimes? (true? (-> options .-input .-includeAllRuntimes))]
+                   (p/let [result (calva/list-sessions+ {:ex/dispatch! dispatch!
+                                                         :calva/include-all-runtimes? include-all-runtimes?})]
+                     (text-tool-result result))))})
 
 (defn LoadFileTool [dispatch!]
   #js {:prepareInvocation (fn prepareInvocation [^js options _token]
