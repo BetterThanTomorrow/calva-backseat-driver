@@ -354,7 +354,7 @@
           text (get-in outer [:result :content 0 :text])
           parsed (js->clj (.parse js/JSON text) :keywordize-keys true)]
     (or (->> (:sessions parsed)
-             (some (fn [s] (when (:isActiveSession s) (:replSessionKey s)))))
+             (some (fn [s] (when (:currentRoutedTarget s) (:replSessionKey s)))))
         (:replSessionKey (first (:sessions parsed))))))
 
 (defn- eval-data-url+

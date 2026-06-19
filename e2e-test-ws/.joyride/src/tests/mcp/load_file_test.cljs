@@ -12,7 +12,7 @@
 (defn- get-session-key+ [socket]
   (p/let [sessions (mcp/call-tool socket 10 "clojure_list_sessions" {})]
     (or (->> (:sessions sessions)
-             (some (fn [s] (when (:isActiveSession s) (:replSessionKey s)))))
+             (some (fn [s] (when (:currentRoutedTarget s) (:replSessionKey s)))))
         (:replSessionKey (first (:sessions sessions))))))
 
 (defn- test-tool-presence+ [socket]

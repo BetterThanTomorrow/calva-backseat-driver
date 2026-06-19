@@ -47,7 +47,7 @@ Not every task needs all steps. A planner might stop at step 4. A reviewer might
 
 Call `clojure_list_sessions` first. It tells you:
 - Which sessions exist (`clj`, `cljs`, `bb`, etc.)
-- Which session is active for the user's current file (`isActiveSession`)
+- Which session is active for the user's current file (`currentRoutedTarget`)
 
 You don't need to re-check sessions for every evaluation, but do re-check when switching file types or when evaluations fail unexpectedly.
 
