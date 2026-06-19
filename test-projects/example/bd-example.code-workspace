@@ -21,18 +21,22 @@
 				}
 			},
 			{
-				"name": "Shadow CLJS + Replicant",
+				"name": "Shadow CLJS (browser + server)",
 				"autoSelectForConnect": true,
 				"projectRootPath": [
 					"."
 				],
 				"cljsType": "shadow-cljs",
 				"projectType": "shadow-cljs",
-				"shadowCljsBuildId": "app",
 				"menuSelections": {
 					"cljAliases": [
 						"dev"
-					]
+					],
+					"cljsLaunchBuilds": [
+						":app",
+						":server"
+					],
+					"cljsDefaultBuild": ":app"
 				}
 			}
 		],

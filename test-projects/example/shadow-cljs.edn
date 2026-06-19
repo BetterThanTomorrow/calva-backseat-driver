@@ -5,4 +5,8 @@
         :output-dir "resources/public/js"
         :asset-path "/js"
         :modules {:main {:init-fn mini.app/init}}
-        :devtools {:after-load mini.app/reload}}}}
+        :devtools {:after-load mini.app/reload}}
+  :server {:target :node-script
+           :main mini.server/main
+           :output-to "out/mini-server.js"
+           :devtools {:after-load mini.server/reload}}}}

@@ -13,6 +13,8 @@ pom.xml.asc
 *.log
 .shadow-cljs
 resources/public/js/
+out/
+.calva/mini-server/
 .idea
 .lein-*
 .nrepl-*
