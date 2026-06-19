@@ -25,22 +25,22 @@ You have access to Backseat Driver's Clojure-focused MCP tools. See these skills
 src/mini/              - Test Clojure and ClojureScript files
 resources/public/      - Static assets and shadow-cljs browser output
 out/                   - Compiled node-script output
-shadow-cljs.edn        - Shadow CLJS build config (`:app` browser, `:server` node)
+shadow-cljs.edn        - Shadow CLJS build config (`:app` browser, `:tui` node)
 test/mini/             - Test namespace (future use)
 .github/               - Instructions, prompts, and skills
 ```
 
 ## Shadow CLJS
 
-Minimal browser app using Replicant. Jack in with the **Shadow CLJS (browser + server)** Calva connect sequence — it watches both `:app` and `:server` builds. The browser app is served at http://localhost:8780
+Minimal browser app using Replicant. Jack in with the **Shadow CLJS (browser + tui)** Calva connect sequence — it watches both `:app` and `:tui` builds. The browser app is served at http://localhost:8780
 
-Node socket server build (`:server`) — a small TCP server that stays running, increments a counter on `"inc"` commands, and writes its port to `.calva/mini-server/port`.
+Node prompt app (`:tui`) — a small readline menu in the terminal. Enter `1` to increment a counter, `2` to quit.
 
 ```bash
-npx shadow-cljs -A :dev watch app server
+npx shadow-cljs -A :dev watch app tui
+# or run the compiled script in a terminal:
+node out/mini-tui.js
 ```
-
-Send newline-terminated commands, e.g. `echo inc | nc localhost $(cat .calva/mini-server/port)`
 
 If jack-in fails with `already started`, a stale shadow-cljs server is still running. Stop it first:
 
