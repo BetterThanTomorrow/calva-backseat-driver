@@ -125,11 +125,12 @@
     (let [session {:supportsRuntimes true :builds nil}
           result (session-runtimes/project-session session false)]
       (is (= [] (:builds result)))))
-  (testing "currentRoutedTarget maps to isActiveSession when absent"
+  (testing "currentRoutedTarget preserved on session"
     (let [session {:replSessionKey "cljs" :supportsRuntimes false :currentRoutedTarget true}
           result (session-runtimes/project-session session false)]
-      (is (= true (:isActiveSession result)))))
-  (testing "missing isActiveSession and currentRoutedTarget defaults to false"
-    (let [session {:replSessionKey "clj" :supportsRuntimes false}
+      (is (= true (:currentRoutedTarget result)))))
+  (testing "session fields pass through when supportsRuntimes false"
+    (let [session {:replSessionKey "clj" :supportsRuntimes false :currentRoutedTarget false}
           result (session-runtimes/project-session session false)]
-      (is (= false (:isActiveSession result))))))
+      (is (= false (:currentRoutedTarget result)))))
+)

@@ -52,7 +52,7 @@
   (p/let [result (mcp/call-tool socket 97 "clojure_list_sessions" {})
           sessions (:sessions result)]
     (or (->> sessions
-             (some (fn [s] (when (:isActiveSession s) (:replSessionKey s)))))
+             (some (fn [s] (when (:currentRoutedTarget s) (:replSessionKey s)))))
         (:replSessionKey (first sessions)))))
 
 ;; --- Shared query ---
