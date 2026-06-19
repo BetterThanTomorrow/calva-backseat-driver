@@ -3,8 +3,8 @@
     "backseat-driver": {
       "command": "node",
       "args": [
-        "/Users/pez/.config/calva/backseat-driver/calva-mcp-server.js",
-        "1668"
+        "~/.config/calva/backseat-driver/calva-mcp-server.js",
+        ".calva/mcp-server/port"
       ]
     }
   }
