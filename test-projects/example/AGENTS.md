@@ -22,10 +22,16 @@ You have access to Backseat Driver's Clojure-focused MCP tools. See these skills
 ## Project Structure
 
 ```
-src/mini/          - Test Clojure files
-test/mini/         - Test namespace (future use)
-.github/           - Instructions, prompts, and skills
+src/mini/              - Test Clojure and ClojureScript files
+resources/public/      - Static assets and shadow-cljs output
+shadow-cljs.edn        - Shadow CLJS build config (`:app` browser build)
+test/mini/             - Test namespace (future use)
+.github/               - Instructions, prompts, and skills
 ```
+
+## Shadow CLJS
+
+Minimal browser app using Replicant. The user Jacks in with the **Shadow CLJS + Replicant** Calva connect sequence. The app is served at  http://localhost:8780
 
 ## Resources
 

@@ -12,6 +12,7 @@ pom.xml.asc
 *.jar
 *.log
 .shadow-cljs
+resources/public/js/
 .idea
 .lein-*
 .nrepl-*

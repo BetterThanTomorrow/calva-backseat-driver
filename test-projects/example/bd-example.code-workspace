@@ -9,7 +9,6 @@
 		"calva.replConnectSequences": [
 			{
 				"name": "Mini Clojure Project",
-				// "autoSelectForConnect": true,
 				"projectRootPath": [
 					"."
 				],
@@ -20,11 +19,26 @@
 						"test"
 					]
 				}
+			},
+			{
+				"name": "Shadow CLJS + Replicant",
+				"autoSelectForConnect": true,
+				"projectRootPath": [
+					"."
+				],
+				"cljsType": "shadow-cljs",
+				"projectType": "shadow-cljs",
+				"shadowCljsBuildId": "app",
+				"menuSelections": {
+					"cljAliases": [
+						"dev"
+					]
+				}
 			}
 		],
 		"calva.autoOpenInspector": false,
 		"calva-backseat-driver.autoStartMCPServer": true,
-		"calva-backseat-driver.mcpSocketServerPort": 1668,
+		"calva-backseat-driver.mcpSocketServerPort": 0,
 		"calva-backseat-driver.enableMcpReplEvaluation": true
 	},
 }
