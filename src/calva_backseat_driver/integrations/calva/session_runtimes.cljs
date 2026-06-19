@@ -36,12 +36,20 @@
     (project-build-full build)
     (project-build-compact build)))
 
+(defn- enrich-session-fields
+  "Map listSessionsAndRuntimes fields to listSessions-compatible shape."
+  [session]
+  (if (contains? session :isActiveSession)
+    session
+    (assoc session :isActiveSession (boolean (:currentRoutedTarget session)))))
+
 (defn project-session
   "Project a session map; omit :builds when :supportsRuntimes is false."
   [session include-all-runtimes?]
-  (if (:supportsRuntimes session)
-    (-> session
-        (dissoc :builds)
-        (assoc :builds (mapv #(project-build % include-all-runtimes?)
-                             (or (:builds session) []))))
-    (dissoc session :builds)))
+  (let [session (enrich-session-fields session)]
+    (if (:supportsRuntimes session)
+      (-> session
+          (dissoc :builds)
+          (assoc :builds (mapv #(project-build % include-all-runtimes?)
+                               (or (:builds session) []))))
+      (dissoc session :builds))))
