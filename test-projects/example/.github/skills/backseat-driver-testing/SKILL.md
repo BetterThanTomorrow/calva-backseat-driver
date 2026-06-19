@@ -1,6 +1,6 @@
 ---
 name: backseat-driver-testing
-description: 'Testing strategies for Calva Backseat Driver MCP tools. Use when: Testing Backseat Driver, validating tool updates, testing structural editing workflows, verifying REPL evaluation with who-tracking, testing output log filtering, testing load-file tool, smoke testing after dep bumps, or debugging tool behavior. Covers all Backseat Driver tool categories: structural editing, REPL eval, load file, symbol info, bracket balancing, and output log.'
+description: 'Testing strategies for Calva Backseat Driver MCP tools. Use when: Testing Backseat Driver, validating tool updates, testing structural editing workflows, verifying REPL evaluation with who-tracking, testing shadow-cljs runtime discovery and targeting, testing output log filtering, testing load-file tool, smoke testing after dep bumps, or debugging tool behavior. Covers all Backseat Driver tool categories: structural editing, REPL eval, load file, symbol info, bracket balancing, output log, and shadow-cljs runtime targeting.'
 ---
 
 # Backseat Driver Testing Skill
@@ -12,6 +12,7 @@ Strategies and patterns for testing the Backseat Driver MCP server toolset. Each
 - After bumping Backseat Driver dependencies and rebuilding
 - When testing new or modified tool parameters
 - When validating structural editing, REPL evaluation, or output log behavior
+- When testing shadow-cljs runtime discovery (`includeAllRuntimes`) or targeted evaluation (`targetRuntimeId`)
 - When debugging who-tracking or cross-evaluator awareness
 
 ## Before You Start
@@ -24,6 +25,7 @@ Match the user's request to the relevant section(s). When asked to "run a full t
 
 **Section index** — each section lists its own prerequisites:
 - **REPL Session Listing** — no prerequisites
+- **Shadow-cljs Runtime Targeting** — requires shadow-cljs REPL connected with at least one live runtime (manual gate; see section)
 - **REPL Evaluation** — requires session listing first
 - **Load File** — requires session listing first
 - **Structural Editing** — requires session listing first
@@ -40,6 +42,7 @@ The `bd-tester` agent is a purpose-built subagent for Backseat Driver testing. I
   - Group A (independent): Bracket Balancer, Symbol Info / ClojureDocs
   - Group B (needs evals first): REPL Evaluation, Load File, then Output Log Queries
   - Group C (needs evals first): Structural Editing
+  - **Shadow-cljs Runtime Targeting**: manual gate only — requires human setup (browser tab + optional node runtime). Do not delegate to `bd-tester` unless the human has confirmed shadow-cljs is connected and runtimes are visible in Calva.
 
 When delegating, pass the specific section name, any prerequisite results (e.g., available session keys), and the success criteria from this skill. The `bd-tester` agent handles skill loading and reporting internally.
 
@@ -66,6 +69,108 @@ Prerequisites: none. Run this first when testing any REPL-dependent section.
 - JVM Clojure REPL connected → expect at least one session with key `"clj"`
 - Babashka REPL connected → expect a session with key `"bb"`
 - Exactly one session has `currentRoutedTarget: true`
+
+**Shadow session fields** (only when a session has `supportsRuntimes: true` — typically the shadow-cljs session, e.g. `"shadow-cljs"` in this project):
+- `supportsRuntimes`: `true`
+- `builds[]`: per-build runtime summary (compact by default)
+- `currentlyConnectedRuntimeId`, `currentlyConnectedCljsBuild`, `availableBuilds`: informational connection metadata from Calva
+
+Per build (compact default):
+- `buildId`, `isActive`, `isCurrentlyConnected`
+- `runtimeCount`, `mostRecentRuntime` (first runtime in Calva's pre-sorted list)
+- `mostRecentRuntime` fields: `runtimeId`, `description`, `buildId`, `host`, `lastActivity` only — no `workerId`, `sinceInst`, or `sinceDescription`
+
+Non-shadow sessions (`clj`, `bb`, etc.) must **not** include `builds` — flat session shape unchanged.
+
+## Shadow-cljs Runtime Targeting
+
+Prerequisites:
+- **Calva >= 2.0.592** (`repl.listSessionsAndRuntimes` API)
+- Shadow-cljs connected via Calva (in this project: **Shadow CLJS (browser + tui)** connect sequence)
+- At least one browser runtime attached (open http://localhost:8780 after jack-in)
+- For multi-runtime tests: also attach the `:tui` node runtime (Calva shadow runtime picker) or open a second browser tab on the same build
+
+If `supportsRuntimes` is absent or `builds` is empty, ask the human to finish jack-in / open the browser before continuing. This section is a **manual gate** — automated E2E does not cover live shadow runtimes.
+
+### 1. Compact session listing (default)
+
+Call `clojure_list_sessions` with no parameters.
+
+**Verify on the shadow session** (`supportsRuntimes: true`):
+- `builds` is a vector with entries for configured builds (e.g. `app`, infrastructure builds like `browser-repl`)
+- Each build has `runtimeCount` ≥ 1 when a tab/process is connected
+- `mostRecentRuntime` is present when `runtimeCount` > 0
+- No `runtimes` array on builds (compact mode)
+
+**Verify on non-shadow sessions** (`clj`, `bb`, `mini-clj`, etc.):
+- No `builds` key
+- Other session fields unchanged (`replSessionKey`, `globs`, `currentRoutedTarget`, …)
+
+### 2. Full runtime listing
+
+Call `clojure_list_sessions` with `includeAllRuntimes: true`.
+
+**Verify**:
+- Shadow session builds include `runtimes[]` with the same sort order Calva returned (first = most recently active)
+- Each runtime has only: `runtimeId`, `description`, `buildId`, `host`, `lastActivity`
+- `runtimeCount` and `mostRecentRuntime` still present and consistent with `runtimes[0]` when non-empty
+
+### 3. Targeted evaluation (`targetRuntimeId`)
+
+Pick a shadow session key (e.g. `"shadow-cljs"`) and two distinct `runtimeId` values from `clojure_list_sessions` — ideally on the same build when testing tab vs tab, or browser vs node.
+
+**Record baseline**: Note `currentlyConnectedRuntimeId` and `currentlyConnectedCljsBuild` from the session listing (editor-selected runtime).
+
+**Evaluate on a non-selected runtime**:
+```json
+{
+  "code": "(str \"targeted-runtime-smoke-\" (random-uuid))",
+  "namespace": "mini.app",
+  "replSessionKey": "shadow-cljs",
+  "who": "smoke-tester",
+  "description": "runtime-targeting smoke test",
+  "targetRuntimeId": <runtime-id-from-listing>
+}
+```
+
+**Verify**:
+- Evaluation succeeds (`result` present, no `error`)
+- `session-key` echoes the shadow session
+- Re-list sessions: `currentlyConnectedRuntimeId` and `currentlyConnectedCljsBuild` are **unchanged** (stateless targeting — editor selection not moved)
+- Optional: `lastActivity` on the targeted runtime updates in a subsequent `includeAllRuntimes: true` listing
+
+**Default behavior (no `targetRuntimeId`)**: Evaluate the same expression without `targetRuntimeId`. Confirm it still works and does not error — omitted parameter preserves editor-connected runtime routing.
+
+### 4. Wrong or stale `targetRuntimeId`
+
+Call `clojure_evaluate_code` with a `targetRuntimeId` that is not in the current listing (e.g. `99999`).
+
+**Verify**: Clear error in the response (not a silent wrong runtime). No crash.
+
+### 5. Calva API cross-check (diagnosis)
+
+When Backseat Driver listing or targeting looks wrong, bypass BD via Joyride:
+
+```clojure
+(require '["ext://betterthantomorrow.calva$v1" :as calva])
+(require '[promesa.core :as p])
+
+;; Compact listing from Calva directly
+(p/let [sessions (calva/repl.listSessionsAndRuntimes)]
+  (js->clj sessions :keywordize-keys true))
+
+;; Targeted eval directly
+(p/let [r (calva/repl.evaluate "(+ 1 1)"
+            #js {:sessionKey "shadow-cljs"
+                 :ns "mini.app"
+                 :who "joyride-test"
+                 :targetRuntimeId 1})]
+  (js->clj r :keywordize-keys true))
+```
+
+**Decision tree** (same as other BD tests):
+- Calva direct API matches BD → BD projection or handler bug
+- Both wrong → Calva / shadow-cljs / environment issue
 
 ## REPL Evaluation with Who-Tracking
 
@@ -465,7 +570,9 @@ This verifies that BD's conditional skill injection works correctly.
 
 When reporting results, cover only the sections that were tested.
 
-**Session Listing**: Sessions discovered with expected keys and `currentRoutedTarget` field.
+**Session Listing**: Sessions discovered with expected keys and `currentRoutedTarget` field. Shadow sessions expose compact `builds[]`; non-shadow sessions omit `builds`.
+
+**Shadow-cljs Runtime Targeting**: Compact vs `includeAllRuntimes: true` listing shapes correct. `targetRuntimeId` evaluates on the chosen runtime without changing `currentlyConnectedRuntimeId`. Invalid runtime ID produces a clear error. Non-shadow sessions unchanged.
 
 **REPL Evaluation**: `who` echoed, result correct, `description` appears in output log. Babashka eval returns correct session key (when bb REPL connected).
 
