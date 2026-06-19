@@ -10,13 +10,22 @@
   "calva.replConnectSequences": [
     {
       "name": "Mini Clojure Project",
-      "autoSelectForConnect": true,
-      // "autoSelectForJackIn": true,
       "projectRootPath": ["."],
       "cljsType": "none",
       "projectType": "deps.edn",
       "menuSelections": {
         "cljAliases": ["test"]
+      }
+    },
+    {
+      "name": "Shadow CLJS + Replicant",
+      "autoSelectForConnect": true,
+      "projectRootPath": ["."],
+      "cljsType": "shadow-cljs",
+      "projectType": "shadow-cljs",
+      "shadowCljsBuildId": "app",
+      "menuSelections": {
+        "cljAliases": ["dev"]
       }
     }
   ],
