@@ -13,6 +13,14 @@
       "projectRootPath": ["."],
       "cljsType": "none",
       "projectType": "deps.edn",
+      "replSessionNames": {
+        "primary": "mini-clj"
+      },
+      "replSessionFilePatterns": {
+        "primary": {
+          "always-claim": ["**/*.clj"]
+        }
+      },
       "menuSelections": {
         "cljAliases": ["test"]
       }
@@ -23,6 +31,18 @@
       "projectRootPath": ["."],
       "cljsType": "shadow-cljs",
       "projectType": "shadow-cljs",
+      "replSessionNames": {
+        "primary": "shadow-clj",
+        "secondary": "shadow-cljs"
+      },
+      "replSessionFilePatterns": {
+        "primary": {
+          "always-claim": ["deps.edn", "shadow-cljs.edn"]
+        },
+        "secondary": {
+          "always-claim": ["**/app.cljs", "**/tui.cljs"]
+        }
+      },
       "menuSelections": {
         "cljAliases": ["dev"],
         "cljsLaunchBuilds": [":app", ":tui"],

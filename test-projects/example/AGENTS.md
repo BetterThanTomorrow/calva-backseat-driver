@@ -34,6 +34,18 @@ test/mini/             - Test namespace (future use)
 
 Minimal browser app using Replicant. Jack in with the **Shadow CLJS (browser + tui)** Calva connect sequence — it watches both `:app` and `:tui` builds. The browser app is served at http://localhost:8780
 
+### REPL sessions
+
+Connect sequences name sessions and route evaluations by file pattern ([Calva docs](https://calva.io/connect-sequences/)):
+
+| Session | Connect sequence | Files |
+|---------|------------------|-------|
+| `mini-clj` | Mini Clojure Project | `**/*.clj` |
+| `shadow-clj` | Shadow CLJS (browser + tui) | `deps.edn`, `shadow-cljs.edn` |
+| `shadow-cljs` | Shadow CLJS (browser + tui) | `**/app.cljs`, `**/tui.cljs` |
+
+For `tui.cljs` evaluations, select the `:tui` node runtime in Calva's shadow runtime picker (default connect attaches to `:app` / browser).
+
 Node prompt app (`:tui`) — a small readline menu in the terminal. Enter `1` to increment a counter, `2` to quit.
 
 ```bash
