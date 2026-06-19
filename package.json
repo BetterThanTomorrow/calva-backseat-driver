@@ -158,7 +158,7 @@
         ],
         "toolReferenceName": "clojure-eval",
         "displayName": "Evaluate Clojure Code",
-        "modelDescription": "**Evaluate Clojure Code** using Calva's REPL connection. \"Use the REPL\" means this tool. In a Joyride context use `joyride_evaluate_code` instead of this tool.\n\nResult may include `otherWhosSinceLast` — other evaluators active since your last call. If evaluation results contain image data, it will be automatically extracted and returned as viewable images.\n\nUse `description` instead of line comments in the code you are evaluating, for explaining the purpose of the evaluation, or to help yourself think.\n\nIndent code properly before evaluation (agents often get maps misaligned).\n\nAlways load the `backseat-driver` skill when using this tool.",
+        "modelDescription": "**Evaluate Clojure Code** using Calva's REPL connection. \"Use the REPL\" means this tool. In a Joyride context use `joyride_evaluate_code` instead of this tool.\n\nResult may include `otherWhosSinceLast` — other evaluators active since your last call. If evaluation results contain image data, it will be automatically extracted and returned as viewable images.\n\nUse `description` instead of line comments in the code you are evaluating, for explaining the purpose of the evaluation, or to help yourself think.\n\nIndent code properly before evaluation (agents often get maps misaligned).\n\nWhen a session supports runtimes you can pass `targetRuntimeId` (from `clojure_list_sessions`) to evaluate on a specific runtime.\n\nAlways load the `backseat-driver` skill when using this tool.",
         "userDescription": "Evaluate Clojure or ClojureScript code in the connected REPL.",
         "canBeReferencedInPrompt": true,
         "icon": "$(terminal-bash)",
@@ -189,6 +189,10 @@
             "maxImages": {
               "type": "number",
               "description": "Maximum number of images to return from image data found in the result. Defaults to 10. Images beyond this cap are replaced with <<image-N-capped>> markers in the text but not returned as image content. Avoid settings this above 20, because Copilot has a hard cap of 20 images."
+            },
+            "targetRuntimeId": {
+              "type": "number",
+              "description": "Shadow-cljs only. Evaluate on a specific runtime (browser tab / Node process) without changing the editor's connected runtime. Get IDs from `clojure_list_sessions`."
             }
           },
           "required": [
@@ -209,14 +213,19 @@
         ],
         "toolReferenceName": "list-sessions",
         "displayName": "List REPL Sessions",
-        "modelDescription": "**List REPL Sessions** returns information about all available REPL sessions. Use this tool to discover which session keys are available for evaluation. Each session includes the session key, project root, and file glob patterns it handles. The session serving the user's active file is marked with `isActiveSession: true`.",
+        "modelDescription": "**List REPL Sessions** returns information about all available REPL sessions. Use this tool to discover which session keys are available for evaluation. Each session includes the session key, project root, and file glob patterns it handles. The session serving the user's active file is marked with `isActiveSession: true`. If the repl session supports runtimes, the tool will return brief information about this.",
         "userDescription": "List available REPL sessions and their details.",
         "canBeReferencedInPrompt": true,
         "icon": "$(list-unordered)",
         "when": ":calva-mcp-extension/activated?",
         "inputSchema": {
           "type": "object",
-          "properties": {},
+          "properties": {
+            "includeAllRuntimes": {
+              "type": "boolean",
+              "description": "Shadow-cljs only. List every connected runtime per build instead of just the count and most-recently-active one."
+            }
+          },
           "required": []
         }
       },

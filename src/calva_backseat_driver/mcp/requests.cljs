@@ -70,13 +70,14 @@
                               "replSessionKey" {:type "string"}
                               "who" {:type "string"}
                               "description" {:type "string"}
-                              "maxImages" {:type "number"}}
+                              "maxImages" {:type "number"}
+                              "targetRuntimeId" {:type "number"}}
                  :required ["code" "namespace" "replSessionKey" "who"]
                  :priority 9}))
 
 (def list-sessions-tool-listing
   (tool-listing {:tool-name "clojure_list_sessions"
-                 :properties {}
+                 :properties {"includeAllRuntimes" {:type "boolean"}}
                  :required []
                  :priority 9}))
 
@@ -211,7 +212,7 @@
   (or (ex-message e) (str e)))
 
 (defn- handle-evaluate-code [options id arguments]
-  (let [{:keys [code replSessionKey who description maxImages]
+  (let [{:keys [code replSessionKey who description maxImages targetRuntimeId]
          ns :namespace} arguments
         who-error (calva/validate-who who)]
     (if who-error
@@ -221,12 +222,15 @@
                                                    :calva/repl-session-key replSessionKey
                                                    :calva/who who
                                                    :calva/description description}
-                                                  (when ns {:calva/ns ns})))]
+                                                  (when ns {:calva/ns ns})
+                                                  (when targetRuntimeId {:calva/target-runtime-id targetRuntimeId})))]
         (content-response id (tools/mcp-content-with-images result :max-images (if (some? maxImages) maxImages 10)))))))
 
-(defn- handle-list-sessions [options id _arguments]
-  (p/let [result (calva/list-sessions+ options)]
-    (text-response id result)))
+(defn- handle-list-sessions [options id arguments]
+  (let [{:keys [includeAllRuntimes]} arguments]
+    (p/let [result (calva/list-sessions+ (merge options
+                                                {:calva/include-all-runtimes? (true? includeAllRuntimes)}))]
+      (clj-response id result))))
 
 (defn- handle-symbol-info [options id arguments]
   (p/let [{:keys [clojureSymbol replSessionKey]

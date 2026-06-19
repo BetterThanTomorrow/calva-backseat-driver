@@ -57,6 +57,23 @@ Result: MCP tools stay in sync automatically. No duplicated schemas.
 - Skills (MCP resources + injected instructions) are declared separately under `contributes.chatSkills`.
 - Internal actions/effects (Ex framework) are not exposed as tools.
 
+## Runtime targeting example
+
+Shadow-cljs runtime parameters follow the same manifest-first pattern. Example `package.json` property entries:
+
+```json
+"includeAllRuntimes": {
+  "type": "boolean",
+  "description": "Shadow-cljs only. List every connected runtime per build instead of just the count and most-recently-active one."
+},
+"targetRuntimeId": {
+  "type": "number",
+  "description": "Shadow-cljs only. Evaluate on a specific runtime (browser tab / Node process) without changing the editor's connected runtime. Get IDs from `clojure_list_sessions`."
+}
+```
+
+Handlers read these optional parameters from MCP/LM tool arguments. The response shape for `clojure_list_sessions` is shaped in `integrations/calva/session_runtimes.cljs` — a projection layer that complements manifest-only params: compact `runtimeCount`/`mostRecentRuntime` by default, full `runtimes[]` when `includeAllRuntimes` is true.
+
 ## Related Code
 
 - `package.json` — the single source of truth
@@ -65,5 +82,5 @@ Result: MCP tools stay in sync automatically. No duplicated schemas.
 
 ## References
 
-- Calva API docs (runtime targeting fields and `listRuntimes`/`evaluate` with `targetRuntimeId`)
+- Calva API docs (runtime targeting fields and `listSessionsAndRuntimes`/`evaluate` with `targetRuntimeId`)
 - `backseat-driver-internals/SKILL.md` (MCP server lifecycle, tool registration)

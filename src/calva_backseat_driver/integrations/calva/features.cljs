@@ -4,6 +4,7 @@
    [calva-backseat-driver.integrations.calva.api :as calva]
    [calva-backseat-driver.integrations.calva.batch-edit :as batch-edit]
    [calva-backseat-driver.integrations.calva.editor :as editor]
+   [calva-backseat-driver.integrations.calva.session-runtimes :as session-runtimes]
    [calva-backseat-driver.integrations.parinfer :as parinfer]
    [clojure.string :as string]
    [promesa.core :as p]))
@@ -45,10 +46,12 @@
 
 (defn list-sessions+
   "Returns a promise that resolves to a list of available REPL sessions."
-  [{:ex/keys [dispatch!]}]
+  [{:ex/keys [dispatch!]
+    :calva/keys [include-all-runtimes?]}]
   (dispatch! [[:app/ax.log :debug "[Server] Listing REPL sessions"]])
-  (p/let [sessions ((get-in calva/calva-api [:repl :listSessions]))]
-    #js {:sessions sessions}))
+  (p/let [sessions ((get-in calva/calva-api [:repl :listSessionsAndRuntimes]))]
+    {:sessions (mapv #(session-runtimes/project-session % (true? include-all-runtimes?))
+                     (js->clj sessions :keywordize-keys true))}))
 
 (defn- validate-session-key+
   "Validates a session key against available sessions.
@@ -100,7 +103,7 @@
   "Returns a promise that resolves to the result of evaluating Clojure/ClojureScript code.
    Pre-validates session key against available sessions before evaluation."
   [{:ex/keys [dispatch!]
-    :calva/keys [code repl-session-key ns who description]}]
+    :calva/keys [code repl-session-key ns who description target-runtime-id]}]
   (p/let [input-validation (validate-eval-inputs+ code repl-session-key dispatch!)]
     (if (:error input-validation)
       (:error input-validation)
@@ -112,6 +115,7 @@
                                                  ns (assoc :ns ns)
                                                  who (assoc :who who)
                                                  description (assoc :description description)
+                                                 target-runtime-id (assoc :targetRuntimeId target-runtime-id)
                                                  nrepl-eval-options (assoc :nReplOptions nrepl-eval-options)))
                                    ^js evaluation+ (evaluate-fn code options-js)]
                              (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
