@@ -145,7 +145,12 @@ Pick a shadow session key (e.g. `"shadow-cljs"`) and two distinct `runtimeId` va
 
 Call `clojure_evaluate_code` with a `targetRuntimeId` that is not in the current listing (e.g. `99999`).
 
-**Verify**: Clear error in the response (not a silent wrong runtime). No crash.
+**Verify** (shadow-cljs behavior — not a Backseat Driver bug):
+- Evaluation **succeeds** on the editor's currently connected runtime (e.g. `(+ 1 1)` → `2`), not an error response
+- No crash
+- Re-list sessions: `currentlyConnectedRuntimeId` unchanged
+
+Do **not** expect a clear error for unknown ids unless shadow-cljs / Calva change this upstream. When targeting must be exact, confirm via `lastActivity` on the intended runtime after eval, or use a runtime-specific observable (e.g. `js/window` in browser vs node context).
 
 ### 5. Calva API cross-check (diagnosis)
 
@@ -572,7 +577,7 @@ When reporting results, cover only the sections that were tested.
 
 **Session Listing**: Sessions discovered with expected keys and `currentRoutedTarget` field. Shadow sessions expose compact `builds[]`; non-shadow sessions omit `builds`.
 
-**Shadow-cljs Runtime Targeting**: Compact vs `includeAllRuntimes: true` listing shapes correct. `targetRuntimeId` evaluates on the chosen runtime without changing `currentlyConnectedRuntimeId`. Invalid runtime ID produces a clear error. Non-shadow sessions unchanged.
+**Shadow-cljs Runtime Targeting**: Compact vs `includeAllRuntimes: true` listing shapes correct. `targetRuntimeId` evaluates on the chosen runtime without changing `currentlyConnectedRuntimeId`. Unknown/stale `targetRuntimeId` succeeds on the editor-connected runtime (shadow-cljs behavior — not an error). Non-shadow sessions unchanged.
 
 **REPL Evaluation**: `who` echoed, result correct, `description` appears in output log. Babashka eval returns correct session key (when bb REPL connected).
 
