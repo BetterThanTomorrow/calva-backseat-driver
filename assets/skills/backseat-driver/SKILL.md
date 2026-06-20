@@ -61,7 +61,7 @@ When `clojure_list_sessions` shows `supportsRuntimes: true` on a session:
 - Optional `targetRuntimeId` on `clojure_evaluate_code` evaluates on a specific runtime without changing the editor's connected runtime. Get IDs from `clojure_list_sessions`.
 - `lastActivity: null` means no Calva evaluation on that runtime this session yet.
 - When the user must choose among similar runtimes, present each runtime's `description`.
-- Default (editor-selected runtime) and explicit targeting are both valid — choose based on context.
+- Choose default runtime (which is the user's currently selected runtime) or explicit targeting based on context.
 
 ### The `who` parameter
 

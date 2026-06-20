@@ -13,7 +13,7 @@ Backseat Driver gives VS Code AI harnesses access to [Calva](https://calva.io)'s
 
 ## Features
 
-* Tool: **Evaluate Code** Access to the Clojure REPL to evaluate code at will; shadow-cljs sessions can list per-build runtimes and optionally evaluate on a specific runtime via `targetRuntimeId` without changing the editor connection
+* Tool: **Evaluate Code** Access to the Clojure REPL to evaluate code at will. All active REPL sessions in Calva are available for targeting (and with shadow-cljs, also builds and runtime).
 * Tool: **Create Clojure File** Creates Clojure files with automatic bracket balancing
 * Tool: **Append Code** Appends code to Clojure files with automatic bracket balancing
 * Tool: **Replace Top Level Form** Structural editing, including formatting, bracket balancing and linting
