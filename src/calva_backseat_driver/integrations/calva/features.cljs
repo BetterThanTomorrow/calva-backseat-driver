@@ -122,6 +122,8 @@
                              (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
                              (let [other-whos (some-> (.-otherWhosSinceLast evaluation+)
                                                       (js->clj))
+                                   shadow-build (calva/js-field-value evaluation+ "shadowBuild")
+                                   shadow-runtime-id (calva/js-field-value evaluation+ "shadowRuntimeId")
                                    notes (cond-> []
                                            (not ns)
                                            (conj no-ns-eval-note)
@@ -145,6 +147,12 @@
 
                                  (seq other-whos)
                                  (assoc :other-whos-since-last other-whos)
+
+                                 shadow-build
+                                 (assoc :shadow-build shadow-build)
+
+                                 shadow-runtime-id
+                                 (assoc :shadow-runtime-id shadow-runtime-id)
 
                                  (.-error evaluation+)
                                  (merge {:error (.-error evaluation+)

@@ -2,7 +2,8 @@
   (:require [clojure.core.match :refer [match]]
             [cljs.reader :as reader]
             [datascript.core :as d]
-            [calva-backseat-driver.app.db :as db]))
+            [calva-backseat-driver.app.db :as db]
+            [calva-backseat-driver.integrations.calva.api :as calva-api]))
 
 (defn handle-action [state _context action]
   (match action
@@ -14,13 +15,17 @@
 
     [:calva/ax.add-output message]
     (let [line (inc (:calva/output-line-counter state 0))
+          shadow-build (calva-api/map-field-value message :shadowBuild)
+          shadow-runtime-id (calva-api/map-field-value message :shadowRuntimeId)
           entity (cond-> {:output/line line
                           :output/category (:category message)
                           :output/text (:text message)
                           :output/timestamp (js/Date.now)}
                    (:who message) (assoc :output/who (:who message))
                    (:ns message) (assoc :output/ns (:ns message))
-                   (:replSessionKey message) (assoc :output/repl-session-key (:replSessionKey message)))]
+                   (:replSessionKey message) (assoc :output/repl-session-key (:replSessionKey message))
+                   shadow-build (assoc :output/shadow-build shadow-build)
+                   shadow-runtime-id (assoc :output/shadow-runtime-id shadow-runtime-id))]
       {:ex/db (assoc state :calva/output-line-counter line)
        :ex/fxs [[:calva/fx.transact-output entity]]})
 

@@ -15,6 +15,8 @@ Each message has these attributes:
 | `:output/timestamp` | integer | Epoch milliseconds |
 | `:output/ns` | string | Namespace — present on `evaluatedCode` messages |
 | `:output/repl-session-key` | string | REPL session key — present on `evaluatedCode` messages |
+| `:output/shadow-build` | string | Shadow-cljs build name — when applicable |
+| `:output/shadow-runtime-id` | integer | Shadow-cljs runtime ID — when applicable |
 
 **Categories:** `"evaluationResults"`, `"evaluatedCode"`, `"evaluationOutput"`, `"evaluationErrorOutput"`, `"otherOutput"`, `"otherErrorOutput"`
 

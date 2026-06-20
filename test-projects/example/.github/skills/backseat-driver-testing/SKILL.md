@@ -136,8 +136,10 @@ Pick a shadow session key (e.g. `"shadow-cljs"`) and two distinct `runtimeId` va
 **Verify**:
 - Evaluation succeeds (`result` present, no `error`)
 - `session-key` echoes the shadow session
+- When Calva reports them, `shadow-build` and `shadow-runtime-id` on the eval result match the intended runtime (especially after `targetRuntimeId`)
 - Re-list sessions: `currentlyConnectedRuntimeId` and `currentlyConnectedCljsBuild` are **unchanged** (stateless targeting — editor selection not moved)
 - Optional: `lastActivity` on the targeted runtime updates in a subsequent `includeAllRuntimes: true` listing
+- Optional: output log `evaluatedCode` entry for the eval includes `:output/shadow-build` and `:output/shadow-runtime-id` when applicable
 
 **Default behavior (no `targetRuntimeId`)**: Evaluate the same expression without `targetRuntimeId`. Confirm it still works and does not error — omitted parameter preserves editor-connected runtime routing.
 
@@ -200,6 +202,7 @@ The `clojure_evaluate_code` tool supports evaluator identity tracking.
 - `notes`: Array of informational messages (includes other-evaluator alerts)
 - `stdout`, `stderr`: Captured output
 - `session-key`: Echo of the session key
+- `shadow-build`, `shadow-runtime-id`: Shadow-cljs build and runtime that handled the eval (when applicable)
 
 **Test steps**:
 
@@ -369,6 +372,7 @@ The output log is a DataScript database where each message is an entity with the
 - `:output/timestamp` — milliseconds since epoch
 - `:output/ns` — namespace (present on `evaluatedCode` messages)
 - `:output/repl-session-key` — REPL session key (present on `evaluatedCode` messages)
+- `:output/shadow-build`, `:output/shadow-runtime-id` — shadow-cljs build and runtime (when applicable)
 
 Use `pull` to select only the attributes you need — this protects the context window.
 
