@@ -141,6 +141,8 @@ Any `data:image/...` URLs found anywhere in a result — whether the result is a
 
 **Log persistence:** Only `evaluatedCode` entries are retained across VS Code restarts and window reloads. Other categories (`evaluationResults`, `evaluationOutput`, `evaluationErrorOutput`, `otherOutput`) exist only for the current session. This means the log serves as a long-term searchable history of what was evaluated — useful when an agent or the human developer needs to find something from a past session.
 
+Shadow-cljs messages may include `:output/shadow-build` and `:output/shadow-runtime-id` on evaluation-related categories — the build and runtime that handled the evaluation.
+
 **Common queries** (use with the `query` parameter, `inputs` is a JSON array for `:in` params):
 
 Check for errors since a line you've already seen:
