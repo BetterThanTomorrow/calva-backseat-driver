@@ -192,7 +192,7 @@
             },
             "targetRuntimeId": {
               "type": "number",
-              "description": "Shadow-cljs only. Evaluate on a specific runtime (browser tab / Node process) without changing the editor's connected runtime. Get IDs from `clojure_list_sessions`."
+              "description": "Only when the session supports runtimes (like shadow-cljs). Evaluate on a specific runtime (browser tab / Node process) without changing the editor's connected runtime. Get IDs from `clojure_list_sessions`."
             }
           },
           "required": [
@@ -223,7 +223,7 @@
           "properties": {
             "includeAllRuntimes": {
               "type": "boolean",
-              "description": "Shadow-cljs only. List every connected runtime per build instead of just the count and most-recently-active one."
+              "description": "Only valid when the session supports runtimes. List every connected runtime per build. (Without this option you'll get the last active runtime per build plus a count on total number of runtimes.)"
             }
           },
           "required": []
