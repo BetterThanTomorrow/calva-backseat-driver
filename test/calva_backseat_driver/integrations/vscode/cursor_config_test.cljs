@@ -70,11 +70,11 @@
     (is (nil? (config/mcp-client-identifier nil))))
 
   (testing "missing extension id yields nil"
-    (is (nil? (config/mcp-client-identifier #js {:extension #js {}}))))
+    (is (nil? (config/mcp-client-identifier #js {:extension #js {}})))))
 
 (deftest cursor-mcp-settings-display-name-test
   (testing "Cursor Settings label prefixes extension- to registerServer name"
-    (is (= "extension-backseat-driver" (config/cursor-mcp-settings-display-name))))))
+    (is (= "extension-backseat-driver" (config/cursor-mcp-settings-display-name)))))
 
 (deftest should-register-cursor-mcp?-test
   (let [server-info {:server/port-file-uri #js {:fsPath "/ws/port"}}]
