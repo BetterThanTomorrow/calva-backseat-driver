@@ -7,8 +7,7 @@
    [calva-backseat-driver.app.db :as db]
    [calva-backseat-driver.integrations.calva.api :as calva-api]
    [calva-backseat-driver.integrations.calva.version :as version]
-   [calva-backseat-driver.integrations.vscode.cursor :as cursor]
-   [promesa.core :as p]))
+   [calva-backseat-driver.integrations.vscode.cursor :as cursor]))
 
 (defn- extension-context []
   (:vscode/extension-context @db/!app-db))
@@ -41,13 +40,8 @@
     (swap! db/!app-db assoc
            :vscode/extension-context context
            :app/getConfiguration vscode/workspace.getConfiguration))
-  (let [dispatch-activate (fn []
-                            (swap! db/!app-db dissoc :mcp/cursor-registered?)
-                            (ex/dispatch! context [[:app/ax.activate (initial-state context)]]))]
-    (if (cursor/cursor-mcp-available?)
-      (-> (cursor/unregister-mcp-server!+)
-          (p/finally dispatch-activate))
-      (dispatch-activate)))
+  (swap! db/!app-db dissoc :mcp/cursor-registered?)
+  (ex/dispatch! context [[:app/ax.activate (initial-state context)]])
 
   (js/console.timeLog "activation" "Calva Backseat Driver activate END")
   (js/console.timeEnd "activation")
