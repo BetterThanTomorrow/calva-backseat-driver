@@ -4,6 +4,7 @@
    ["path" :as path]
    ["vscode" :as vscode]
    [calva-backseat-driver.ex.ax :as ax]
+   [calva-backseat-driver.integrations.vscode.cursor :as cursor]
    [calva-backseat-driver.mcp.requests :as requests]
    [calva-backseat-driver.mcp.server :as server]
    [cljs.core.match :refer [match]]
@@ -57,14 +58,33 @@
            (fn [e]
              (dispatch! context (ax/enrich-with-args on-error e))))))
 
-    [:mcp/fx.stop-server options]
+    [:mcp/fx.register-cursor-mcp-server server-info options]
     (let [{:ex/keys [on-success on-error]} options]
-      (-> (p/catch
-           (server/stop-server!+ (assoc options :ex/dispatch!
-                                        (partial dispatch! context)))
-           (fn [e]
-             (dispatch! context (ax/enrich-with-args on-error (.-message e)))))
+      (-> (cursor/register-mcp-server!+ context server-info)
+          (p/then (fn [result]
+                    (if (:ok result)
+                      (dispatch! context (ax/enrich-with-args on-success result))
+                      (dispatch! context (ax/enrich-with-args on-error result)))))
+          (p/catch (fn [e]
+                     (dispatch! context (ax/enrich-with-args on-error e))))))
+
+    [:mcp/fx.stop-server options]
+    (let [{:ex/keys [on-success on-error]
+           :keys [mcp/cursor-registered?]} options
+          stop-server+ (fn []
+                         (p/catch
+                          (server/stop-server!+ (assoc options :ex/dispatch!
+                                                         (partial dispatch! context)))
+                          (fn [e]
+                            (dispatch! context (ax/enrich-with-args on-error (.-message e)))
+                            false)))]
+      (-> (if cursor-registered?
+            (cursor/unregister-mcp-server!+)
+            (p/resolved true))
+          (p/then (fn [_] (stop-server+)))
           (p/then (fn [success?]
+                    (when cursor-registered?
+                      (dispatch! context [[:mcp/ax.cursor-mcp-unregistered {:ok true}]]))
                     (dispatch! context (ax/enrich-with-args on-success success?))))))
 
     [:mcp/fx.show-server-started-message server-info wrapper-config-path]
