@@ -4,23 +4,28 @@
 
 (defn handle-action [state _context action]
   (match action
-    [:mcp/ax.start-server]
-    {:ex/db (assoc state :app/server-starting? true)
-     :ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/starting? true]]
-     :ex/fxs [[:mcp/fx.start-server {:app/log-dir-initialized+ (:app/log-dir-initialized+ state)
-                                     :mcp/repl-enabled? :vscode/config.enableMcpReplEvaluation
-                                     :server/port :vscode/config.mcpSocketServerPort
-                                     :ex/on-success [[:mcp/ax.server-started :ex/action-args]]
-                                     :ex/on-error [[:mcp/ax.server-error :ex/action-args]]}]]}
+    [:mcp/ax.start-server & _]
+    (let [silent? (some-> action second :silent?)]
+      {:ex/db (assoc state
+                     :app/server-starting? true
+                     :app/server-start-silent? silent?)
+       :ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/starting? true]]
+       :ex/fxs [[:mcp/fx.start-server {:app/log-dir-initialized+ (:app/log-dir-initialized+ state)
+                                       :mcp/repl-enabled? :vscode/config.enableMcpReplEvaluation
+                                       :server/port :vscode/config.mcpSocketServerPort
+                                       :ex/on-success [[:mcp/ax.server-started :ex/action-args]]
+                                       :ex/on-error [[:mcp/ax.server-error :ex/action-args]]}]]})
 
     [:mcp/ax.server-started server-info]
-    {:ex/db (assoc state
-                   :app/server-info server-info
-                   :app/server-starting? false)
-     :ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/starting? false]
-              [:app/ax.set-when-context :calva-backseat-driver/started? true]]
-     :ex/fxs [[:mcp/fx.show-server-started-message server-info (:mcp/wrapper-config-path state)]
-              [:app/fx.return (clj->js server-info)]]}
+    (let [silent? (:app/server-start-silent? state)]
+      {:ex/db (assoc state
+                     :app/server-info server-info
+                     :app/server-starting? false
+                     :app/server-start-silent? false)
+       :ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/starting? false]
+                [:app/ax.set-when-context :calva-backseat-driver/started? true]]
+       :ex/fxs (cond-> [[:app/fx.return (clj->js server-info)]]
+                 (not silent?) (conj [:mcp/fx.show-server-started-message server-info (:mcp/wrapper-config-path state)]))})
 
     [:mcp/ax.stop-server]
     {:ex/db (assoc state :app/server-stopping? true)
