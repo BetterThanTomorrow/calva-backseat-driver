@@ -62,6 +62,7 @@ The structural editing tools for inserting and replacing top level forms respect
 
 - `calva-backseat-driver.editor.fuzzyLineTargetingPadding` (default `2`) — number of lines on each side of the requested line that the AI is allowed to scan when matching target text. Increase this if forms move around during larger refactorings; set to `0` for exact line targeting. _Trade-off_: higher values tolerate line shifts but raise the risk of matching a nearby, similar form when the agent's copy of the buffer is stale.
 - `calva-backseat-driver.editor.lineContextResponsePadding` (default `10`) — number of lines on each side of the requested line included in the troubleshooting snippet returned when targeting fails. Reduce this to keep responses shorter, or increase it for more surrounding context. _Trade-off_: larger values give the agent more cues for a retry, but can cost extra tokens (or time) compared with sending a focused snippet.
+
 ### MCP
 
 See: [Configure Backseat Driver as an MCP server](MCP-CONFIGURATION.md)
