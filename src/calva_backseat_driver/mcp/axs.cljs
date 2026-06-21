@@ -1,5 +1,7 @@
 (ns calva-backseat-driver.mcp.axs
   (:require
+   [calva-backseat-driver.integrations.vscode.cursor-config :as cursor-config]
+   [calva-backseat-driver.mcp.cursor-registration :as cursor-reg]
    [cljs.core.match :refer [match]]))
 
 (defn handle-action [state _context action]
@@ -17,31 +19,47 @@
                                        :ex/on-error [[:mcp/ax.server-error :ex/action-args]]}]]})
 
     [:mcp/ax.server-started server-info]
-    (let [silent? (:app/server-start-silent? state)]
+    (let [silent? (:app/server-start-silent? state)
+          register? (cursor-reg/should-register-on-server-started? state server-info)]
       {:ex/db (assoc state
                      :app/server-info server-info
                      :app/server-starting? false
                      :app/server-start-silent? false)
        :ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/starting? false]
                 [:app/ax.set-when-context :calva-backseat-driver/started? true]]
-       :ex/fxs (into []
-                     (cond-> []
-                       (not silent?)
-                       (conj [:mcp/fx.show-server-started-message server-info (:mcp/wrapper-config-path state)])
-                       :always
-                       (conj [:app/fx.return (clj->js server-info)])))})
+       :ex/fxs (cursor-reg/server-started-fxs server-info silent?
+                                               (:mcp/wrapper-config-path state)
+                                               register?)})
+
+    [:mcp/ax.cursor-mcp-registered result]
+    {:ex/db (assoc state :mcp/cursor-registered? true)
+     :ex/fxs [[:app/fx.log
+               (select-keys state [:app/min-log-level :app/log-file-uri :app/log-dir-initialized+])
+               :info
+               ["Cursor MCP server registered:" cursor-config/cursor-mcp-server-name]]]}
+
+    [:mcp/ax.cursor-mcp-registration-failed failure]
+    {:ex/fxs [[:app/fx.log
+               (select-keys state [:app/min-log-level :app/log-file-uri :app/log-dir-initialized+])
+               :warn
+               ["Cursor MCP auto-registration failed:" failure]]]}
+
+    [:mcp/ax.cursor-mcp-unregistered _result]
+    {:ex/db (dissoc state :mcp/cursor-registered?)}
 
     [:mcp/ax.stop-server]
     {:ex/db (assoc state :app/server-stopping? true)
      :ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/stopping? true]]
      :ex/fxs [[:mcp/fx.stop-server (merge {:ex/on-success [[:mcp/ax.server-stopped :ex/action-args]]
-                                           :ex/on-error [[:mcp/ax.server-error :ex/action-args]]}
+                                           :ex/on-error [[:mcp/ax.server-error :ex/action-args]]
+                                           :mcp/cursor-registered? (:mcp/cursor-registered? state)}
                                           (:app/server-info state))]]}
 
     [:mcp/ax.server-stopped success?]
     {:ex/db (dissoc state
                     :app/server-info
-                    :app/server-stopping?)
+                    :app/server-stopping?
+                    :mcp/cursor-registered?)
      :ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/stopping? false]
               [:app/ax.set-when-context :calva-backseat-driver/started? false]]
      :ex/fxs [[:vscode/fx.show-information-message "MCP server stopped"]

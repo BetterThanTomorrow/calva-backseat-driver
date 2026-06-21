@@ -52,6 +52,12 @@
           "markdownDescription": "Automatically start the MCP server when the extension is activated.",
           "scope": "resource"
         },
+        "calva-backseat-driver.autoRegisterCursorMcp": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "In Cursor, automatically register the Backseat Driver MCP server with the IDE Agent (via `vscode.cursor.mcp.registerServer`). Requires a workspace folder. When enabled, the MCP socket server starts silently on activation. Disable if you prefer manual `.cursor/mcp.json` configuration. Takes effect after window reload.",
+          "scope": "resource"
+        },
         "calva-backseat-driver.mcpSocketServerPort": {
           "type": "number",
           "default": 1664,
