@@ -1,5 +1,6 @@
 (ns calva-backseat-driver.integrations.vscode.cursor
   (:require
+   ["fs" :as fs]
    ["vscode" :as vscode]
    [calva-backseat-driver.integrations.vscode.cursor-config :as config]
    [promesa.core :as p]))
@@ -30,6 +31,10 @@
 (defn should-register-cursor-mcp? [auto-register-cursor-mcp? server-info]
   (config/should-register-cursor-mcp? auto-register-cursor-mcp? (cursor-mcp-available?) server-info))
 
+(defn port-file-ready? [server-info]
+  (let [path (port-file-fs-path server-info)]
+    (and (seq path) (.existsSync fs path))))
+
 (defn register-mcp-server!+ [^js extension-context server-info]
   (let [{:keys [ok config reason]} (build-cursor-mcp-registration-config extension-context server-info)]
     (cond
@@ -39,10 +44,15 @@
       (not (cursor-mcp-available?))
       (p/resolved {:ok false :reason :cursor-api-unavailable})
 
+      (not (port-file-ready? server-info))
+      (p/resolved {:ok false :reason :port-file-not-ready})
+
       :else
-      (-> (.registerServer (.-mcp (.-cursor vscode)) (clj->js config))
-          (p/then (fn [_] {:ok true :config config}))
-          (p/catch (fn [err] {:ok false :error err :config config}))))))
+      (-> (unregister-mcp-server!+)
+          (p/then (fn [_]
+                    (-> (.registerServer (.-mcp (.-cursor vscode)) (clj->js config))
+                        (p/then (fn [_] {:ok true :config config}))
+                        (p/catch (fn [err] {:ok false :error err :config config})))))))))
 
 (defn unregister-mcp-server!+ []
   (cond
