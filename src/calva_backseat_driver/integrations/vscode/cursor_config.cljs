@@ -3,6 +3,16 @@
    ["path" :as path]))
 
 (def cursor-mcp-server-name "backseat-driver")
+(def cursor-mcp-reload-client-command-id "mcp.reloadClient")
+
+(defn mcp-client-identifier
+  "Cursor MCP service identifier for extension-registered stdio servers.
+   Observed shape: user-{extensionId}-extension-{registerServer name}."
+  [^js extension-context]
+  (when extension-context
+    (let [extension-id (some-> extension-context .-extension .-id)]
+      (when (seq extension-id)
+        (str "user-" extension-id "-extension-" cursor-mcp-server-name)))))
 
 (defn wrapper-script-path
   "Absolute path to the stdio wrapper bundled with the running extension instance."

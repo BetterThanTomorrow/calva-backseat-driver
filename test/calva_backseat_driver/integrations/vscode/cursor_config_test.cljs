@@ -60,6 +60,18 @@
   (testing "both off"
     (is (not (config/should-auto-start-mcp-server? false false false)))))
 
+(deftest mcp-client-identifier-test
+  (testing "builds Cursor MCP service identifier from extension id and server name"
+    (is (= "user-betterthantomorrow.calva-backseat-driver-extension-backseat-driver"
+           (config/mcp-client-identifier
+            #js {:extension #js {:id "betterthantomorrow.calva-backseat-driver"}}))))
+
+  (testing "nil context yields nil"
+    (is (nil? (config/mcp-client-identifier nil))))
+
+  (testing "missing extension id yields nil"
+    (is (nil? (config/mcp-client-identifier #js {:extension #js {}})))))
+
 (deftest should-register-cursor-mcp?-test
   (let [server-info {:server/port-file-uri #js {:fsPath "/ws/port"}}]
     (testing "all conditions met"
