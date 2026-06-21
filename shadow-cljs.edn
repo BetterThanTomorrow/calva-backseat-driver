@@ -16,12 +16,14 @@
                   :output-to "dist/calva-mcp-server.js"}
   :test-watch
   {:target    :node-test
+   :js-options {:resolve {"vscode" {:target :file :file "test/vscode_stub.js"}}}
    :output-to "out/extension-tests.js"
    :ns-regexp "-test$"
    :autorun   true}
 
   :test-compile
   {:target    :node-test
+   :js-options {:resolve {"vscode" {:target :file :file "test/vscode_stub.js"}}}
    :compiler-options {:infer-externs :auto
                                     :externs ["externs/mcp_server.js"
                                               "datascript/externs.js"]}
