@@ -6,10 +6,11 @@ Clojure Tools for VS Code Agent harnesses. (Such as Copilot and Cursor.)
 [![Issues](https://img.shields.io/github/issues/BetterThanTomorrow/calva-backseat-driver)](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues)
 [![License](https://img.shields.io/github/license/BetterThanTomorrow/calva-backseat-driver)](https://github.com/BetterThanTomorrow/calva-backseat-driver/blob/master/LICENSE.txt)
 
-Backseat Driver gives VS Code AI harnesses access to [Calva](https://calva.io)'s Clojure tools via two interfaces:
+Backseat Driver gives VS Code AI harnesses access to [Calva](https://calva.io)'s Clojure tools these ways:
 
-1. **VS Code LM Tools.** For Copilot. Zero config.
-2. **MCP**. For other AI harnesses. In **Cursor**, Backseat Driver auto-registers its MCP server when you open a Clojure project (zero config). Other clients require [some configuration](MCP-CONFIGURATION.md) per project.
+1. **Copilot**: Zero config. (Using **VS Code LM Tools.**).
+2. **Cursor**, Zero config. (Using Cursor add-MCP-server API).
+3. **Other AI harnesses**: MCP (Requiring [some configuration](MCP-CONFIGURATION.md) per project).
 
 ## Features
 
@@ -67,17 +68,11 @@ The structural editing tools for inserting and replacing top level forms respect
 
 See: [Configure Backseat Driver as an MCP server](MCP-CONFIGURATION.md)
 
-In **Cursor**, the IDE Agent can use Backseat Driver MCP tools without `.cursor/mcp.json` when **Auto Register Cursor MCP** is enabled (default). The extension silently starts the socket server and registers the stdio wrapper via `vscode.cursor.mcp.registerServer`.
-
-REPL evaluation through MCP is enabled by default. Set `calva-backseat-driver.enableMcpReplEvaluation` to `false` in workspace settings if you want to disable it.
-
-Disable Cursor auto-registration with `calva-backseat-driver.autoRegisterCursorMcp` (reload required).
-
 ## Getting Started
 
 ### Prerequisites
 
-- [VS Code](https://code.visualstudio.com/)
+- [VS Code](https://code.visualstudio.com/) (or your favorite fork)
 - [Calva](https://marketplace.visualstudio.com/items?itemName=betterthantomorrow.calva)
 - [Calva Backseat Driver](https://marketplace.visualstudio.com/items?itemName=betterthantomorrow.calva-backseat-driver)
 - GitHub Copilot (or some MCP compliant assistant)
@@ -95,25 +90,6 @@ It works very well will subagents, also parallel subagents. Try something like:
 1. "Please task three parallel subagents to use the REPL to investigate how to implement ...”
   * The REPL output will show you, and the agents, who is trying what at the REPL.
   * You can participate in the REPL party.
-
-> [!NOTE]
-> The stronger the model you use, the better result. As of this writing, Claude Opus 4.6 is the best to understand how to use Backseat Driver and Clojure.
-
-All tools can be referenced in the chat by prepending the tool name with a `#`, e.g.`#clojure-eval`.
-
-### MCP
-
-Copilot doesn't need MCP, but for other AI harnesses Calva Backseat Driver implements the [Model Context Protocol](https://modelcontextprotocol.io) (MCP), creating a bridge between AI assistants and your REPL.
-
-See [MCP-CONFIGURATION.md](MCP-CONFIGURATION.md) for how to configure your harness.
-
-## Alternatives
-
-Some projects/tools to look to complement Backseat Driver, or use instead of it:
-
-* [Clojure MCP](https://github.com/bhauman/clojure-mcp) - [Bruce Hauman](https://github.com/bhauman)'s take. A very comprehensive set of tools, resources, prompts and agents to use AI for generating more maintainable code than we could do without AI.
-* [nREPL MCP Server](https://github.com/JohanCodinha/nrepl-mcp-server), gives the AI tools to connect to a running nREPL server and evaluate code (and more)
-* [Babashka AI Coding Tools](https://github.com/nextdoc/ai-tools), Clojure test runner for AI agents.
 
 ## WIP
 
