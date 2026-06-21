@@ -31,6 +31,16 @@
                                                (:mcp/wrapper-config-path state)
                                                register?)})
 
+    [:mcp/ax.ensure-cursor-mcp-registered]
+    (let [server-info (:app/server-info state)]
+      (when (and server-info
+                 (not (:mcp/cursor-registered? state))
+                 (cursor-reg/should-register-on-server-started? state server-info))
+        {:ex/fxs [[:mcp/fx.register-cursor-mcp-server
+                   server-info
+                   {:ex/on-success [[:mcp/ax.cursor-mcp-registered :ex/action-args]]
+                    :ex/on-error [[:mcp/ax.cursor-mcp-registration-failed :ex/action-args]]}]]}))
+
     [:mcp/ax.cursor-mcp-registered result]
     {:ex/db (assoc state :mcp/cursor-registered? true)
      :ex/fxs [[:app/fx.log
