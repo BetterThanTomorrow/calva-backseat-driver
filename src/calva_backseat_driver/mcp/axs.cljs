@@ -7,14 +7,17 @@
 (defn handle-action [state _context action]
   (match action
     [:mcp/ax.start-server & _]
-    (let [silent? (some-> action second :silent?)]
+    (let [silent? (some-> action second :silent?)
+          server-port (if (and silent? (cursor-reg/should-use-random-port-for-cursor? state))
+                        0
+                        :vscode/config.mcpSocketServerPort)]
       {:ex/db (assoc state
                      :app/server-starting? true
                      :app/server-start-silent? silent?)
        :ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/starting? true]]
        :ex/fxs [[:mcp/fx.start-server {:app/log-dir-initialized+ (:app/log-dir-initialized+ state)
                                        :mcp/repl-enabled? :vscode/config.enableMcpReplEvaluation
-                                       :server/port :vscode/config.mcpSocketServerPort
+                                       :server/port server-port
                                        :ex/on-success [[:mcp/ax.server-started :ex/action-args]]
                                        :ex/on-error [[:mcp/ax.server-error :ex/action-args]]}]]})
 
@@ -44,7 +47,7 @@
      :ex/fxs [[:app/fx.log
                (select-keys state [:app/min-log-level :app/log-file-uri :app/log-dir-initialized+])
                :info
-               ["Cursor MCP server registered:" cursor-config/cursor-mcp-server-name]]]}
+               ["Cursor MCP server registered:" (cursor-config/cursor-mcp-settings-display-name)]]]}
 
     [:mcp/ax.cursor-mcp-registration-failed failure]
     {:ex/fxs [[:app/fx.log

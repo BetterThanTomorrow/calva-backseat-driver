@@ -1,96 +1,37 @@
-# Configur Backseat Driver as an MCP Server
+# Configure Backseat Driver as an MCP Server
 
-Backseat Driver is both a Copilot native plugin (no MCP, or configuration needed) and an MCP server (for other AI/Agent harnesses).
+If you are using Backseat Driver with harnesses _other than_ Copilot or [Cursor](https://www.cursor.com/), you'll need to configure an MCP server.
 
-> [!NOTE]
-> If you use Backseat Driver as an MCP server, please help in maintaining this document. 🙏
+## How it works
+
+Backseat Driver runs a socket server inside the VS Code Extension Host and writes a port file when it starts. Your MCP client starts a small Node **stdio wrapper** that connects to that socket. The wrapper accepts either a port number or a path to the port file.
+
+There is one Backseat Driver MCP server per workspace. The port file will be created at `<workspace-root>/.calva/mcp-server/port`.
+
+* Default socket port is `1664`. If that port is busy, a random available port is used instead.
+* Change the preferred port with `calva-backseat-driver.mcpSocketServerPort`. Use `0` to always pick a random port.
+
+## What you need to do
+
+With your project opened in VS Code (or fork):
+
+1. Start the Calva MCP socket server (**Calva Backseat Driver: Start the MCP socket server**), or configure the MCP server to auto-start. Backseat Driver will:
+   * Create the port file
+   * Show a confirmation dialog offering a button: **Copy command + port** or **Copy command + port-file** for your MCP client config
+
+     ![MCP Server Started message with Copy Command button](assets/howto/mcp-copy-stdio-command.png)
+2. Add the MCP server in your client (steps vary by client)
 
 ## Configuration
 
-> [!NOTE]
-> REPL evaluation through MCP is enabled by default. Search for *Backseat Driver* in VS Code Settings and set **Enable MCP Repl Evaluation** to `false` if you want to disable it.
->
-> MCP clients vary in how they handle tool permissions — many ask for confirmation before running tools. You can also restrict what your client is allowed to invoke.
+Backseat Driver is per-project, so configure it at the project/workspace level when your client allows that.
 
-The MCP server is running as a plain socket server in the VS Code Extension Host, writing out a port file when it starts. Then the MCP client (the agent harness) needs to start a `stdio` relay/proxy/wrapper. The wrapper script takes the port or a port file as an argument. Because of these and other reasons, there will be one Calva Backseat Driver per workspace, and the port file will be written to the `.calva/mcp-server/` directory in the workspace root.
-* The default port for the socket server is `1664`. If that is not available, a random, high, available port number will be used.
-* You can configure the try-first port to something else via the setting `calva-backseat-driver.mcpSocketServerPort`. Use `0` to use a random, high, available port number.
+* **Project-level config:** prefer the **port file** as the wrapper argument (`.calva/mcp-server/port` in a single-root window).
+* **No project-level config:** assign different socket ports per project via `mcpSocketServerPort`, then point your client's stdio command at that port for the session you are in.
 
-1. Open your project
-1. Start the Calva MCP socket server
-   * This will create a port file: `<workspace-root>/.calva/mcp-server/port`
-   * When the server is started, a confirmation dialog will be shown. This dialog has a button which lets you copy the command for starting the stdio wrapper to the clipboard.
+### Cursor
 
-     ![MCP Server Started message with Copy Command button](assets/howto/mcp-copy-stdio-command.png)
-1. Add the MCP server config (will vary depending on MCP Client)
-
-### Workspace/project level config
-
-Backseat Driver is a per-project MCP server, so should be configured on the project level if the assistant you are using allows it.
-
-* **If you can use project/workspace level configuration**, then it is best to use the **port file** as the argument to the stdio script. If your MCP client doesn't support project level configuration.
-* **If your MCP client does not support project/workspace configuration**, then you can still configure Backseat Driver to use different socket server ports for different projects. And then configure your MCP client with the appropriate port number for your session.
-
-I am sorry that this is a bit messy. It is obvious that MCP is a bit new, and that project level MCP servers may not have been considered when creating MCP. I have tried to understand and navigate the limitations and to provide configurability/Ux to the best of my understanding and ability.
-
-### Cursor configuration
-
-[Cursor](https://www.cursor.com/) supports project level config.
-
-#### Zero-config (recommended)
-
-When you open a Clojure project in Cursor with Calva and Backseat Driver installed:
-
-1. Backseat Driver activates and silently starts the MCP socket server (when **Auto Register Cursor MCP** is enabled — default `true`).
-2. The extension registers a `backseat-driver` MCP server with Cursor via `vscode.cursor.mcp.registerServer`.
-3. In **Cursor Settings → Tools and MCP**, you should see `backseat-driver` and the IDE Agent can call REPL tools.
-
-Requirements:
-
-* A workspace folder (the port file is written to `<workspace-root>/.calva/mcp-server/port`).
-* Cursor with the `vscode.cursor.mcp` API (Cursor IDE Agent — not the SDK-only path).
-
-Settings:
-
-* `calva-backseat-driver.autoRegisterCursorMcp` (default `true`) — master switch for programmatic registration. Changes take effect after window reload.
-* `calva-backseat-driver.autoStartMCPServer` — unchanged; still starts the socket server in any editor when `true`. Cursor auto-register implies a silent start when the Cursor MCP API is present; it does not change the meaning of this setting elsewhere.
-
-**Duplicate manual config:** If you also have a `backseat-driver` entry in `.cursor/mcp.json`, you may get duplicate servers. Remove the manual entry when using auto-registration, or set `autoRegisterCursorMcp` to `false`.
-
-**Port conflicts:** The socket server tries `calva-backseat-driver.mcpSocketServerPort` (default `1664`); if busy, Node assigns another port and rewrites the port file. Auto-registration passes the **port file path** (not a numeric port) to the stdio wrapper so Cursor always connects to the bound port.
-
-**Multi-root workspaces:** Port file and registration use the **first** workspace folder only (same as manual MCP today).
-
-Real Cursor integration is verified manually; automated tests cover Backseat Driver logic and config construction.
-
-#### Manual `.cursor/mcp.json` (fallback)
-
-Use this when auto-registration is disabled, for troubleshooting, or if your Cursor build lacks `vscode.cursor.mcp`.
-
-1. Start the MCP socket server manually (**Calva Backseat Driver: Start the MCP socket server**) or enable `calva-backseat-driver.autoStartMCPServer`.
-2. Copy the stdio command from the confirmation dialog (or from **Copy command + port-file**).
-3. In your project's `.cursor/mcp.json` add a `"backseat-driver"` entry like so:
-```json
-{
-  "mcpServers": {
-    "backseat-driver": {
-      "command": "node",
-      "args": [
-        "<absolute path to calva-mcp-server.js in user-home-config directory>",
-        "<port-file path>, can be relative (for single folder windows this is `.calva/mcp-server/port`)"
-      ]
-    }
-  }
-}
-```
-
-The home-directory wrapper copy (`~/.config/calva/backseat-driver/calva-mcp-server.js`) is refreshed on extension activate and remains the stable path for static MCP configs. Cursor auto-registration uses the running extension's `dist/calva-mcp-server.js` instead.
-
-Both paths needed above can be conveniently determined by clicking on the **Copy command** button (shown when starting the MCP server) and then pasting into `mcp.json` file.
-
-In **Cursor Settings → Tools and MCP**, you will see `backseat-driver` as a server, and a toggle for starting it.
-
-Check the [Cursor MCP docs](https://docs.cursor.com/chat/tools#mcp-servers).
+No config needed for Cursor. Backseat Driver handles this for you, Zero Conf, the MCP server will be named `extension-backseat-driver`. If for some reason you need to configure this manually, you can disable the automatic Cursor config and MCP connect by settting `autoRegisterCursorMcp` to `false`. 
 
 ### Windsurf configuration
 
@@ -98,7 +39,7 @@ Please help with providing info here.
 
 ### Claude desktop
 
-Claude Desktop doesn't run in VS Code, and afaict doesn't have any other project/workspace concept, so it is the global config that you will use. The app has a button for finding its configuration file. Configuring to use the port for the stdio command is probably easiest.
+Claude Desktop doesn't run in VS Code and has no project/workspace concept, so use its global MCP config. The app can open that file for you. Using an absolute path to the port file in the stdio command is usually easiest.
 
 ```json
 {
@@ -106,7 +47,7 @@ Claude Desktop doesn't run in VS Code, and afaict doesn't have any other project
     "backseat-driver": {
       "command": "node",
       "args": [
-  "<absolute path to calva-mcp-server.js in user-home-config directory>",
+        "<absolute path to calva-mcp-server.js>",
         "<absolute path to your project root's `.calva/mcp-server/port`>"
       ]
     }

@@ -3,16 +3,23 @@
    ["path" :as path]))
 
 (def cursor-mcp-server-name "backseat-driver")
+(def cursor-mcp-extension-segment "extension")
 (def cursor-mcp-reload-client-command-id "mcp.reloadClient")
 
+(defn cursor-mcp-settings-display-name
+  "Label shown in Cursor Settings → Tools and MCP for extension-registered servers."
+  []
+  (str cursor-mcp-extension-segment "-" cursor-mcp-server-name))
+
 (defn mcp-client-identifier
-  "Cursor MCP service identifier for extension-registered stdio servers.
-   Observed shape: user-{extensionId}-extension-{registerServer name}."
+  "Cursor MCP service identifier for `mcp.reloadClient`.
+   Built as user-{extensionId}-extension-{registerServer name}, which is why
+   Settings shows extension-backseat-driver when name is backseat-driver."
   [^js extension-context]
   (when extension-context
     (let [extension-id (some-> extension-context .-extension .-id)]
       (when (seq extension-id)
-        (str "user-" extension-id "-extension-" cursor-mcp-server-name)))))
+        (str "user-" extension-id "-" cursor-mcp-extension-segment "-" cursor-mcp-server-name)))))
 
 (defn wrapper-script-path
   "Absolute path to the stdio wrapper bundled with the running extension instance."
@@ -21,7 +28,7 @@
     (path/join (.-extensionPath extension-context) "dist" "calva-mcp-server.js")))
 
 (defn port-file-fs-path [server-info]
-  (some-> server-info :server/port-file-uri (unchecked-get "fsPath")))
+  (some-> server-info :server/port-file-uri .-fsPath))
 
 (defn build-stdio-server-config
   "Pure config builder. Returns {:ok true :config ...} or {:ok false :reason ...}."
