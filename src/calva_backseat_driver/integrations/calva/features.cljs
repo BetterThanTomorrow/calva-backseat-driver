@@ -53,7 +53,7 @@
   (p/let [sessions-js ((get-in calva/calva-api [:repl :listSessionsAndRuntimes]))
           sessions (or (js->clj sessions-js :keywordize-keys true) [])]
     {:sessions (mapv #(session-runtimes/project-session % (true? include-all-runtimes?))
-                      sessions)}))
+                     sessions)}))
 
 (defn- validate-session-key+
   "Validates a session key against available sessions.
