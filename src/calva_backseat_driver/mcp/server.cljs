@@ -103,39 +103,57 @@
     responses))
 
 (def ^:private active-sockets (atom #{}))
+(def ^:private socket-id-counter (atom 0))
+
+(defn- next-socket-id! []
+  (swap! socket-id-counter inc))
+
+(defn- socket-peer-label [^js socket]
+  (try
+    (let [remote-address (.-remoteAddress socket)
+          remote-port (.-remotePort socket)]
+      (when (and remote-address remote-port)
+        (str remote-address ":" remote-port)))
+    (catch :default _ nil)))
 
 (defn- setup-socket-handlers! [{:ex/keys [dispatch!] :as options} ^js socket]
-  (.setEncoding socket "utf8")
-  (swap! active-sockets conj socket)
-  (.on socket "close" (fn [] (swap! active-sockets disj socket)))
+  (let [socket-id (next-socket-id!)
+        peer-label (or (socket-peer-label socket) "unknown")]
+    (.setEncoding socket "utf8")
+    (swap! active-sockets conj socket)
+    (dispatch! [[:app/ax.log :info "[Server] Socket connected:" socket-id peer-label]])
+    (.on socket "close"
+         (fn []
+           (dispatch! [[:app/ax.log :info "[Server] Socket closed:" socket-id peer-label]])
+           (swap! active-sockets disj socket)))
 
-  (let [buffer (volatile! "")]
-    (.on socket "data"
-         (fn [data-chunk]
-           (let [responses (handle-socket-data! options buffer data-chunk)]
-             (doseq [response responses]
-               (when response
-                 (if (p/promise? response)
-                   (-> response
-                       (p/then (fn [resolved-response]
-                                 (dispatch! [[:app/ax.log :debug
-                                              "[Server] Sending resolved response:"
-                                              (pr-str resolved-response)]])
-                                 (.write socket (format-response-json resolved-response))))
-                       (p/catch (fn [err]
-                                  (dispatch! [[:app/ax.log :error
-                                               "[Server] Error resolving response:" err]])
-                                  (let [error-response (create-error-response nil -32603 (str "Internal error: " err))]
-                                    (.write socket (format-response-json error-response))))))
-                   ;; Handle non-promise responses
-                   (do
-                     (dispatch! [[:app/ax.log :debug
-                                  "[Server] Sending response:"
-                                  (pr-str response)]])
-                     (.write socket (format-response-json response))))))))
-         (.on socket "error"
-              (fn [err]
-                (dispatch! [[:app/ax.log :error "[Server] Socket error:" err]]))))))
+    (let [buffer (volatile! "")]
+      (.on socket "data"
+           (fn [data-chunk]
+             (let [responses (handle-socket-data! options buffer data-chunk)]
+               (doseq [response responses]
+                 (when response
+                   (if (p/promise? response)
+                     (-> response
+                         (p/then (fn [resolved-response]
+                                   (dispatch! [[:app/ax.log :debug
+                                                "[Server] Sending resolved response:"
+                                                (pr-str resolved-response)]])
+                                   (.write socket (format-response-json resolved-response))))
+                         (p/catch (fn [err]
+                                    (dispatch! [[:app/ax.log :error
+                                                 "[Server] Error resolving response:" err]])
+                                    (let [error-response (create-error-response nil -32603 (str "Internal error: " err))]
+                                      (.write socket (format-response-json error-response))))))
+                     ;; Handle non-promise responses
+                     (do
+                       (dispatch! [[:app/ax.log :debug
+                                    "[Server] Sending response:"
+                                    (pr-str response)]])
+                       (.write socket (format-response-json response))))))))
+      (.on socket "error"
+           (fn [err]
+             (dispatch! [[:app/ax.log :error "[Server] Socket error:" socket-id peer-label err]])))))))
 
 (defn- start-socket-server!+ [{:ex/keys [dispatch!]
                                :server/keys [port] :as options}]

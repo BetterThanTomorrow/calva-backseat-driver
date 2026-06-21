@@ -13,6 +13,17 @@
    (:mcp/cursor-mcp-available? state)
    server-info))
 
+(defn should-call-register-server? [state server-info]
+  (and (should-register-on-server-started? state server-info)
+       (not (:mcp/cursor-registered? state))
+       (not (:mcp/cursor-register-server-called? state))))
+
+(defn register-cursor-mcp-server-effect [server-info]
+  [:mcp/fx.register-cursor-mcp-server
+   server-info
+   {:ex/on-success [[:mcp/ax.cursor-mcp-registered :ex/action-args]]
+    :ex/on-error [[:mcp/ax.cursor-mcp-registration-failed :ex/action-args]]}])
+
 (defn server-started-fxs
   [server-info silent? wrapper-config-path register?]
   (into []
@@ -20,9 +31,6 @@
           (not silent?)
           (conj [:mcp/fx.show-server-started-message server-info wrapper-config-path])
           register?
-          (conj [:mcp/fx.register-cursor-mcp-server
-                 server-info
-                 {:ex/on-success [[:mcp/ax.cursor-mcp-registered :ex/action-args]]
-                  :ex/on-error [[:mcp/ax.cursor-mcp-registration-failed :ex/action-args]]}])
+          (conj (register-cursor-mcp-server-effect server-info))
           :always
           (conj [:app/fx.return (clj->js server-info)]))))

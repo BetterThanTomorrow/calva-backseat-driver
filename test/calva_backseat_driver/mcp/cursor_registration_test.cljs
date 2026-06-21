@@ -25,6 +25,22 @@
                 (assoc state-on :mcp/cursor-mcp-available? false)
                 server-info))))))
 
+(deftest should-call-register-server?-test
+  (let [server-info {:server/port-file-uri #js {:fsPath "/ws/port"}}
+        state-on (assoc (mock-state true) :mcp/cursor-mcp-available? true)]
+    (testing "calls register when eligible"
+      (is (reg/should-call-register-server? state-on server-info)))
+
+    (testing "skips when already registered"
+      (is (not (reg/should-call-register-server?
+                (assoc state-on :mcp/cursor-registered? true)
+                server-info))))
+
+    (testing "skips when registerServer already called this activation"
+      (is (not (reg/should-call-register-server?
+                (assoc state-on :mcp/cursor-register-server-called? true)
+                server-info))))))
+
 (deftest server-started-fxs-test
   (let [server-info {:server/port 1664
                      :server/port-file-uri #js {:fsPath "/ws/port"}}]

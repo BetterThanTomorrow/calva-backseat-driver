@@ -35,6 +35,19 @@
   (let [path (port-file-fs-path server-info)]
     (and (seq path) (.existsSync fs path))))
 
+(defn reload-mcp-client!+ [^js extension-context]
+  (let [identifier (config/mcp-client-identifier extension-context)]
+    (cond
+      (not identifier)
+      (p/resolved {:ok false :reason :missing-extension-context})
+
+      :else
+      (-> (vscode/commands.executeCommand
+           config/cursor-mcp-reload-client-command-id
+           (clj->js {:identifier identifier}))
+          (p/then (fn [result] {:ok true :identifier identifier :result result}))
+          (p/catch (fn [err] {:ok false :identifier identifier :error err}))))))
+
 (defn register-mcp-server!+ [^js extension-context server-info]
   (let [{:keys [ok config reason]} (build-cursor-mcp-registration-config extension-context server-info)]
     (cond
@@ -51,6 +64,13 @@
       (-> (.registerServer (.-mcp (.-cursor vscode)) (clj->js config))
           (p/then (fn [_] {:ok true :config config}))
           (p/catch (fn [err] {:ok false :error err :config config}))))))
+
+(defn register-and-reload-mcp-client!+ [^js extension-context server-info]
+  (p/let [register-result (register-mcp-server!+ extension-context server-info)]
+    (if-not (:ok register-result)
+      register-result
+      (p/let [reload-result (reload-mcp-client!+ extension-context)]
+        (assoc register-result :reload reload-result)))))
 
 (defn unregister-mcp-server!+ []
   (cond

@@ -20,11 +20,12 @@
 
     [:mcp/ax.server-started server-info]
     (let [silent? (:app/server-start-silent? state)
-          register? (cursor-reg/should-register-on-server-started? state server-info)]
-      {:ex/db (assoc state
-                     :app/server-info server-info
-                     :app/server-starting? false
-                     :app/server-start-silent? false)
+          register? (cursor-reg/should-call-register-server? state server-info)]
+      {:ex/db (cond-> (assoc state
+                             :app/server-info server-info
+                             :app/server-starting? false
+                             :app/server-start-silent? false)
+               register? (assoc :mcp/cursor-register-server-called? true))
        :ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/starting? false]
                 [:app/ax.set-when-context :calva-backseat-driver/started? true]]
        :ex/fxs (cursor-reg/server-started-fxs server-info silent?
@@ -34,12 +35,9 @@
     [:mcp/ax.ensure-cursor-mcp-registered]
     (let [server-info (:app/server-info state)]
       (when (and server-info
-                 (not (:mcp/cursor-registered? state))
-                 (cursor-reg/should-register-on-server-started? state server-info))
-        {:ex/fxs [[:mcp/fx.register-cursor-mcp-server
-                   server-info
-                   {:ex/on-success [[:mcp/ax.cursor-mcp-registered :ex/action-args]]
-                    :ex/on-error [[:mcp/ax.cursor-mcp-registration-failed :ex/action-args]]}]]}))
+                 (cursor-reg/should-call-register-server? state server-info))
+        {:ex/db (assoc state :mcp/cursor-register-server-called? true)
+         :ex/fxs [(cursor-reg/register-cursor-mcp-server-effect server-info)]}))
 
     [:mcp/ax.cursor-mcp-registered result]
     {:ex/db (assoc state :mcp/cursor-registered? true)
@@ -55,7 +53,9 @@
                ["Cursor MCP auto-registration failed:" failure]]]}
 
     [:mcp/ax.cursor-mcp-unregistered _result]
-    {:ex/db (dissoc state :mcp/cursor-registered?)}
+    {:ex/db (dissoc state
+                    :mcp/cursor-registered?
+                    :mcp/cursor-register-server-called?)}
 
     [:mcp/ax.stop-server]
     {:ex/db (assoc state :app/server-stopping? true)
@@ -69,7 +69,8 @@
     {:ex/db (dissoc state
                     :app/server-info
                     :app/server-stopping?
-                    :mcp/cursor-registered?)
+                    :mcp/cursor-registered?
+                    :mcp/cursor-register-server-called?)
      :ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/stopping? false]
               [:app/ax.set-when-context :calva-backseat-driver/started? false]]
      :ex/fxs [[:vscode/fx.show-information-message "MCP server stopped"]
