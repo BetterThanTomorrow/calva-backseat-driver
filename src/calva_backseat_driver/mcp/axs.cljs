@@ -28,12 +28,12 @@
                              :app/server-info server-info
                              :app/server-starting? false
                              :app/server-start-silent? false)
-               register? (assoc :mcp/cursor-register-server-called? true))
+                register? (assoc :mcp/cursor-register-server-called? true))
        :ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/starting? false]
                 [:app/ax.set-when-context :calva-backseat-driver/started? true]]
        :ex/fxs (cursor-reg/server-started-fxs server-info silent?
-                                               (:mcp/wrapper-config-path state)
-                                               register?)})
+                                              (:mcp/wrapper-config-path state)
+                                              register?)})
 
     [:mcp/ax.ensure-cursor-mcp-registered]
     (let [server-info (:app/server-info state)]

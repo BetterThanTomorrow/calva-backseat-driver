@@ -4,8 +4,8 @@
 
 (defn- mock-state [auto-register?]
   {:app/getConfiguration (fn [_]
-                          #js {:get (fn [key]
-                                      (when (= key "autoRegisterCursorMcp") auto-register?))})})
+                           #js {:get (fn [key]
+                                       (when (= key "autoRegisterCursorMcp") auto-register?))})})
 
 (deftest should-register-on-server-started?-test
   (let [server-info {:server/port-file-uri #js {:fsPath "/ws/port"}}
