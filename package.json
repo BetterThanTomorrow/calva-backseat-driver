@@ -42,8 +42,8 @@
       "properties": {
         "calva-backseat-driver.enableMcpReplEvaluation": {
           "type": "boolean",
-          "default": false,
-          "markdownDescription": "Enable the REPL evaluation tool through MCP.\n\n **⚠️ SECURITY WARNING**: _When enabled and you have also started the MCP server, any network client with access to the MCP server can execute arbitrary code in your REPL environment._ That said, Copilot and other compliant MCP clients will default to a low-trust mode with confirmation before any evaluation.",
+          "default": true,
+          "markdownDescription": "Expose REPL evaluation through the MCP server (`clojure_evaluate_code`, `clojure_load_file`). Enabled by default — set to `false` to disable. The socket server is local to your machine; this setting controls whether evaluation tools are listed and callable.",
           "scope": "resource"
         },
         "calva-backseat-driver.autoStartMCPServer": {

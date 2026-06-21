@@ -8,9 +8,9 @@ Backseat Driver is both a Copilot native plugin (no MCP, or configuration needed
 ## Configuration
 
 > [!NOTE]
-> The MCP server defaults to evaluation being disabled. Search for *Backseat Driver* in VS Code Settings to enable it.
+> REPL evaluation through MCP is enabled by default. Search for *Backseat Driver* in VS Code Settings and set **Enable MCP Repl Evaluation** to `false` if you want to disable it.
 >
-> Note that there are several layers to the security model here. Compliant MCP servers will default to low trust mode and ask for your confirmation every time the LLM wants to use the tool. Full YOLO mode is enabled if you enable the tool in the Calva MCP settings, and configure your AI client to be allowed to use it without asking.
+> MCP clients vary in how they handle tool permissions — many ask for confirmation before running tools. You can also restrict what your client is allowed to invoke.
 
 The MCP server is running as a plain socket server in the VS Code Extension Host, writing out a port file when it starts. Then the MCP client (the agent harness) needs to start a `stdio` relay/proxy/wrapper. The wrapper script takes the port or a port file as an argument. Because of these and other reasons, there will be one Calva Backseat Driver per workspace, and the port file will be written to the `.calva/mcp-server/` directory in the workspace root.
 * The default port for the socket server is `1664`. If that is not available, a random, high, available port number will be used.
