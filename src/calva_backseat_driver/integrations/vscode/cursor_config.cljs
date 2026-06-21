@@ -21,7 +21,7 @@
     (path/join (.-extensionPath extension-context) "dist" "calva-mcp-server.js")))
 
 (defn port-file-fs-path [server-info]
-  (some-> server-info :server/port-file-uri .-fsPath))
+  (some-> server-info :server/port-file-uri (unchecked-get "fsPath")))
 
 (defn build-stdio-server-config
   "Pure config builder. Returns {:ok true :config ...} or {:ok false :reason ...}."

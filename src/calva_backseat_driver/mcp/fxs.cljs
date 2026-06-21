@@ -59,22 +59,24 @@
              (dispatch! context (ax/enrich-with-args on-error e))))))
 
     [:mcp/fx.register-cursor-mcp-server server-info options]
-    (let [{:ex/keys [on-success on-error]} options
-          started-at (.toISOString (js/Date.))]
-      (dispatch! context [[:app/ax.log :info "[Cursor MCP] registerServer starting at" started-at]])
+    (let [{:ex/keys [on-success on-error]} options]
       (-> (cursor/register-and-reload-mcp-client!+ context server-info)
           (p/then (fn [result]
-                    (dispatch! context [[:app/ax.log :info "[Cursor MCP] registerServer completed at"
-                                         (.toISOString (js/Date.)) result]])
-                    (when (:reload result)
-                      (dispatch! context [[:app/ax.log :info "[Cursor MCP] reloadClient completed at"
-                                           (.toISOString (js/Date.)) (:reload result)]]))
-                    (if (:ok result)
-                      (dispatch! context (ax/enrich-with-args on-success result))
-                      (dispatch! context (ax/enrich-with-args on-error result)))))
+                    (cond
+                      (not (:ok result))
+                      (do
+                        (dispatch! context [[:app/ax.log :warn "[Cursor MCP] registerServer failed:" result]])
+                        (dispatch! context (ax/enrich-with-args on-error result)))
+
+                      (and (:reload result) (not (:ok (:reload result))))
+                      (do
+                        (dispatch! context [[:app/ax.log :warn "[Cursor MCP] reloadClient failed:" (:reload result)]])
+                        (dispatch! context (ax/enrich-with-args on-success result)))
+
+                      :else
+                      (dispatch! context (ax/enrich-with-args on-success result)))))
           (p/catch (fn [e]
-                     (dispatch! context [[:app/ax.log :error "[Cursor MCP] registerServer failed at"
-                                          (.toISOString (js/Date.)) e]])
+                     (dispatch! context [[:app/ax.log :error "[Cursor MCP] registerServer error:" e]])
                      (dispatch! context (ax/enrich-with-args on-error e))))))
 
     [:mcp/fx.stop-server options]
@@ -88,13 +90,13 @@
                             (dispatch! context (ax/enrich-with-args on-error (.-message e)))
                             false)))]
       (-> (if cursor-registered?
-            (let [started-at (.toISOString (js/Date.))]
-              (dispatch! context [[:app/ax.log :info "[Cursor MCP] unregisterServer starting at" started-at]])
-              (-> (cursor/unregister-mcp-server!+)
-                  (p/then (fn [result]
-                            (dispatch! context [[:app/ax.log :info "[Cursor MCP] unregisterServer completed at"
-                                                 (.toISOString (js/Date.)) result]])
-                            result))))
+            (-> (cursor/unregister-mcp-server!+)
+                (p/then (fn [result]
+                          (when-not (:ok result)
+                            (let [err (:error result)]
+                              (when (or (nil? err) (not= "Canceled" (.-name err)))
+                                (dispatch! context [[:app/ax.log :debug "[Cursor MCP] unregisterServer:" result]]))))
+                          result)))
             (p/resolved true))
           (p/then (fn [_] (stop-server+)))
           (p/then (fn [success?]
