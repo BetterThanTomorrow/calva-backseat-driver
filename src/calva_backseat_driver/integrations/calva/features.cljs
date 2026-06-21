@@ -2,6 +2,7 @@
   (:require
    ["vscode" :as vscode]
    [calva-backseat-driver.integrations.calva.api :as calva]
+   [calva-backseat-driver.integrations.calva.values :as calva-values]
    [calva-backseat-driver.integrations.calva.batch-edit :as batch-edit]
    [calva-backseat-driver.integrations.calva.editor :as editor]
    [calva-backseat-driver.integrations.calva.session-runtimes :as session-runtimes]
@@ -122,8 +123,8 @@
                              (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
                              (let [other-whos (some-> (.-otherWhosSinceLast evaluation+)
                                                       (js->clj))
-                                   shadow-build (calva/js-field-value evaluation+ "shadowBuild")
-                                   shadow-runtime-id (calva/js-field-value evaluation+ "shadowRuntimeId")
+                                   shadow-build (calva-values/js-field-value evaluation+ "shadowBuild")
+                                   shadow-runtime-id (calva-values/js-field-value evaluation+ "shadowRuntimeId")
                                    notes (cond-> []
                                            (not ns)
                                            (conj no-ns-eval-note)

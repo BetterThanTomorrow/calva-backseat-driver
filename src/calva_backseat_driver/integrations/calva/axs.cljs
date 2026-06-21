@@ -3,7 +3,7 @@
             [cljs.reader :as reader]
             [datascript.core :as d]
             [calva-backseat-driver.app.db :as db]
-            [calva-backseat-driver.integrations.calva.api :as calva-api]))
+            [calva-backseat-driver.integrations.calva.values :as calva-values]))
 
 (defn handle-action [state _context action]
   (match action
@@ -15,8 +15,8 @@
 
     [:calva/ax.add-output message]
     (let [line (inc (:calva/output-line-counter state 0))
-          shadow-build (calva-api/map-field-value message :shadowBuild)
-          shadow-runtime-id (calva-api/map-field-value message :shadowRuntimeId)
+          shadow-build (calva-values/map-field-value message :shadowBuild)
+          shadow-runtime-id (calva-values/map-field-value message :shadowRuntimeId)
           entity (cond-> {:output/line line
                           :output/category (:category message)
                           :output/text (:text message)
