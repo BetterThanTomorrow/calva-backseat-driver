@@ -1,5 +1,6 @@
 (ns calva-backseat-driver.integrations.vscode.cursor-config-test
-  (:require [cljs.test :refer [deftest testing is]]
+  (:require ["path" :as path]
+            [cljs.test :refer [deftest testing is]]
             [calva-backseat-driver.integrations.vscode.cursor-config :as config]))
 
 (deftest build-stdio-server-config-test
@@ -24,7 +25,7 @@
 
 (deftest wrapper-script-path-test
   (testing "joins extensionPath with dist wrapper"
-    (is (= "/Users/dev/backseat-driver/dist/calva-mcp-server.js"
+    (is (= (path/join "/Users/dev/backseat-driver" "dist" "calva-mcp-server.js")
            (config/wrapper-script-path #js {:extensionPath "/Users/dev/backseat-driver"}))))
 
   (testing "nil context yields nil"
@@ -44,7 +45,8 @@
           server-info {:server/port-file-uri #js {:fsPath "/ws/.calva/mcp-server/port"}}
           {:keys [ok config]} (config/build-cursor-mcp-registration-config ctx server-info)]
       (is ok)
-      (is (= ["/ext/root/dist/calva-mcp-server.js" "/ws/.calva/mcp-server/port"]
+      (is (= [(path/join "/ext/root" "dist" "calva-mcp-server.js")
+              "/ws/.calva/mcp-server/port"]
              (get-in config [:server :args]))))))
 
 (deftest should-auto-start-mcp-server?-test
