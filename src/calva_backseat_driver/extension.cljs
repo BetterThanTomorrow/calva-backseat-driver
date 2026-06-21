@@ -7,7 +7,8 @@
    [calva-backseat-driver.app.db :as db]
    [calva-backseat-driver.integrations.calva.api :as calva-api]
    [calva-backseat-driver.integrations.calva.version :as version]
-   [calva-backseat-driver.integrations.vscode.cursor :as cursor]))
+   [calva-backseat-driver.integrations.vscode.cursor :as cursor]
+   [promesa.core :as p]))
 
 (defn- extension-context []
   (:vscode/extension-context @db/!app-db))
@@ -40,7 +41,13 @@
     (swap! db/!app-db assoc
            :vscode/extension-context context
            :app/getConfiguration vscode/workspace.getConfiguration))
-  (ex/dispatch! context [[:app/ax.activate (initial-state context)]])
+  (let [dispatch-activate (fn []
+                            (swap! db/!app-db dissoc :mcp/cursor-registered?)
+                            (ex/dispatch! context [[:app/ax.activate (initial-state context)]]))]
+    (if (cursor/cursor-mcp-available?)
+      (-> (cursor/unregister-mcp-server!+)
+          (p/finally dispatch-activate))
+      (dispatch-activate)))
 
   (js/console.timeLog "activation" "Calva Backseat Driver activate END")
   (js/console.timeEnd "activation")
@@ -76,6 +83,7 @@
       (ex/dispatch! ctx [[:app/ax.init {:auto-start-mcp? :vscode/config.autoStartMCPServer
                                         :auto-register-cursor-mcp? :vscode/config.autoRegisterCursorMcp}]]))
     (when (and (:app/server-info @db/!app-db)
+               (cursor/port-file-ready? (:app/server-info @db/!app-db))
                (:mcp/cursor-mcp-available? @db/!app-db)
                (not (:mcp/cursor-registered? @db/!app-db)))
       (ex/dispatch! ctx [[:mcp/ax.ensure-cursor-mcp-registered]]))))
