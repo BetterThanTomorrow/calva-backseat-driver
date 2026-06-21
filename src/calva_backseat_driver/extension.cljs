@@ -69,7 +69,19 @@
   before-load []
   (println "shadow-cljs reloading..."))
 
+(defn- ensure-cursor-mcp-ready! []
+  (when-let [ctx (extension-context)]
+    (swap! db/!app-db assoc :mcp/cursor-mcp-available? (cursor/cursor-mcp-available?))
+    (when-not (get-in @db/!app-db [:extension/when-contexts :calva-mcp-extension/activated?])
+      (ex/dispatch! ctx [[:app/ax.init {:auto-start-mcp? :vscode/config.autoStartMCPServer
+                                        :auto-register-cursor-mcp? :vscode/config.autoRegisterCursorMcp}]]))
+    (when (and (:app/server-info @db/!app-db)
+               (:mcp/cursor-mcp-available? @db/!app-db)
+               (not (:mcp/cursor-registered? @db/!app-db)))
+      (ex/dispatch! ctx [[:mcp/ax.ensure-cursor-mcp-registered]]))))
+
 (defn ^{:dev/after-load true
         :export true}
   after-load []
-  (println "shadow-cljs reload complete"))
+  (println "shadow-cljs reload complete")
+  (ensure-cursor-mcp-ready!))

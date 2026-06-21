@@ -18,7 +18,8 @@
                                                                 :auto-register-cursor-mcp? :vscode/config.autoRegisterCursorMcp}]]}]
                 [:mcp/fx.copy-wrapper-script-to-config-dir (:mcp/wrapper-config-path new-state)]]})
 
-    [:app/ax.init {:keys [auto-start-mcp? auto-register-cursor-mcp?]}]
+    [:app/ax.init {:auto-start-mcp? auto-start-mcp?
+                   :auto-register-cursor-mcp? auto-register-cursor-mcp?}]
     {:ex/dxs [[:app/ax.register-command "calva-backseat-driver.startMcpServer"
                [[:mcp/ax.start-server]]]
               [:app/ax.register-command "calva-backseat-driver.stopMcpServer"
