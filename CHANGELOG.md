@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.36] - 2026-06-21
+
 - Update the evaluation tool to handle targeting of shadow-cljs runtimes
 - Update the REPL output log tool to include build and runtime for shadow-cljs evaluations
 - No info toast on auto-start of the MCP server
