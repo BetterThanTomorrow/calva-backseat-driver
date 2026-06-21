@@ -48,11 +48,9 @@
       (p/resolved {:ok false :reason :port-file-not-ready})
 
       :else
-      (-> (unregister-mcp-server!+)
-          (p/then (fn [_]
-                    (-> (.registerServer (.-mcp (.-cursor vscode)) (clj->js config))
-                        (p/then (fn [_] {:ok true :config config}))
-                        (p/catch (fn [err] {:ok false :error err :config config})))))))))
+      (-> (.registerServer (.-mcp (.-cursor vscode)) (clj->js config))
+          (p/then (fn [_] {:ok true :config config}))
+          (p/catch (fn [err] {:ok false :error err :config config}))))))
 
 (defn unregister-mcp-server!+ []
   (cond
