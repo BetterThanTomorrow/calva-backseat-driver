@@ -47,7 +47,7 @@
      :ex/fxs [[:app/fx.log
                (select-keys state [:app/min-log-level :app/log-file-uri :app/log-dir-initialized+])
                :info
-               ["Cursor MCP server registered:" (cursor-config/cursor-mcp-settings-display-name)]]]}
+               ["Cursor MCP server registered:" (cursor-config/cursor-mcp-settings-display-name) result]]]}
 
     [:mcp/ax.cursor-mcp-registration-failed failure]
     {:ex/fxs [[:app/fx.log
