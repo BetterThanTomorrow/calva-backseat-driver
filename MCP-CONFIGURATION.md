@@ -37,25 +37,60 @@ I am sorry that this is a bit messy. It is obvious that MCP is a bit new, and th
 
 [Cursor](https://www.cursor.com/) supports project level config.
 
-In your project's `.cursor/mcp.json` add a `"backseat-driver"` entry like so:
+#### Zero-config (recommended)
+
+When you open a Clojure project in Cursor with Calva and Backseat Driver installed:
+
+1. Backseat Driver activates and silently starts the MCP socket server (when **Auto Register Cursor MCP** is enabled — default `true`).
+2. The extension registers a `backseat-driver` MCP server with Cursor via `vscode.cursor.mcp.registerServer`.
+3. In **Cursor Settings → Tools and MCP**, you should see `backseat-driver` and the IDE Agent can call REPL tools.
+
+Requirements:
+
+* A workspace folder (the port file is written to `<workspace-root>/.calva/mcp-server/port`).
+* Cursor with the `vscode.cursor.mcp` API (Cursor IDE Agent — not the SDK-only path).
+
+Settings:
+
+* `calva-backseat-driver.autoRegisterCursorMcp` (default `true`) — master switch for programmatic registration. Changes take effect after window reload.
+* `calva-backseat-driver.autoStartMCPServer` — unchanged; still starts the socket server in any editor when `true`. Cursor auto-register implies a silent start when the Cursor MCP API is present; it does not change the meaning of this setting elsewhere.
+
+**Duplicate manual config:** If you also have a `backseat-driver` entry in `.cursor/mcp.json`, you may get duplicate servers. Remove the manual entry when using auto-registration, or set `autoRegisterCursorMcp` to `false`.
+
+**Port conflicts:** The socket server tries `calva-backseat-driver.mcpSocketServerPort` (default `1664`); if busy, Node assigns another port and rewrites the port file. Auto-registration passes the **port file path** (not a numeric port) to the stdio wrapper so Cursor always connects to the bound port.
+
+**Multi-root workspaces:** Port file and registration use the **first** workspace folder only (same as manual MCP today).
+
+Real Cursor integration is verified manually; automated tests cover Backseat Driver logic and config construction.
+
+#### Manual `.cursor/mcp.json` (fallback)
+
+Use this when auto-registration is disabled, for troubleshooting, or if your Cursor build lacks `vscode.cursor.mcp`.
+
+1. Start the MCP socket server manually (**Calva Backseat Driver: Start the MCP socket server**) or enable `calva-backseat-driver.autoStartMCPServer`.
+2. Copy the stdio command from the confirmation dialog (or from **Copy command + port-file**).
+3. In your project's `.cursor/mcp.json` add a `"backseat-driver"` entry like so:
 ```json
 {
   "mcpServers": {
     "backseat-driver": {
       "command": "node",
       "args": [
-  "<absolute path to calva-mcp-server.js in user-home-config directory>",
+        "<absolute path to calva-mcp-server.js in user-home-config directory>",
         "<port-file path>, can be relative (for single folder windows this is `.calva/mcp-server/port`)"
       ]
     }
   }
 }
 ```
-Both paths needed above can be conveniently determined by clicking on the **Copy command** button (shown when starting the MCP server) and then pasting into `mcp.json` file, as described above: [Configuration](#configuration-if-using-mcp-server).
 
-In **Cursor Settings -> Tools and MCPs**, you will see `backseat-driver` as a server, and a toggle for starting it.
+The home-directory wrapper copy (`~/.config/calva/backseat-driver/calva-mcp-server.js`) is refreshed on extension activate and remains the stable path for static MCP configs. Cursor auto-registration uses the running extension's `dist/calva-mcp-server.js` instead.
 
-You will want to check the [Cursor MCP docs](https://docs.cursor.com/chat/tools#mcp-servers).
+Both paths needed above can be conveniently determined by clicking on the **Copy command** button (shown when starting the MCP server) and then pasting into `mcp.json` file.
+
+In **Cursor Settings → Tools and MCP**, you will see `backseat-driver` as a server, and a toggle for starting it.
+
+Check the [Cursor MCP docs](https://docs.cursor.com/chat/tools#mcp-servers).
 
 ### Windsurf configuration
 
