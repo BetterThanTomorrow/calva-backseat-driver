@@ -26,7 +26,7 @@
               [:app/ax.set-when-context :calva-mcp-extension/activated?
                true]
               (when autostart-mcp-server?
-                [:mcp/ax.start-server])]}
+                [:mcp/ax.start-server {:silent? true}])]}
 
     [:app/ax.init-output-listener]
     {:ex/dxs [[:calva/ax.subscribe-to-output]]}
