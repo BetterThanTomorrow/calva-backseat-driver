@@ -69,7 +69,7 @@
 			}
 		],
 		"calva.autoOpenInspector": false,
-		"calva-backseat-driver.autoStartMCPServer": true,
-		"calva-backseat-driver.mcpSocketServerPort": 0
+		// "calva-backseat-driver.autoStartMCPServer": true,
+		// "calva-backseat-driver.mcpSocketServerPort": 0
 	},
 }
