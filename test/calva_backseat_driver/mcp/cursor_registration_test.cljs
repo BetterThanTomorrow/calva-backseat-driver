@@ -41,6 +41,19 @@
                 (assoc state-on :mcp/cursor-register-server-called? true)
                 server-info))))))
 
+(deftest should-use-random-port-for-cursor?-test
+  (testing "uses random port when Cursor auto-register is enabled"
+    (is (reg/should-use-random-port-for-cursor?
+         (assoc (mock-state true) :mcp/cursor-mcp-available? true))))
+
+  (testing "skips when setting off"
+    (is (not (reg/should-use-random-port-for-cursor?
+              (assoc (mock-state false) :mcp/cursor-mcp-available? true)))))
+
+  (testing "skips when Cursor API unavailable"
+    (is (not (reg/should-use-random-port-for-cursor?
+              (assoc (mock-state true) :mcp/cursor-mcp-available? false))))))
+
 (deftest server-started-fxs-test
   (let [server-info {:server/port 1664
                      :server/port-file-uri #js {:fsPath "/ws/port"}}]

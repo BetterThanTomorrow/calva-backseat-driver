@@ -18,6 +18,10 @@
        (not (:mcp/cursor-registered? state))
        (not (:mcp/cursor-register-server-called? state))))
 
+(defn should-use-random-port-for-cursor? [state]
+  (and (:mcp/cursor-mcp-available? state)
+       (read-auto-register-cursor-mcp? state)))
+
 (defn register-cursor-mcp-server-effect [server-info]
   [:mcp/fx.register-cursor-mcp-server
    server-info
