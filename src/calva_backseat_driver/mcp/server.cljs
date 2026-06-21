@@ -151,9 +151,9 @@
                                     "[Server] Sending response:"
                                     (pr-str response)]])
                        (.write socket (format-response-json response))))))))
-      (.on socket "error"
-           (fn [err]
-             (dispatch! [[:app/ax.log :error "[Server] Socket error:" socket-id peer-label err]])))))))
+           (.on socket "error"
+                (fn [err]
+                  (dispatch! [[:app/ax.log :error "[Server] Socket error:" socket-id peer-label err]])))))))
 
 (defn- start-socket-server!+ [{:ex/keys [dispatch!]
                                :server/keys [port] :as options}]
