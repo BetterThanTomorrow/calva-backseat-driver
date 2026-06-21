@@ -67,6 +67,8 @@ The structural editing tools for inserting and replacing top level forms respect
 
 See: [Configure Backseat Driver as an MCP server](MCP-CONFIGURATION.md)
 
+REPL evaluation through MCP is enabled by default. Set `calva-backseat-driver.enableMcpReplEvaluation` to `false` in workspace settings if you want to disable it.
+
 ## Getting Started
 
 ### Prerequisites

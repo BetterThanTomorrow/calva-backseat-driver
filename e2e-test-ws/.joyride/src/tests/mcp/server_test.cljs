@@ -103,7 +103,7 @@
           (js/console.log "ClojureDocs present?" (contains? tool-names "clojuredocs_info"))
           (js/console.log "Output log present?" (contains? tool-names "clojure_repl_output_log"))
 
-          ;; Evaluation tool - controlled by setting but defaults to DISABLED for MCP
+          ;; Evaluation tool - enabled by default; requires REPL for some clients
           (js/console.log "Evaluation tool present?" (contains? tool-names "clojure_evaluate_code")))
         (p/catch (fn [e]
                    (js/console.error "[tools-validation] Error:" (.-message e) e)

@@ -162,7 +162,7 @@ When making multiple edits, work from highest line number to lowest (line number
 Settings read via enrichment:
 ```clojure
 ;; In action/effect context:
-:vscode/config.enableMcpReplEvaluation  ; boolean
+:vscode/config.enableMcpReplEvaluation  ; boolean (default true — set false to disable MCP eval)
 :vscode/config.mcpSocketServerPort      ; number (default 1664, 0=random)
 :vscode/config.autoStartMCPServer       ; boolean
 :vscode/config.provideBdSkill           ; boolean (default true) — enable/disable Backseat Driver skill

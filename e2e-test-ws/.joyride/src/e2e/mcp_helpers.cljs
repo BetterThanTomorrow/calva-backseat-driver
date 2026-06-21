@@ -106,7 +106,7 @@
         (.end socket)))
 
 (def ^:private backseat-driver-setting-defaults
-  {"enableMcpReplEvaluation" false
+  {"enableMcpReplEvaluation" true
    "autoStartMCPServer" false
    "mcpSocketServerPort" 1664
    "provideBdSkill" true

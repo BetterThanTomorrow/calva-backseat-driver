@@ -10,7 +10,7 @@ Calva Backseat Driver (v0.0.27) is a VS Code extension that transforms AI coding
 
 ### 8 Tools (VS Code Language Model API + MCP)
 
-**REPL Exploration & Understanding**: `clojure_evaluate_code` (opt-in for MCP, enabled by default for Copilot), `clojure_load_file` (requires Calva >= 2.0.576), `clojure_list_sessions`, `clojure_repl_output_log`, `clojure_symbol_info`, `clojuredocs_info`
+**REPL Exploration & Understanding**: `clojure_evaluate_code`, `clojure_load_file` (requires Calva >= 2.0.576), `clojure_list_sessions`, `clojure_repl_output_log`, `clojure_symbol_info`, `clojuredocs_info`
 
 **Structural Editing**: `clojure_edit_files`, `clojure_balance_brackets`
 
@@ -124,7 +124,7 @@ The tools are exposed as VS Code Language Model API (for Copilot) and MCP (for e
 
 **REPL Exploration & Understanding:**
 
-1. **clojure_evaluate_code** (opt-in for MCP, enabled by default for Copilot)
+1. **clojure_evaluate_code**
    - Execute Clojure/ClojureScript code in connected REPL
    - Parameters: `code`, `namespace`, `replSessionKey`, `who`, `description`, optional `targetRuntimeId` (shadow-cljs)
 
@@ -209,12 +209,9 @@ The tools are exposed as VS Code Language Model API (for Copilot) and MCP (for e
 ## Security Model
 
 ### REPL Evaluation
-- **Disabled by default** - Requires explicit user opt-in
-- **Multi-layer security**:
-  1. Extension setting must be enabled
-  2. MCP clients default to low-trust mode
-  3. Confirmation prompts for evaluation actions
-- **Workspace-scoped** - Settings per workspace for granular control
+- **Enabled by default** — set `enableMcpReplEvaluation` to `false` to disable
+- **Workspace-scoped** — per-workspace control when you want evaluation off
+- **Client-side permissions** — MCP clients may still ask before invoking tools
 
 ### MCP Server
 - **Socket-based communication** - Runs on localhost with port file

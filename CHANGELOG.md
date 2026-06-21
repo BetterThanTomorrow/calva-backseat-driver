@@ -7,6 +7,7 @@ Changes to Calva Backseat Driver
 - Update the evaluation tool to handle targeting of shadow-cljs runtimes
 - Update the REPL output log tool to include build and runtime for shadow-cljs evaluations
 - No info toast on auto-start of the MCP server
+- MCP REPL evaluation is enabled by default; set `calva-backseat-driver.enableMcpReplEvaluation` to `false` to opt out
 
 ## [v0.0.35] - 2026-06-07
 

@@ -77,7 +77,7 @@ Never use `p/delay` or `setTimeout` for waiting on conditions.
 | `stop-mcp-session!` | Stop server command → close socket |
 | `send-request` | JSON-RPC request over TCP socket, resolves first `data` event |
 | `call-tool` | Wraps `send-request` for `tools/call`, parses JSON text content |
-| `ensure-repl-and-eval-enabled!` | Connect Joyride REPL → wait for session → enable `enableMcpReplEvaluation` setting. **Activates the extension as a side effect.** |
+| `ensure-repl-and-eval-enabled!` | Connect Joyride REPL → wait for session → ensure `enableMcpReplEvaluation` is on (default is `true`). **Activates the extension as a side effect.** |
 | `backup-settings!` | Snapshot `.vscode/settings.json` to a temp file, returns path |
 | `restore-settings!` | Restore settings from backup path |
 | `workspace-uri` | The workspace folder URI |

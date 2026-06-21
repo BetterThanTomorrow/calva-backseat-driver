@@ -258,7 +258,7 @@ Subsystem contracts, state architecture, and temporal sequences for the Backseat
 
 | Setting | Type | Default | Purpose |
 |---|---|---|---|
-| `enableMcpReplEvaluation` | boolean | false | Enable REPL eval via MCP |
+| `enableMcpReplEvaluation` | boolean | true | Expose REPL eval via MCP (set `false` to disable) |
 | `mcpSocketServerPort` | number | 1664 | Socket server port (0 = random) |
 | `autoStartMCPServer` | boolean | false | Start MCP server on activation |
 | `provideBdSkill` | boolean | true | Provide Backseat Driver skill via MCP |

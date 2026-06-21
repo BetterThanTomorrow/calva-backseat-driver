@@ -378,7 +378,7 @@
                                                          (skills/filter-skills (get-skills)
                                                                                {:provide-bd-skill? provide-bd-skill?
                                                                                 :provide-edit-skill? provide-edit-skill?}))
-              :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (if this is enabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."}}))
+              :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (unless disabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."}}))
 
 (defn- handle-tools-list [options id]
   (let [{:mcp/keys [repl-enabled?]} options]
