@@ -132,5 +132,4 @@
   (testing "session fields pass through when supportsRuntimes false"
     (let [session {:replSessionKey "clj" :supportsRuntimes false :currentRoutedTarget false}
           result (session-runtimes/project-session session false)]
-      (is (= false (:currentRoutedTarget result)))))
-)
+      (is (= false (:currentRoutedTarget result))))))

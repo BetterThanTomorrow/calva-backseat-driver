@@ -40,8 +40,8 @@
   "Project a session map; omit :builds when :supportsRuntimes is false."
   [session include-all-runtimes?]
   (if (:supportsRuntimes session)
-      (-> session
-          (dissoc :builds)
-          (assoc :builds (mapv #(project-build % include-all-runtimes?)
-                               (or (:builds session) []))))
-      (dissoc session :builds)))
+    (-> session
+        (dissoc :builds)
+        (assoc :builds (mapv #(project-build % include-all-runtimes?)
+                             (or (:builds session) []))))
+    (dissoc session :builds)))

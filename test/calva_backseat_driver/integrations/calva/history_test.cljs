@@ -78,7 +78,7 @@
                     :replSessionKey "clj"}])
           entity (get-in result [:ex/fxs 0 1])]
       (is (not (contains? entity :output/shadow-build)))
-      (is (not (contains? entity :output/shadow-runtime-id)))))
+      (is (not (contains? entity :output/shadow-runtime-id))))))
 
 (deftest add-output-omits-undefined-shadow-fields
   (testing "No shadow keys when Calva sent undefined values"
@@ -94,7 +94,7 @@
                     :shadowRuntimeId js/undefined}])
           entity (get-in result [:ex/fxs 0 1])]
       (is (not (contains? entity :output/shadow-build)))
-      (is (not (contains? entity :output/shadow-runtime-id)))))))
+      (is (not (contains? entity :output/shadow-runtime-id))))))
 
 (deftest history-loaded-action
   (testing "Sets output-line-counter from loaded max-line"
