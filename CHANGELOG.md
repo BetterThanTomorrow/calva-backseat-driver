@@ -4,6 +4,9 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- Update the evaluation tool to handle targeting of shadow-cljs runtimes
+- Update the REPL output log tool to include build and runtime for shadow-cljs evaluations
+
 ## [v0.0.35] - 2026-06-07
 
 - Fix MCP request hanging on errors downstream
