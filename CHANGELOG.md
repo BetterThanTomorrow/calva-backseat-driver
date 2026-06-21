@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- **Cursor zero-config MCP:** When the Cursor MCP API is available, Backseat Driver auto-registers its MCP server with the IDE Agent (`vscode.cursor.mcp.registerServer`). The socket server starts silently on activation; no `.cursor/mcp.json` required. New setting: `calva-backseat-driver.autoRegisterCursorMcp` (default `true`). Manual MCP setup remains supported.
+
 ## [v0.0.36] - 2026-06-21
 
 - Update the evaluation tool to handle targeting of shadow-cljs runtimes

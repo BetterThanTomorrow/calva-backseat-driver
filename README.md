@@ -9,7 +9,7 @@ Clojure Tools for VS Code Agent harnesses. (Such as Copilot and Cursor.)
 Backseat Driver gives VS Code AI harnesses access to [Calva](https://calva.io)'s Clojure tools via two interfaces:
 
 1. **VS Code LM Tools.** For Copilot. Zero config.
-2. **MCP**. For other AI harnesses. Requires [some configuration](MCP-CONFIGURATION.md) per project.
+2. **MCP**. For other AI harnesses. In **Cursor**, Backseat Driver auto-registers its MCP server when you open a Clojure project (zero config). Other clients require [some configuration](MCP-CONFIGURATION.md) per project.
 
 ## Features
 
@@ -67,7 +67,11 @@ The structural editing tools for inserting and replacing top level forms respect
 
 See: [Configure Backseat Driver as an MCP server](MCP-CONFIGURATION.md)
 
+In **Cursor**, the IDE Agent can use Backseat Driver MCP tools without `.cursor/mcp.json` when **Auto Register Cursor MCP** is enabled (default). The extension silently starts the socket server and registers the stdio wrapper via `vscode.cursor.mcp.registerServer`.
+
 REPL evaluation through MCP is enabled by default. Set `calva-backseat-driver.enableMcpReplEvaluation` to `false` in workspace settings if you want to disable it.
+
+Disable Cursor auto-registration with `calva-backseat-driver.autoRegisterCursorMcp` (reload required).
 
 ## Getting Started
 
