@@ -4,7 +4,7 @@
       "command": "node",
       "args": [
         "~/.config/calva/backseat-driver/calva-mcp-server.js",
-        ".calva/mcp-server/port"
+        "../backseat-driver/.calva/mcp-server/port"
       ]
     }
   }
