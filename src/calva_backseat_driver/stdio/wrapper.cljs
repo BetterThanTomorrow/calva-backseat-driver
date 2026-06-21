@@ -10,6 +10,10 @@
                  :info 2
                  :debug 3})
 
+(def startup-retry-delay-ms 500)
+
+(def startup-timeout-ms 30000)
+
 (def min-log-level
   (let [arg-level (some #(when (.startsWith % "--min-log-level=")
                            (subs % (count "--min-log-level=")))
@@ -35,13 +39,66 @@
      (.readFile fs port-file-path #js {:encoding "utf8"}
                 (fn [err data]
                   (if err
-                    (do (log-stderr :error "Port file read error:" err)
+                    (do (log-stderr :warn "Port file read error:" err)
                         (resolve nil))
                     (let [port-num (js/parseInt data 10)]
                       (if (js/isNaN port-num)
                         (do (log-stderr :error "Invalid port number in file:" data)
                             (resolve nil))
                         (resolve port-num)))))))))
+
+(defn- sleep+ [ms]
+  (js/Promise.
+   (fn [resolve _reject]
+     (js/setTimeout resolve ms))))
+
+(defn- resolve-port+ [port-or-port-file]
+  (if-let [parsed-port (parse-long port-or-port-file)]
+    (do
+      (log-stderr :info "Connecting to Backseat Driver on port." parsed-port)
+      (js/Promise.resolve parsed-port))
+    (let [started-at (js/Date.now)]
+      (log-stderr :info "Connecting to Backseat Driver using port file." port-or-port-file)
+      (letfn [(try-read+ []
+                (-> (read-port-from-file port-or-port-file)
+                    (.then (fn [port]
+                             (if port
+                               port
+                               (if (< (- (js/Date.now) started-at) startup-timeout-ms)
+                                 (-> (sleep+ startup-retry-delay-ms)
+                                     (.then try-read+))
+                                 nil))))))]
+        (try-read+)))))
+
+(defn- connect-socket+ [port]
+  (js/Promise.
+   (fn [resolve reject]
+     (let [socket (net/connect #js {:port port})
+           connected? (volatile! false)]
+       (.once socket "connect"
+              (fn []
+                (vreset! connected? true)
+                (resolve socket)))
+       (.once socket "error"
+              (fn [err]
+                (when-not @connected?
+                  (.destroy socket)
+                  (reject err))))))))
+
+(defn- connect-socket-with-retry+ [port]
+  (let [started-at (js/Date.now)
+        !last-error (volatile! nil)]
+    (letfn [(try-connect+ []
+              (-> (connect-socket+ port)
+                  (.catch (fn [err]
+                            (vreset! !last-error err)
+                            (if (< (- (js/Date.now) started-at) startup-timeout-ms)
+                              (do
+                                (log-stderr :warn "Could not connect to MCP server, retrying:" (.-message err))
+                                (-> (sleep+ startup-retry-delay-ms)
+                                    (.then try-connect+)))
+                              (js/Promise.reject (or @!last-error err)))))))]
+      (try-connect+))))
 
 (defn- process-newline-buffer! [buffer on-line]
   (loop []
@@ -150,20 +207,15 @@
                                      :message "Configuration error: Port or port file path not provided."}})
                    "\n"))
       (.exit process 1))
-    (-> (if-let [parsed-port (parse-long port-or-port-file)]
-          (js/Promise. (fn [resolve _]
-                         (log-stderr :info "Connecting to Backseat Driver on port." parsed-port)
-                         (resolve parsed-port)))
-          (do
-            (log-stderr :info "Connecting to Backseat Driver using port file." port-or-port-file)
-            (read-port-from-file port-or-port-file)))
+    (-> (resolve-port+ port-or-port-file)
         (.then (fn [port]
                  (if port
-                   (let [socket (net/connect #js {:port port})
-                         stdin (.-stdin process)]
-                     (handle-stdin stdin socket)
-                     (handle-socket socket)
-                     (log-stderr :info "Connected to MCP server on port" port))
+                   (-> (connect-socket-with-retry+ port)
+                       (.then (fn [socket]
+                                (let [stdin (.-stdin process)]
+                                  (handle-stdin stdin socket)
+                                  (handle-socket socket)
+                                  (log-stderr :info "Connected to MCP server on port" port)))))
                    (do
                      (log-stderr :error "Error: Port file not found:" port-or-port-file)
                      (.write original-stdout
@@ -172,4 +224,14 @@
                                         :error #js {:code -32001
                                                     :message "MCP server not running or port file missing."}})
                                   "\n"))
-                     (.exit process 1))))))))
+                     (.exit process 1)))))
+        (.catch (fn [err]
+                  (log-stderr :error "Could not connect to MCP server:" err)
+                  (.write original-stdout
+                          (str (js/JSON.stringify
+                                #js {:jsonrpc "2.0"
+                                     :error #js {:code -32000
+                                                 :message (str "Server connection error: "
+                                                               (.-message err))}})
+                               "\n"))
+                  (.exit process 1))))))
