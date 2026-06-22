@@ -2,6 +2,7 @@
   (:require
    ["fs" :as fs]
    ["net" :as net]
+   ["path" :as path]
    ["vscode" :as vscode]
    [clojure.string :as string]
    [promesa.core :as p]))
@@ -20,9 +21,6 @@
 
 (defn- get-port-file-uri+ [ctx-or-base-uri]
   (vscode/Uri.joinPath (get-server-dir+ ctx-or-base-uri) "port"))
-
-(defn- ensure-port-file-dir-exists!+ [ctx-or-base-uri]
-  (vscode/workspace.fs.createDirectory (get-server-dir+ ctx-or-base-uri)))
 
 (defn- delete-port-file!+ [{:ex/keys [dispatch!]} ^js port-file-uri]
   (p/create
@@ -203,18 +201,31 @@
           (catch js/Error e
             (dispatch! [:app/ax.log :error "[Server] Error sending notification:" (.-message e)])))))))
 
+(defn- cursor-unique-id [workspace-root-path-or-nil]
+  (if workspace-root-path-or-nil
+    (str "ws-" (hash workspace-root-path-or-nil))
+    "no-workspace"))
+
+(defn- get-cursor-port-file-uri [wrapper-config-path workspace-root-uri]
+  (let [config-parent (.dirname path wrapper-config-path)
+        unique-id (cursor-unique-id (some-> workspace-root-uri .-fsPath))
+        port-file-path (.join path config-parent "mcp-server" unique-id "port")]
+    (vscode/Uri.file port-file-path)))
+
 (defn start-server!+
   "Creates a socket server and writes the port to a file.
    Returns a promise that resolves to a map with server info when the MCP server starts successfully."
-  [{:ex/keys [dispatch!] :keys [vscode/extension-context mcp/use-global-port-file?] :as options}]
+  [{:ex/keys [dispatch!] :keys [vscode/extension-context mcp/use-global-port-file? mcp/wrapper-config-path] :as options}]
   (p/let [server-info+ (start-socket-server!+ options)
           port (:server/port server-info+)
-          port-file-base (if use-global-port-file?
-                           (.-globalStorageUri ^js extension-context)
-                           extension-context)
-          ^js port-file-uri (get-port-file-uri+ port-file-base)]
+          ^js port-file-uri (if use-global-port-file?
+                              (get-cursor-port-file-uri wrapper-config-path (get-workspace-root-uri-or-nil))
+                              (get-port-file-uri+ extension-context))
+          port-file-dir (if use-global-port-file?
+                          (vscode/Uri.joinPath port-file-uri "..")
+                          (get-server-dir+ extension-context))]
     (p/do!
-     (ensure-port-file-dir-exists!+ port-file-base)
+     (vscode/workspace.fs.createDirectory port-file-dir)
      (.writeFile vscode/workspace.fs port-file-uri (js/Buffer.from (str port)))
      (dispatch! [[:app/ax.log :info "Wrote port file:" (.-fsPath port-file-uri)]])
      (assoc server-info+ :server/port-file-uri port-file-uri))))

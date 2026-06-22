@@ -19,6 +19,7 @@
        :ex/fxs [[:mcp/fx.start-server {:app/log-dir-initialized+ (:app/log-dir-initialized+ state)
                                        :mcp/repl-enabled? :vscode/config.enableMcpReplEvaluation
                                        :mcp/use-global-port-file? use-global-port-file?
+                                       :mcp/wrapper-config-path (:mcp/wrapper-config-path state)
                                        :server/port server-port
                                        :ex/on-success [[:mcp/ax.server-started :ex/action-args]]
                                        :ex/on-error [[:mcp/ax.server-error :ex/action-args]]}]]})
