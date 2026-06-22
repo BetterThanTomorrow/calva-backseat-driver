@@ -11,9 +11,14 @@
         (some? (.-mcp (.-cursor vscode)))
         (fn? (.-registerServer (.-mcp (.-cursor vscode)))))))
 
-(defn port-file-ready? [server-info]
-  (let [path (config/port-file-fs-path server-info)]
-    (and (seq path) (.existsSync fs path))))
+(defn port-file-ready?+ [server-info]
+  (p/let [path (config/port-file-fs-path server-info)
+          uri (when (seq path) (vscode/Uri.file path))]
+    (if-not uri
+      false
+      (-> (vscode/workspace.fs.stat uri)
+          (p/then (fn [_] true))
+          (p/catch (fn [_] false))))))
 
 (defn reload-mcp-client!+ [^js extension-context]
   (let [identifier (config/mcp-client-identifier extension-context)]
@@ -29,7 +34,8 @@
           (p/catch (fn [err] {:ok false :identifier identifier :error err}))))))
 
 (defn register-mcp-server!+ [^js extension-context server-info]
-  (let [{:keys [ok config reason]} (config/build-cursor-mcp-registration-config extension-context server-info)]
+  (p/let [{:keys [ok config reason]} (config/build-cursor-mcp-registration-config extension-context server-info)
+          ready? (port-file-ready?+ server-info)]
     (cond
       (not ok)
       (p/resolved {:ok false :reason reason})
@@ -37,7 +43,7 @@
       (not (cursor-mcp-available?))
       (p/resolved {:ok false :reason :cursor-api-unavailable})
 
-      (not (port-file-ready? server-info))
+      (not ready?)
       (p/resolved {:ok false :reason :port-file-not-ready})
 
       :else
