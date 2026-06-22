@@ -8,7 +8,8 @@
   (match action
     [:mcp/ax.start-server & _]
     (let [silent? (some-> action second :silent?)
-          server-port (if (cursor-reg/should-use-random-port-for-cursor? state)
+          use-global-port-file? (cursor-reg/should-use-random-port-for-cursor? state)
+          server-port (if use-global-port-file?
                         0
                         :vscode/config.mcpSocketServerPort)]
       {:ex/db (assoc state
@@ -17,6 +18,7 @@
        :ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/starting? true]]
        :ex/fxs [[:mcp/fx.start-server {:app/log-dir-initialized+ (:app/log-dir-initialized+ state)
                                        :mcp/repl-enabled? :vscode/config.enableMcpReplEvaluation
+                                       :mcp/use-global-port-file? use-global-port-file?
                                        :server/port server-port
                                        :ex/on-success [[:mcp/ax.server-started :ex/action-args]]
                                        :ex/on-error [[:mcp/ax.server-error :ex/action-args]]}]]})
