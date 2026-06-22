@@ -15,7 +15,7 @@
   (let [base (cond
                (instance? vscode/Uri ctx-or-base-uri) ctx-or-base-uri
                (get-workspace-root-uri-or-nil) (get-workspace-root-uri-or-nil)
-               :else (.-globalStorageUri ctx-or-base-uri))]
+               :else (.-globalStorageUri ^js ctx-or-base-uri))]
     (vscode/Uri.joinPath base ".calva" "mcp-server")))
 
 (defn- get-port-file-uri+ [ctx-or-base-uri]

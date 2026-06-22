@@ -1,6 +1,5 @@
 (ns calva-backseat-driver.integrations.vscode.cursor
   (:require
-   ["fs" :as fs]
    ["vscode" :as vscode]
    [calva-backseat-driver.integrations.vscode.cursor-config :as config]
    [promesa.core :as p]))
