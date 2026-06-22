@@ -201,14 +201,21 @@
           (catch js/Error e
             (dispatch! [:app/ax.log :error "[Server] Error sending notification:" (.-message e)])))))))
 
-(defn- cursor-unique-id [workspace-root-path-or-nil]
-  (if workspace-root-path-or-nil
+(defn- cursor-unique-id [workspace-root-path-or-nil storage-uri-path-or-nil]
+  (cond
+    workspace-root-path-or-nil
     (str "ws-" (hash workspace-root-path-or-nil))
-    "no-workspace"))
 
-(defn- get-cursor-port-file-uri [wrapper-config-path workspace-root-uri]
+    storage-uri-path-or-nil
+    (str "win-" (hash storage-uri-path-or-nil))
+
+    :else
+    "singleton-fallback"))
+
+(defn- get-cursor-port-file-uri [wrapper-config-path workspace-root-uri storage-uri]
   (let [config-parent (.dirname path wrapper-config-path)
-        unique-id (cursor-unique-id (some-> workspace-root-uri .-fsPath))
+        unique-id (cursor-unique-id (some-> workspace-root-uri .-fsPath)
+                                    (some-> storage-uri .-fsPath))
         port-file-path (.join path config-parent "mcp-server" unique-id "port")]
     (vscode/Uri.file port-file-path)))
 
@@ -219,7 +226,9 @@
   (p/let [server-info+ (start-socket-server!+ options)
           port (:server/port server-info+)
           ^js port-file-uri (if use-global-port-file?
-                              (get-cursor-port-file-uri wrapper-config-path (get-workspace-root-uri-or-nil))
+                              (get-cursor-port-file-uri wrapper-config-path
+                                                       (get-workspace-root-uri-or-nil)
+                                                       (some-> extension-context .-storageUri))
                               (get-port-file-uri+ extension-context))
           port-file-dir (if use-global-port-file?
                           (vscode/Uri.joinPath port-file-uri "..")
