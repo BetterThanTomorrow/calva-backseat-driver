@@ -203,7 +203,7 @@ Use Backseat Driver's structural editing tools for all Clojure file modification
 
 ### Joyride projects
 
-In a Joyride context, if the `joyride_evaluate_code` tool is available, "Use the REPL" means `joyride_evaluate_code`. In lieu of the `joyride_evaluate_code` tool, use the `clojure_evaluate_code` tool. Joyride's REPL runs in the VS Code Extension Host and is promise-aware in ways that Backseat Driver's REPL is not — using Backseat Driver's eval for Joyride code leads to async problems. Other tools of Backseat Driver (ClojureDocs, symbol info, structural editing, output log) remain useful.
+In a Joyride context, if the `joyride_evaluate_code` tool is available, "Use the REPL" means `joyride_evaluate_code`. In lieu of the `joyride_evaluate_code` tool, use the `clojure_evaluate_tool`. Joyride's REPL runs in the VS Code Extension Host and is promise-aware in ways that Backseat Driver's REPL is not — using Backseat Driver's eval for Joyride code leads to async problems. Other tools of Backseat Driver (ClojureDocs, symbol info, structural editing, output log) remain useful.
 
 
 ## Invariants
