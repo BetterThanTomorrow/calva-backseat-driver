@@ -21,11 +21,8 @@
 (defn- get-port-file-uri+ [ctx-or-base-uri]
   (vscode/Uri.joinPath (get-server-dir+ ctx-or-base-uri) "port"))
 
-(defn- get-port-file-uri []
-  (vscode/Uri.joinPath (get-server-dir) "port"))
-
-(defn- ensure-port-file-dir-exists!+ []
-  (vscode/workspace.fs.createDirectory (get-server-dir)))
+(defn- ensure-port-file-dir-exists!+ [ctx-or-base-uri]
+  (vscode/workspace.fs.createDirectory (get-server-dir+ ctx-or-base-uri)))
 
 (defn- delete-port-file!+ [{:ex/keys [dispatch!]} ^js port-file-uri]
   (p/create
@@ -209,19 +206,15 @@
 (defn start-server!+
   "Creates a socket server and writes the port to a file.
    Returns a promise that resolves to a map with server info when the MCP server starts successfully."
-  [{:ex/keys [dispatch!] :as options}]
+  [{:ex/keys [dispatch!] :keys [vscode/extension-context] :as options}]
   (p/let [server-info+ (start-socket-server!+ options)
           port (:server/port server-info+)
-          ^js port-file-uri (get-port-file-uri)]
-    (if port-file-uri
-      (p/do!
-       (ensure-port-file-dir-exists!+)
-       (.writeFile vscode/workspace.fs port-file-uri (js/Buffer.from (str port)))
-       (dispatch! [[:app/ax.log :info "Wrote port file:" (.-fsPath port-file-uri)]])
-       (assoc server-info+ :server/port-file-uri port-file-uri))
-      (do
-        (dispatch! [[:app/ax.log :error "[Server] Could not determine workspace root to write port file."]])
-        (p/rejected (js/Error. "Could not determine workspace root"))))))
+          ^js port-file-uri (get-port-file-uri+ extension-context)]
+    (p/do!
+     (ensure-port-file-dir-exists!+ extension-context)
+     (.writeFile vscode/workspace.fs port-file-uri (js/Buffer.from (str port)))
+     (dispatch! [[:app/ax.log :info "Wrote port file:" (.-fsPath port-file-uri)]])
+     (assoc server-info+ :server/port-file-uri port-file-uri))))
 
 (defn- close-server!+ [{:ex/keys [dispatch!]
                         :server/keys [instance]}]
@@ -252,14 +245,14 @@
 (defn stop-server!+
   "Stops the MCP server and removes the port file.
    Returns a promise that resolves to a boolean indicating success."
-  [{:keys [server/instance ex/dispatch!] :as options}]
+  [{:keys [server/instance ex/dispatch! vscode/extension-context] :as options}]
   (if-not instance
     (do
       (dispatch! [[:app/ax.log :info "No server instance provided to stop."]])
       (p/resolved false))
     (-> (close-server!+ options)
         (p/then (fn [_]
-                  (let [port-file-uri (get-port-file-uri)]
+                  (let [port-file-uri (get-port-file-uri+ extension-context)]
                     (delete-port-file!+ options port-file-uri))))
         (p/then (fn [_] true))
         (p/catch (fn [err]
