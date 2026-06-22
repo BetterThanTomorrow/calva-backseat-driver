@@ -26,8 +26,8 @@
     [:mcp/ax.server-started server-info]
     (let [silent? (:app/server-start-silent? state)
           effective-state (if silent?
-                           state
-                           (dissoc state :mcp/cursor-register-server-called?))
+                            state
+                            (dissoc state :mcp/cursor-register-server-called?))
           register? (cursor-reg/should-call-register-server? effective-state server-info)]
       {:ex/db (cond-> (assoc state
                              :app/server-info server-info
