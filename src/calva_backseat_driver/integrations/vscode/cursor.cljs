@@ -11,13 +11,11 @@
         (fn? (.-registerServer (.-mcp (.-cursor vscode)))))))
 
 (defn port-file-ready?+ [server-info]
-  (p/let [path (config/port-file-fs-path server-info)
-          uri (when (seq path) (vscode/Uri.file path))]
-    (if-not uri
-      false
-      (-> (vscode/workspace.fs.stat uri)
-          (p/then (fn [_] true))
-          (p/catch (fn [_] false))))))
+  (if-let [uri (:server/port-file-uri server-info)]
+    (-> (vscode/workspace.fs.stat uri)
+        (p/then (fn [_] true))
+        (p/catch (fn [_] false)))
+    (p/resolved false)))
 
 (defn reload-mcp-client!+ [^js extension-context]
   (let [identifier (config/mcp-client-identifier extension-context)]
