@@ -206,12 +206,15 @@
 (defn start-server!+
   "Creates a socket server and writes the port to a file.
    Returns a promise that resolves to a map with server info when the MCP server starts successfully."
-  [{:ex/keys [dispatch!] :keys [vscode/extension-context] :as options}]
+  [{:ex/keys [dispatch!] :keys [vscode/extension-context mcp/use-global-port-file?] :as options}]
   (p/let [server-info+ (start-socket-server!+ options)
           port (:server/port server-info+)
-          ^js port-file-uri (get-port-file-uri+ extension-context)]
+          port-file-base (if use-global-port-file?
+                           (.-globalStorageUri ^js extension-context)
+                           extension-context)
+          ^js port-file-uri (get-port-file-uri+ port-file-base)]
     (p/do!
-     (ensure-port-file-dir-exists!+ extension-context)
+     (ensure-port-file-dir-exists!+ port-file-base)
      (.writeFile vscode/workspace.fs port-file-uri (js/Buffer.from (str port)))
      (dispatch! [[:app/ax.log :info "Wrote port file:" (.-fsPath port-file-uri)]])
      (assoc server-info+ :server/port-file-uri port-file-uri))))
