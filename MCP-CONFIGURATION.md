@@ -62,3 +62,5 @@ Please help with providing info here.
 ### Other MCP client?
 
 Please add configuration for other AI clients! 🙏
+
+Cursor auto-registration works without a workspace folder (single-file or folder-less windows use the extension's global storage for the port file). When auto-registration is enabled, a random port is used (the configured static port is respected only when auto-registration is disabled).
