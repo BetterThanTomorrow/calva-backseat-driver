@@ -2,6 +2,7 @@
   (:require
    ["fs" :as fs]
    ["net" :as net]
+   ["os" :as os]
    ["path" :as path]
    ["vscode" :as vscode]
    [clojure.string :as string]
@@ -212,11 +213,10 @@
     :else
     "singleton-fallback"))
 
-(defn- get-cursor-port-file-uri [wrapper-config-path workspace-root-uri storage-uri]
-  (let [config-parent (.dirname path wrapper-config-path)
-        unique-id (cursor-unique-id (some-> workspace-root-uri .-fsPath)
+(defn- get-cursor-port-file-uri [_wrapper-config-path workspace-root-uri storage-uri]
+  (let [unique-id (cursor-unique-id (some-> workspace-root-uri .-fsPath)
                                     (some-> storage-uri .-fsPath))
-        port-file-path (.join path config-parent "mcp-server" unique-id "port")]
+        port-file-path (.join path (os/tmpdir) "calva-mcp-server" unique-id "port")]
     (vscode/Uri.file port-file-path)))
 
 (defn start-server!+
