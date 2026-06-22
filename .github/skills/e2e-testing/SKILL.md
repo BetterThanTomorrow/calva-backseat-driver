@@ -5,7 +5,9 @@ description: 'E2E test authoring for Backseat Driver. Use when: writing, modifyi
 
 # E2E Testing — Backseat Driver
 
-E2e tests run inside a VS Code Extension Host via Joyride. They exercise the full stack: extension activation, MCP server lifecycle, TCP socket communication, tool invocation, and VS Code command registration.
+E2e tests run inside a VS Code Extension Host via Joyride. They exercise the full stack: extension activation, MCP server lifecycle, TCP socket communication, tool invocation, and VS Code command registration. Together with the `bd-tester` agent (which uses the MCP protocol for its test harness) in the example/test project inside the dev Extension Host, the e2e suite provides full coverage of the MCP server and tools.
+
+When verifying a change that affects MCP behavior, use the `bd-tester` agent in the dev Extension Host to specifically exercise the changed functionality, and often run its full protocol as a regression check.
 
 ## Running Tests
 

@@ -70,15 +70,20 @@ npm run watch           # shadow-cljs + nREPL, auto-runs tests
 
 ### Testing Commands
 ```bash
-bb run-e2e-tests-ws     # Full E2E
-bb run-mcp-inspector    # Test MCP tools interactively
+bb run-e2e-tests-ws     # Full E2E (exercises MCP server for many tests)
 bb package-pre-release  # Package pre-release VSIX
 ```
+
+`bb run-mcp-inspector` remains available for interactive/ad-hoc exploration of MCP tools when needed, but is not part of the daily verification routine.
+
+**Verification after changes**:
+- Full MCP coverage comes from the e2e tests + the `bd-tester` agent in the example/test project used inside the dev Extension Host.
+- For any change affecting the MCP server, tools, port file, or Cursor auto-registration: after the change, launch the dev Extension Host (F5), use `bd-tester` to specifically test the modified behavior, and frequently run its full protocol as a regression check.
 
 **Note**: When running `bb run-e2e-tests-ws`: Detailed output goes to .tmp/e2e-output.log — read that file for details, if needed. The command outputs a very brief summary. Don't pipe or redirect.
 
 ### E2E Testing
-Load the `e2e-testing` skill (`.github/skills/e2e-testing/SKILL.md`) when writing, modifying, or debugging e2e tests. It covers test runner mechanics, shared helpers, session lifecycle patterns, and data shape through MCP.
+Load the `e2e-testing` skill (`.github/skills/e2e-testing/SKILL.md`) when writing, modifying, or debugging e2e tests. It covers test runner mechanics, shared helpers, session lifecycle patterns, and data shape through MCP. The e2e suite (plus the `bd-tester` agent in the dev extension host's test project) provides full coverage of the MCP server/tools protocol.
 
 Key rule: always use `wait-for+` polling instead of `p/delay`/`setTimeout` for async conditions.
 
