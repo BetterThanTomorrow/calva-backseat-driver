@@ -33,7 +33,10 @@
     "ai"
   ],
   "activationEvents": [
-    "onLanguage:clojure"
+    "*",
+    "onCommand:calva-backseat-driver.startMcpServer",
+    "onCommand:calva-backseat-driver.stopMcpServer",
+    "onCommand:calva-backseat-driver.openLogFile"
   ],
   "main": "out/extension.js",
   "contributes": {
