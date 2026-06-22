@@ -6,13 +6,20 @@
    [clojure.string :as string]
    [promesa.core :as p]))
 
-(defn- get-workspace-root-uri []
+(defn- get-workspace-root-uri-or-nil []
   (some-> vscode/workspace.workspaceFolders
           first
           .-uri))
 
-(defn- get-server-dir []
-  (vscode/Uri.joinPath (get-workspace-root-uri) ".calva" "mcp-server"))
+(defn- get-server-dir+ [ctx-or-base-uri]
+  (let [base (cond
+               (instance? vscode/Uri ctx-or-base-uri) ctx-or-base-uri
+               (get-workspace-root-uri-or-nil) (get-workspace-root-uri-or-nil)
+               :else (.-globalStorageUri ctx-or-base-uri))]
+    (vscode/Uri.joinPath base ".calva" "mcp-server")))
+
+(defn- get-port-file-uri+ [ctx-or-base-uri]
+  (vscode/Uri.joinPath (get-server-dir+ ctx-or-base-uri) "port"))
 
 (defn- get-port-file-uri []
   (vscode/Uri.joinPath (get-server-dir) "port"))
