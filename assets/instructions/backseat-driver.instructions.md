@@ -18,7 +18,7 @@ Shadow-cljs sessions may expose multiple JavaScript runtimes via `clojure_list_s
 
 ## Joyride Boundary
 
-In a Joyride context, if the `joyride_evaluate_code` tool is available, "Use the REPL" means `joyride_evaluate_code`. All other Backseat Driver tools remain useful in Joyride contexts. In lieu of the `joyride_evaluate_code` tool, use the `clojure_evaluate_tool`. 
+In a Joyride context, if the `joyride_evaluate_code` tool is available, "Use the REPL" means `joyride_evaluate_code`. All other Backseat Driver tools remain useful in Joyride contexts. In lieu of the `joyride_evaluate_code` tool, use the `clojure_evaluate_code` tool. 
 
 ## Load the Skills
 
