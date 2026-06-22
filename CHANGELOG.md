@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.37] - 2026-06-22
+
 - Backseat Driver is now also a Cursor extension making its Clojure tools available to the agent with Zero Config.
 
 ## [v0.0.36] - 2026-06-21
