@@ -202,6 +202,9 @@
           (catch js/Error e
             (dispatch! [:app/ax.log :error "[Server] Error sending notification:" (.-message e)])))))))
 
+(defn random-anon-id []
+  (str "anon-" (subs (str (random-uuid)) 0 8)))
+
 (defn- cursor-unique-id [workspace-root-path-or-nil storage-uri-path-or-nil]
   (cond
     workspace-root-path-or-nil
@@ -211,7 +214,7 @@
     (str "win-" (hash storage-uri-path-or-nil))
 
     :else
-    "singleton-fallback"))
+    (random-anon-id)))
 
 (defn- get-cursor-port-file-uri [_wrapper-config-path workspace-root-uri storage-uri]
   (let [unique-id (cursor-unique-id (some-> workspace-root-uri .-fsPath)
@@ -227,8 +230,8 @@
           port (:server/port server-info+)
           ^js port-file-uri (if use-global-port-file?
                               (get-cursor-port-file-uri wrapper-config-path
-                                                       (get-workspace-root-uri-or-nil)
-                                                       (some-> extension-context .-storageUri))
+                                                        (get-workspace-root-uri-or-nil)
+                                                        (some-> extension-context .-storageUri))
                               (get-port-file-uri+ extension-context))
           port-file-dir (if use-global-port-file?
                           (vscode/Uri.joinPath port-file-uri "..")
