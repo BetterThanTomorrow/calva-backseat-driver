@@ -8,7 +8,7 @@
   (match action
     [:mcp/ax.start-server & _]
     (let [silent? (some-> action second :silent?)
-          server-port (if (and silent? (cursor-reg/should-use-random-port-for-cursor? state))
+          server-port (if (cursor-reg/should-use-random-port-for-cursor? state)
                         0
                         :vscode/config.mcpSocketServerPort)]
       {:ex/db (assoc state
@@ -23,7 +23,10 @@
 
     [:mcp/ax.server-started server-info]
     (let [silent? (:app/server-start-silent? state)
-          register? (cursor-reg/should-call-register-server? state server-info)]
+          effective-state (if silent?
+                           state
+                           (dissoc state :mcp/cursor-register-server-called?))
+          register? (cursor-reg/should-call-register-server? effective-state server-info)]
       {:ex/db (cond-> (assoc state
                              :app/server-info server-info
                              :app/server-starting? false
