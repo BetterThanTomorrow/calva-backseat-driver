@@ -4,7 +4,7 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
-- Backseat Driver is now also a Cursor extension, making its Clojure tools available to the agent with Zero Config.
+- Backseat Driver is now also a Cursor extension making its Clojure tools available to the agent with Zero Config.
 
 ## [v0.0.36] - 2026-06-21
 
