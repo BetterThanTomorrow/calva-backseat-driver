@@ -51,7 +51,8 @@
     [:mcp/fx.start-server options]
     (let [{:ex/keys [on-success on-error]} options]
       (-> (server/start-server!+ (assoc options :ex/dispatch!
-                                        (partial dispatch! context)))
+                                        (partial dispatch! context)
+                                        :vscode/extension-context context))
           (p/then (fn [server-info]
                     (dispatch! context (ax/enrich-with-args on-success server-info))))
           (p/catch
@@ -85,7 +86,8 @@
           stop-server+ (fn []
                          (p/catch
                           (server/stop-server!+ (assoc options :ex/dispatch!
-                                                       (partial dispatch! context)))
+                                                       (partial dispatch! context)
+                                                       :vscode/extension-context context))
                           (fn [e]
                             (dispatch! context (ax/enrich-with-args on-error (.-message e)))
                             false)))]
