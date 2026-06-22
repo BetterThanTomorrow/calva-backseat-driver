@@ -10,7 +10,12 @@ module.exports = {
     getExtension: () => null
   },
   Uri: {
-    joinPath: (...parts) => ({ fsPath: parts.filter(Boolean).join("/") })
+    joinPath: (base, ...rest) => {
+      if (!base || typeof base.fsPath !== 'string') {
+        throw new Error('Uri.joinPath: base must be a vscode.Uri');
+      }
+      return { fsPath: [base.fsPath, ...rest.filter(Boolean)].join('/') };
+    }
   },
   workspace: {
     getConfiguration: () => ({ get: () => undefined }),
