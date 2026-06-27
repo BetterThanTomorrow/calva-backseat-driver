@@ -174,8 +174,10 @@
                               extension-path (str (fs/home)
                                                   "/.vscode-insiders/extensions/betterthantomorrow."
                                                   vsix-basename)]
-                          (println "Using installed extension at:" extension-path)
-                          (fs/path extension-path "dist" "calva-mcp-server.js"))
+                          (println "Using installed extension")
+                          (if (fs/exists? extension-path)
+                            (fs/path extension-path "dist" "calva-mcp-server.js")
+                            (fs/path "dist" "calva-mcp-server.js")))
                         (do
                           (println "Using local dev build")
                           (fs/path "dist" "calva-mcp-server.js")))

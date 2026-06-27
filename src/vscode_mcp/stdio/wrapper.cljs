@@ -1,8 +1,9 @@
-(ns calva-backseat-driver.stdio.wrapper
+(ns vscode-mcp.stdio.wrapper
   (:require
    ["fs" :as fs]
    ["net" :as net]
    ["process" :as process]
+   ["path" :as path]
    [clojure.string :as string]))
 
 (def log-levels {:error 0
@@ -140,22 +141,23 @@
 
   (log-stderr :info "Running in node version: " (.-version process))
 
-  (if-not port-or-port-file
-    (do
-      (log-stderr :error "Usage: calva-mcp-server.js <port or port-file>")
-      (.write original-stdout
+  (let [script-name (path/basename (nth (.-argv process) 1 "mcp-server.js"))]
+    (if-not port-or-port-file
+      (do
+        (log-stderr :error (str "Usage: " script-name " <port or port-file>"))
+        (.write original-stdout
               (str (js/JSON.stringify
                     #js {:jsonrpc "2.0"
                          :error #js {:code -32002
                                      :message "Configuration error: Port or port file path not provided."}})
                    "\n"))
       (.exit process 1))
-    (-> (if-let [parsed-port (parse-long port-or-port-file)]
+        (-> (if-let [parsed-port (parse-long port-or-port-file)]
           (js/Promise. (fn [resolve _]
-                         (log-stderr :info "Connecting to Backseat Driver on port." parsed-port)
+                         (log-stderr :info "Connecting to MCP server on port." parsed-port)
                          (resolve parsed-port)))
           (do
-            (log-stderr :info "Connecting to Backseat Driver using port file." port-or-port-file)
+            (log-stderr :info "Connecting to MCP server using port file." port-or-port-file)
             (read-port-from-file port-or-port-file)))
         (.then (fn [port]
                  (if port
@@ -172,4 +174,4 @@
                                         :error #js {:code -32001
                                                     :message "MCP server not running or port file missing."}})
                                   "\n"))
-                     (.exit process 1))))))))
+                     (.exit process 1)))))))))

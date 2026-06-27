@@ -1,4 +1,4 @@
-(ns btt.mcp.server
+(ns vscode-mcp.server
   (:require
    ["fs" :as fs]
    ["net" :as net]

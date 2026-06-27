@@ -1,4 +1,4 @@
-(ns btt.mcp.cursor-config
+(ns vscode-mcp.cursor-config
   (:require
    ["path" :as path]))
 

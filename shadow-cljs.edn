@@ -12,7 +12,7 @@
               :exports {:activate calva-backseat-driver.extension/activate
                         :deactivate calva-backseat-driver.extension/deactivate}}
   :stdio-wrapper {:target :node-script
-                  :main calva-backseat-driver.stdio.wrapper/main
+                  :main vscode-mcp.stdio.wrapper/main
                   :output-to "dist/calva-mcp-server.js"}
   :test-watch
   {:target    :node-test
