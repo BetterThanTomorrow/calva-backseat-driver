@@ -1,66 +1,22 @@
 (ns calva-backseat-driver.integrations.vscode.cursor
   (:require
-   ["vscode" :as vscode]
-   [calva-backseat-driver.integrations.vscode.cursor-config :as config]
-   [promesa.core :as p]))
+   [btt.mcp.cursor :as btt-cursor]
+   [calva-backseat-driver.integrations.vscode.cursor-config :as config]))
 
 (defn cursor-mcp-available? []
-  (boolean
-   (and (some? (.-cursor vscode))
-        (some? (.-mcp (.-cursor vscode)))
-        (fn? (.-registerServer (.-mcp (.-cursor vscode)))))))
+  (btt-cursor/cursor-mcp-available?))
 
 (defn port-file-ready?+ [server-info]
-  (if-let [uri (:server/port-file-uri server-info)]
-    (-> (vscode/workspace.fs.stat uri)
-        (p/then (fn [_] true))
-        (p/catch (fn [_] false)))
-    (p/resolved false)))
+  (btt-cursor/port-file-ready?+ (:server/port-file-uri server-info)))
 
-(defn reload-mcp-client!+ [^js extension-context]
-  (let [identifier (config/mcp-client-identifier extension-context)]
-    (cond
-      (not identifier)
-      (p/resolved {:ok false :reason :missing-extension-context})
+(defn reload-mcp-client!+ [extension-context]
+  (btt-cursor/reload-mcp-client!+ extension-context config/cursor-mcp-server-name))
 
-      :else
-      (-> (vscode/commands.executeCommand
-           config/cursor-mcp-reload-client-command-id
-           (clj->js {:identifier identifier}))
-          (p/then (fn [result] {:ok true :identifier identifier :result result}))
-          (p/catch (fn [err] {:ok false :identifier identifier :error err}))))))
+(defn register-mcp-server!+ [extension-context server-info]
+  (btt-cursor/register-mcp-server!+ config/cursor-mcp-server-name extension-context "dist/calva-mcp-server.js" (:server/port-file-uri server-info)))
 
-(defn register-mcp-server!+ [^js extension-context server-info]
-  (p/let [{:keys [ok config reason]} (config/build-cursor-mcp-registration-config extension-context server-info)
-          ready? (port-file-ready?+ server-info)]
-    (cond
-      (not ok)
-      (p/resolved {:ok false :reason reason})
-
-      (not (cursor-mcp-available?))
-      (p/resolved {:ok false :reason :cursor-api-unavailable})
-
-      (not ready?)
-      (p/resolved {:ok false :reason :port-file-not-ready})
-
-      :else
-      (-> (.registerServer (.-mcp (.-cursor vscode)) (clj->js config))
-          (p/then (fn [_] {:ok true :config config}))
-          (p/catch (fn [err] {:ok false :error err :config config}))))))
-
-(defn register-and-reload-mcp-client!+ [^js extension-context server-info]
-  (p/let [register-result (register-mcp-server!+ extension-context server-info)]
-    (if-not (:ok register-result)
-      register-result
-      (p/let [reload-result (reload-mcp-client!+ extension-context)]
-        (assoc register-result :reload reload-result)))))
+(defn register-and-reload-mcp-client!+ [extension-context server-info]
+  (btt-cursor/register-and-reload-mcp-client!+ config/cursor-mcp-server-name extension-context "dist/calva-mcp-server.js" (:server/port-file-uri server-info)))
 
 (defn unregister-mcp-server!+ []
-  (cond
-    (not (cursor-mcp-available?))
-    (p/resolved {:ok false :reason :cursor-api-unavailable})
-
-    :else
-    (-> (.unregisterServer (.-mcp (.-cursor vscode)) config/cursor-mcp-server-name)
-        (p/then (fn [_] {:ok true}))
-        (p/catch (fn [err] {:ok false :error err})))))
+  (btt-cursor/unregister-mcp-server!+ config/cursor-mcp-server-name))
