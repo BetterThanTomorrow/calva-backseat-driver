@@ -1,7 +1,7 @@
-(ns btt.mcp.cursor
+(ns vscode-mcp.cursor
   (:require
    ["vscode" :as vscode]
-   [btt.mcp.cursor-config :as config]
+   [vscode-mcp.cursor-config :as config]
    [promesa.core :as p]))
 
 (defn cursor-mcp-available? []

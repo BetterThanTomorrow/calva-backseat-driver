@@ -3,7 +3,7 @@
    ["os" :as os]
    ["path" :as path]
    ["vscode" :as vscode]
-   [btt.mcp.server :as btt-mcp]
+   [vscode-mcp.server :as btt-mcp]
    [promesa.core :as p]))
 
 (defonce ^:private current-server-info (atom nil))

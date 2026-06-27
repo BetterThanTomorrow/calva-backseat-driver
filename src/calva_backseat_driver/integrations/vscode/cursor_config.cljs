@@ -1,6 +1,6 @@
 (ns calva-backseat-driver.integrations.vscode.cursor-config
   (:require
-   [btt.mcp.cursor-config :as btt-cursor-config]))
+   [vscode-mcp.cursor-config :as btt-cursor-config]))
 
 (def cursor-mcp-server-name "backseat-driver")
 (def cursor-mcp-extension-segment "extension")

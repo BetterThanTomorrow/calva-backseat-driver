@@ -1,6 +1,6 @@
 (ns calva-backseat-driver.integrations.vscode.cursor
   (:require
-   [btt.mcp.cursor :as btt-cursor]
+   [vscode-mcp.cursor :as btt-cursor]
    [calva-backseat-driver.integrations.vscode.cursor-config :as config]))
 
 (defn cursor-mcp-available? []
