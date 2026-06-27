@@ -1,65 +1,38 @@
 (ns calva-backseat-driver.integrations.vscode.cursor-config
   (:require
-   ["path" :as path]))
+   [btt.mcp.cursor-config :as btt-cursor-config]))
 
 (def cursor-mcp-server-name "backseat-driver")
 (def cursor-mcp-extension-segment "extension")
 (def cursor-mcp-reload-client-command-id "mcp.reloadClient")
 
-(defn cursor-mcp-settings-display-name
-  "Label shown in Cursor Settings → Tools and MCP for extension-registered servers."
-  []
+(defn cursor-mcp-settings-display-name []
   (str cursor-mcp-extension-segment "-" cursor-mcp-server-name))
 
-(defn mcp-client-identifier
-  "Cursor MCP service identifier for `mcp.reloadClient`.
-   Built as user-{extensionId}-extension-{registerServer name}, which is why
-   Settings shows extension-backseat-driver when name is backseat-driver."
-  [^js extension-context]
-  (when extension-context
-    (let [extension-id (some-> extension-context .-extension .-id)]
-      (when (seq extension-id)
-        (str "user-" extension-id "-" cursor-mcp-extension-segment "-" cursor-mcp-server-name)))))
+(defn mcp-client-identifier [extension-context]
+  (btt-cursor-config/mcp-client-identifier extension-context cursor-mcp-server-name))
 
-(defn wrapper-script-path
-  "Absolute path to the stdio wrapper bundled with the running extension instance."
-  [^js extension-context]
-  (when extension-context
-    (path/join (.-extensionPath extension-context) "dist" "calva-mcp-server.js")))
+(defn wrapper-script-path [extension-context]
+  (btt-cursor-config/wrapper-script-path extension-context "dist/calva-mcp-server.js"))
 
 (defn port-file-fs-path [server-info]
   (some-> server-info :server/port-file-uri (unchecked-get "fsPath")))
 
-(defn build-stdio-server-config
-  "Pure config builder. Returns {:ok true :config ...} or {:ok false :reason ...}."
-  [wrapper-path port-file-path]
-  (cond
-    (not (seq (str wrapper-path)))
-    {:ok false :reason :missing-wrapper-path}
+(defn build-stdio-server-config [wrapper-path port-file-path]
+  (btt-cursor-config/build-stdio-server-config cursor-mcp-server-name wrapper-path port-file-path))
 
-    (not (seq (str port-file-path)))
-    {:ok false :reason :missing-port-file-path}
+(defn build-cursor-mcp-registration-config [extension-context server-info]
+  (btt-cursor-config/build-cursor-mcp-registration-config
+   cursor-mcp-server-name
+   extension-context
+   "dist/calva-mcp-server.js"
+   (:server/port-file-uri server-info)))
 
-    :else
-    {:ok true
-     :config {:name cursor-mcp-server-name
-              :server {:command "node"
-                       :args [(str wrapper-path) (str port-file-path)]
-                       :env {}}}}))
-
-(defn build-cursor-mcp-registration-config
-  [extension-context server-info]
-  (build-stdio-server-config (wrapper-script-path extension-context)
-                             (port-file-fs-path server-info)))
-
-(defn should-auto-start-mcp-server?
-  "True when the existing autoStart setting is on, or Cursor auto-register is enabled and available."
-  [auto-start-mcp? auto-register-cursor-mcp? cursor-mcp-available?]
+(defn should-auto-start-mcp-server? [auto-start-mcp? auto-register-cursor-mcp? cursor-mcp-available?]
   (or auto-start-mcp?
       (and auto-register-cursor-mcp? cursor-mcp-available?)))
 
-(defn should-register-cursor-mcp?
-  [auto-register-cursor-mcp? cursor-mcp-available? server-info]
+(defn should-register-cursor-mcp? [auto-register-cursor-mcp? cursor-mcp-available? server-info]
   (and auto-register-cursor-mcp?
        cursor-mcp-available?
        (seq (port-file-fs-path server-info))))
