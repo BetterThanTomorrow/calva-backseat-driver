@@ -143,7 +143,7 @@
     (println "HEAD Commit ID:" commit-id)
     (println "Packaging pre-release...")
     (util/shell dry "npm" "version" "--no-git-tag-version" version)
-    (util/shell dry "npx" "vsce" "package" "--pre-release")
+    (util/shell dry "npx" "vsce" "package" "--allow-star-activation" "--pre-release")
     (util/shell dry "npm" "version" "--no-git-tag-version" current-version)
     {:vsix-file vsix-file}))
 
