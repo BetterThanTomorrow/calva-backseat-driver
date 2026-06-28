@@ -8,7 +8,6 @@
 ;; If there is anything you want to happen in the workspace before
 ;; the tests run, you can set things up here
 
-#_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
 (def ws-root (first vscode/workspace.workspaceFolders))
 
 (def question 42)
