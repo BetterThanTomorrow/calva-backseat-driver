@@ -14,9 +14,9 @@
 
 (defn- settings-map [options]
   (let [{:mcp/keys [provide-bd-skill? provide-edit-skill?]} options]
-    {"config.calva-backseat-driver.provideBdSkill" provide-bd-skill?
-     "config.calva-backseat-driver.provideEditSkill" provide-edit-skill?
-     ":calva-mcp-extension/activated?" true}))
+    {(keyword "mcp" "calva-backseat-driver.provideBdSkill") provide-bd-skill?
+     (keyword "mcp" "calva-backseat-driver.provideEditSkill") provide-edit-skill?
+     (keyword "mcp" ":calva-mcp-extension/activated?") true}))
 
 
 
@@ -26,8 +26,7 @@
   {:jsonrpc "2.0"
    :id id
    :result {:content [{:type "text"
-                       :text (js/JSON.stringify data)}]
-            :isError false}})
+                       :text (js/JSON.stringify data)}]}})
 
 (defn- clj-response
   "JSON-RPC success response with clj->js JSON-stringified text content."
@@ -35,16 +34,14 @@
   {:jsonrpc "2.0"
    :id id
    :result {:content [{:type "text"
-                       :text (js/JSON.stringify (clj->js data))}]
-            :isError false}})
+                       :text (js/JSON.stringify (clj->js data))}]}})
 
 (defn- content-response
   "JSON-RPC success response with pre-built content array."
   [id content]
   {:jsonrpc "2.0"
    :id id
-   :result {:content content
-            :isError false}})
+   :result {:content content}})
 
 (defn- error-response
   "JSON-RPC error response."
