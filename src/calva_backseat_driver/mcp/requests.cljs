@@ -1,6 +1,5 @@
 (ns calva-backseat-driver.mcp.requests
   (:require
-   ["vscode" :as vscode]
    [calva-backseat-driver.bracket-balance :as bracket-balance]
    [calva-backseat-driver.tools :as tools]
    [calva-backseat-driver.integrations.calva.features :as calva]
