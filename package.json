@@ -494,7 +494,7 @@
     "precompile": "npm run clean",
     "release-test": "node out/extension-tests.js",
     "release": "npx shadow-cljs release :extension :test-compile :stdio-wrapper",
-    "package": "npx vsce package --githubBranch master",
+    "package": "npx vsce package --allow-star-activation --githubBranch master",
     "vscode:prepublish": "npm run clean && npm run release"
   },
   "dependencies": {
