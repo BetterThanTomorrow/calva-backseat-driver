@@ -204,22 +204,6 @@
     {:search-padding (.get config "fuzzyLineTargetingPadding")
      :context-padding (.get config "lineContextResponsePadding")}))
 
-
-
-(defn- form-edit+ [{:ex/keys [dispatch!]
-                    :calva/keys [file-path line target-line-text new-form]
-                    :keys [ranges-fn-key log-verb]}]
-  (let [{:keys [search-padding context-padding]} (get-editor-config)]
-    (dispatch! [[:app/ax.log :debug "[Editor]" log-verb "form at line" line "in" file-path]])
-    (editor/apply-form-edit-by-line-with-text-targeting
-     {:editor/file-path file-path
-      :editor/line-number line
-      :editor/target-line target-line-text
-      :editor/new-form new-form
-      :editor/ranges-fn-key ranges-fn-key
-      :editor/search-padding search-padding
-      :editor/context-padding context-padding})))
-
 (defn- apply-single-edit+
   "Apply a single edit operation. Returns {:success true ...} or {:success false ...}"
   [edit search-padding context-padding]

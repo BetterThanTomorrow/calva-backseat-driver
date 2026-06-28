@@ -235,8 +235,8 @@
                       :editor/original-line-number (:editor/line-number opts)))))
           (p/catch (fn [e] {:success false :error (.-message e)}))))))
 
+#_{:clojure-lsp/ignore [:clojure-lsp/unused-public-var]}
 (comment
-
   (p/let [edit-result (apply-form-edit-by-line-with-text-targeting
                        {:editor/file-path "/Users/pez/Projects/calva-mcp-server/test-projects/example/src/mini/playground.clj"
                         :editor/line-number 214
@@ -310,18 +310,6 @@
                           :error (.-message error)
                           :file-path file-path})))))))
 
-(defn structural-create-file+
-  "Create a new Clojure file with exact content using vscode/workspace.fs API"
-  [file-path content]
-  (p/let [result (create-file-core+ file-path content)]
-    (if (:success result)
-      (p/let [_ (p/delay 1000)
-              diagnostics-after-edit (get-diagnostics-for-file file-path)]
-        (assoc result
-               :message "File created successfully"
-               :diagnostics-after-edit diagnostics-after-edit))
-      result)))
-
 (defn append-code-core+
   "Append a top-level form to the end of a file. Returns {:success true :appended-at-end true} or {:success false ...}"
   [file-path code]
@@ -352,15 +340,3 @@
           (p/catch (fn [error]
                      {:success false
                       :error (.-message error)}))))))
-
-(defn append-code+
-  "Append a top-level form to the end of a file at guaranteed top level"
-  [file-path code]
-  (p/let [diagnostics-before-edit (get-diagnostics-for-file file-path)
-          result (append-code-core+ file-path code)]
-    (if (:success result)
-      (p/let [diagnostics-after-edit (poll-diagnostics+ file-path diagnostics-before-edit)]
-        (assoc result
-               :diagnostics-before-edit diagnostics-before-edit
-               :diagnostics-after-edit diagnostics-after-edit))
-      result)))
