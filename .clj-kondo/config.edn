@@ -1,3 +1,4 @@
 {:lint-as {e2e.macros/deftest-async clojure.test/deftest
            snitch.core/defn* clojure.core/defn
-           snitch.core/*let clojure.core/let}}
+           snitch.core/*let clojure.core/let}
+ :skip-dirs [".vscode-test" ".tmp" "test-projects/example/.clj-kondo"]}
