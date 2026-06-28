@@ -220,37 +220,6 @@
       :editor/search-padding search-padding
       :editor/context-padding context-padding})))
 
-(defn replace-top-level-form+
-  "Replace a top-level form using text targeting and Calva's ranges API"
-  [m]
-  (form-edit+ (assoc m :ranges-fn-key :currentTopLevelForm :log-verb "Replacing")))
-
-(defn insert-top-level-form+
-  "Insert a top-level form using text targeting and Calva's ranges API"
-  [m]
-  (form-edit+ (assoc m :ranges-fn-key :insertionPoint :log-verb "Inserting")))
-
-(defn structural-create-file+
-  "Create a new Clojure file with exact content using vscode/workspace.fs API"
-  [{:ex/keys [dispatch!]
-    :calva/keys [file-path content]}]
-  (dispatch! [[:app/ax.log :debug "[Editor] Creating file" file-path]])
-  (p/let [result (editor/structural-create-file+ file-path content)]
-    (when (not (:success result))
-      (dispatch! [[:app/ax.log :error "[Editor] Failed to create file" file-path (:error result)]]))
-    result))
-
-(defn append-code+
-  "Append a top-level form to the end of a file at guaranteed top level"
-  [{:ex/keys [dispatch!]
-    :calva/keys [file-path code]}]
-  (dispatch! [[:app/ax.log :debug "[Editor] Appending code to end of" file-path]])
-  (p/let [result (editor/append-code+ file-path code)]
-    (when (not (:success result))
-      (dispatch! [[:app/ax.log :error "[Editor] Failed to append code to file" file-path (:error result)]]))
-    result))
-
-
 (defn- apply-single-edit+
   "Apply a single edit operation. Returns {:success true ...} or {:success false ...}"
   [edit search-padding context-padding]
