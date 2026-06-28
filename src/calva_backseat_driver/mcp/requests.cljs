@@ -11,13 +11,13 @@
    [vscode-mcp.responses :refer [text-response clj-response content-response error-response]]))
 
 (defn- get-extension-version [options]
-  (some-> options :vscode/extension-context .-extension .-packageJSON .-version))
+  (some-> ^js (:vscode/extension-context options) .-extension .-packageJSON .-version))
 
 (defn- settings-map [options]
   (let [{:mcp/keys [provide-bd-skill? provide-edit-skill?]} options]
-    {(keyword "mcp" "calva-backseat-driver.provideBdSkill") provide-bd-skill?
-     (keyword "mcp" "calva-backseat-driver.provideEditSkill") provide-edit-skill?
-     (keyword "mcp" ":calva-mcp-extension/activated?") true}))
+    {"config.calva-backseat-driver.provideBdSkill" provide-bd-skill?
+     "config.calva-backseat-driver.provideEditSkill" provide-edit-skill?
+     ":calva-mcp-extension/activated?" true}))
 
 
 (defn- exception-message
