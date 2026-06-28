@@ -235,10 +235,11 @@
     (handle-tools-list options id)
 
     "resources/list"
-    (let [skills (manifest/get-resources (:vscode/extension-context options) {:settings (settings-map options)})]
+    (let [skills (manifest/get-resources (:vscode/extension-context options) {:settings (settings-map options)})
+          public-skills (map #(dissoc % :skill-path) skills)]
       {:jsonrpc "2.0"
        :id id
-       :result {:resources skills}})
+       :result {:resources public-skills}})
 
     "resources/templates/list"
     (let [all-tools (manifest/get-tools (:vscode/extension-context options) {:settings (settings-map options)})
