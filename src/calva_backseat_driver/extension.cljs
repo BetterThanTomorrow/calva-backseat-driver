@@ -71,15 +71,21 @@
   before-load []
   (println "shadow-cljs reloading..."))
 
+(defn- maybe-init-mcp! [ctx]
+  (when-not (get-in @db/!app-db [:extension/when-contexts :calva-mcp-extension/activated?])
+    (ex/dispatch! ctx [[:app/ax.init {:auto-start-mcp? :vscode/config.autoStartMCPServer
+                                      :auto-register-cursor-mcp? :vscode/config.autoRegisterCursorMcp}]])))
+
+(defn- maybe-register-cursor-mcp! [ctx]
+  (when-let [server-info (:app/server-info @db/!app-db)]
+    (when (cursor-reg/should-call-register-server? @db/!app-db server-info)
+      (ex/dispatch! ctx [[:mcp/ax.ensure-cursor-mcp-registered]]))))
+
 (defn- ensure-cursor-mcp-ready! []
   (when-let [ctx (extension-context)]
     (swap! db/!app-db assoc :mcp/cursor-mcp-available? (cursor/cursor-mcp-available?))
-    (when-not (get-in @db/!app-db [:extension/when-contexts :calva-mcp-extension/activated?])
-      (ex/dispatch! ctx [[:app/ax.init {:auto-start-mcp? :vscode/config.autoStartMCPServer
-                                        :auto-register-cursor-mcp? :vscode/config.autoRegisterCursorMcp}]]))
-    (when-let [server-info (:app/server-info @db/!app-db)]
-      (when (cursor-reg/should-call-register-server? @db/!app-db server-info)
-        (ex/dispatch! ctx [[:mcp/ax.ensure-cursor-mcp-registered]])))))
+    (maybe-init-mcp! ctx)
+    (maybe-register-cursor-mcp! ctx)))
 
 (defn ^{:dev/after-load true
         :export true}
