@@ -159,7 +159,7 @@ When making multiple edits, work from highest line number to lowest (line number
 - `assets/skills/` and `assets/instructions/` are the canonical source for content bundled with the extension. When updating skill or instruction content, edit these files — not the installed extension copies under `~/.vscode*/extensions/`.
 - Skills declared in `package.json` under `contributes.chatSkills` are exposed as MCP resources
 - Discovery: `resources/list` returns skill name, description, and URI
-- Reading: `resources/read` at `/skills/{name}/SKILL.md` returns full skill content
+- Reading: `resources/read` at `skill://{name}` returns full skill content
 - Dynamic instructions: the `initialize` response includes instructions composed from available tools and skills
 - Implementation: `src/calva_backseat_driver/mcp/requests.cljs` — `skill-manifests`, `get-skills`, `compose-instructions`
 

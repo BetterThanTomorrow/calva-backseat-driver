@@ -170,8 +170,8 @@
                 (str "Resource has a description: " (:name resource)))
             (is (= "text/markdown" (:mimeType resource))
                 (str "Resource mimeType is text/markdown: " (:name resource)))
-            (is (re-find #"^/skills/[^/]+/SKILL\.md$" (:uri resource))
-                (str "URI matches /skills/{name}/SKILL.md pattern: " (:uri resource)))))
+            (is (re-find #"^skill://.+$" (:uri resource))
+                (str "URI matches skill://{name} pattern: " (:uri resource)))))
         (p/catch (fn [e]
                    (js/console.error "[resources-list] Error:" (.-message e) e)
                    (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
@@ -235,7 +235,7 @@
                                                 {:jsonrpc "2.0"
                                                  :id 2
                                                  :method "resources/read"
-                                                 :params {:uri "/skills/nonexistent/SKILL.md"}})
+                                                 :params {:uri "skill://nonexistent"}})
                 result (js->clj read-response :keywordize-keys true)
 
                 _ (js/console.log "[resources-read-unknown] Response:" (pr-str result))
@@ -315,7 +315,7 @@
                                                             {:jsonrpc "2.0"
                                                              :id 3
                                                              :method "resources/read"
-                                                             :params {:uri "/skills/backseat-driver/SKILL.md"}})
+                                                             :params {:uri "skill://backseat-driver"}})
                             read-result (js->clj read-response :keywordize-keys true)
                             _ (js/console.log "[conditional-skills] Read disabled skill response:" (pr-str read-result))]
                       (is (some? (:error read-result))

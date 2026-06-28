@@ -9,13 +9,8 @@
    [promesa.core :as p]
    [vscode-mcp.manifest :as manifest]))
 
-(defn- get-extension-version []
-  (some-> (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver")
-          .-packageJSON
-          .-version))
-
-(defn- extension-context []
-  (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver"))
+(defn- get-extension-version [options]
+  (some-> options :vscode/extension-context .-extension .-packageJSON .-version))
 
 (defn- settings-map [options]
   (let [{:mcp/keys [provide-bd-skill? provide-edit-skill?]} options]
@@ -31,7 +26,8 @@
   {:jsonrpc "2.0"
    :id id
    :result {:content [{:type "text"
-                       :text (js/JSON.stringify data)}]}})
+                       :text (js/JSON.stringify data)}]
+            :isError false}})
 
 (defn- clj-response
   "JSON-RPC success response with clj->js JSON-stringified text content."
@@ -39,14 +35,16 @@
   {:jsonrpc "2.0"
    :id id
    :result {:content [{:type "text"
-                       :text (js/JSON.stringify (clj->js data))}]}})
+                       :text (js/JSON.stringify (clj->js data))}]
+            :isError false}})
 
 (defn- content-response
   "JSON-RPC success response with pre-built content array."
   [id content]
   {:jsonrpc "2.0"
    :id id
-   :result {:content content}})
+   :result {:content content
+            :isError false}})
 
 (defn- error-response
   "JSON-RPC error response."
@@ -197,7 +195,7 @@
                               :text (js/JSON.stringify info)}]}})
 
       (string/starts-with? uri "skill://")
-      (let [resource (manifest/read-resource (extension-context) uri {:settings (settings-map options)})]
+      (let [resource (manifest/read-resource (:vscode/extension-context options) uri {:settings (settings-map options)})]
         (if resource
           {:jsonrpc "2.0"
            :id id
@@ -209,11 +207,11 @@
 
 (defn- handle-initialize [options id]
   (let [{:mcp/keys [repl-enabled?]} options
-        skills (manifest/get-resources (extension-context) {:settings (settings-map options)})]
+        skills (manifest/get-resources (:vscode/extension-context options) {:settings (settings-map options)})]
     {:jsonrpc "2.0"
      :id id
      :result {:serverInfo {:name "calva-backseat-driver"
-                           :version (get-extension-version)}
+                           :version (get-extension-version options)}
               :protocolVersion "2024-11-05"
               :capabilities {:tools {:listChanged true}
                              :resources {:listChanged true}}
@@ -222,7 +220,7 @@
 
 (defn- handle-tools-list [options id]
   (let [{:mcp/keys [repl-enabled?]} options
-        all-tools (manifest/get-tools (extension-context) {:settings (settings-map options)})]
+        all-tools (manifest/get-tools (:vscode/extension-context options) {:settings (settings-map options)})]
     {:jsonrpc "2.0"
      :id id
      :result {:tools (cond->> all-tools
@@ -240,13 +238,13 @@
     (handle-tools-list options id)
 
     "resources/list"
-    (let [skills (manifest/get-resources (extension-context) {:settings (settings-map options)})]
+    (let [skills (manifest/get-resources (:vscode/extension-context options) {:settings (settings-map options)})]
       {:jsonrpc "2.0"
        :id id
        :result {:resources skills}})
 
     "resources/templates/list"
-    (let [all-tools (manifest/get-tools (extension-context) {:settings (settings-map options)})
+    (let [all-tools (manifest/get-tools (:vscode/extension-context options) {:settings (settings-map options)})
           tool-desc (fn [t-name] (:description (first (filter #(= (:name %) t-name) all-tools))))]
       {:jsonrpc "2.0"
        :id id
