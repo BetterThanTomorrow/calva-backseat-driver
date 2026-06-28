@@ -1,178 +1,27 @@
 (ns calva-backseat-driver.mcp.requests
   (:require
-   ["fs" :as fs]
-   ["path" :as path]
    ["vscode" :as vscode]
    [calva-backseat-driver.bracket-balance :as bracket-balance]
    [calva-backseat-driver.tools :as tools]
    [calva-backseat-driver.integrations.calva.features :as calva]
    [calva-backseat-driver.mcp.skills :as skills]
    [clojure.string :as string]
-   [promesa.core :as p]))
+   [promesa.core :as p]
+   [vscode-mcp.manifest :as manifest]))
 
 (defn- get-extension-version []
   (some-> (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver")
           .-packageJSON
           .-version))
 
-(defn- ^js tool-manifest [tool-name]
-  (try
-    (let [extension (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver")]
-      (if extension
-        (let [^js contributes (some-> extension
-                                      .-packageJSON
-                                      .-contributes)]
-          (some->> contributes
-                   .-languageModelTools
-                   (filter (fn [^js tool]
-                             (= tool-name (.-name tool))))
-                   first))
-        (do
-          (js/console.warn "[Server] Extension not found when looking for tool manifest for:" tool-name)
-          nil)))
-    (catch :default err
-      (js/console.error "[Server] Error getting tool manifest for:" tool-name "error:" (.-message err))
-      nil)))
+(defn- extension-context []
+  (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver"))
 
-(defn- tool-description [tool-name]
-  (some-> tool-name
-          tool-manifest
-          .-modelDescription))
-
-(defn- param-description [tool-name param]
-  (some-> (tool-manifest tool-name)
-          .-inputSchema
-          .-properties
-          (unchecked-get param)
-          .-description))
-
-(comment
-  (tool-description  "clojure_evaluate_code")
-  (param-description "clojure_evaluate_code" "code")
-  :rcf)
-
-(defn- tool-listing [{:keys [tool-name properties required priority]}]
-  {:name tool-name
-   :description (tool-description tool-name)
-   :inputSchema {:type "object"
-                 :properties (into {}
-                                   (map (fn [[k v]]
-                                          [k (merge v {:description (param-description tool-name k)})]))
-                                   properties)
-                 :required required
-                 :audience ["user" "assistant"]
-                 :priority priority}})
-
-(def evaluate-code-tool-listing
-  (tool-listing {:tool-name "clojure_evaluate_code"
-                 :properties {"code" {:type "string"}
-                              "namespace" {:type "string"}
-                              "replSessionKey" {:type "string"}
-                              "who" {:type "string"}
-                              "description" {:type "string"}
-                              "maxImages" {:type "number"}
-                              "targetRuntimeId" {:type "number"}}
-                 :required ["code" "namespace" "replSessionKey" "who"]
-                 :priority 9}))
-
-(def list-sessions-tool-listing
-  (tool-listing {:tool-name "clojure_list_sessions"
-                 :properties {"includeAllRuntimes" {:type "boolean"}}
-                 :required []
-                 :priority 9}))
-
-(def symbol-info-tool-listing
-  (tool-listing {:tool-name "clojure_symbol_info"
-                 :properties {"clojureSymbol" {:type "string"}
-                              "namespace" {:type "string"}
-                              "replSessionKey" {:type "string"}}
-                 :required ["clojureSymbol" "replSessionKey" "namespace"]
-                 :priority 8}))
-
-(def output-log-tool-info
-  (tool-listing {:tool-name "clojure_repl_output_log"
-                 :properties {"query" {:type "string"}
-                              "inputs" {:type "array" :items {}}
-                              "maxImages" {:type "number"}}
-                 :required ["query"]
-                 :priority 10}))
-
-(def clojuredocs-tool-listing
-  (tool-listing {:tool-name "clojuredocs_info"
-                 :properties {"clojureSymbol" {:type "string"}}
-                 :required ["clojureSymbol"]
-                 :priority 8}))
-
-(def bracket-balance-tool-listing
-  (tool-listing {:tool-name "clojure_balance_brackets"
-                 :properties {"text" {:type "string"}}
-                 :required ["text"]
-                 :priority 10}))
-
-(def edit-files-tool-listing
-  (tool-listing {:tool-name "clojure_edit_files"
-                 :properties {"edits" {:type "array"
-                                       :items {:type "object"
-                                               :properties {"type" {:type "string"}
-                                                            "filePath" {:type "string"}
-                                                            "line" {:type "integer"}
-                                                            "targetLineText" {:type "string"}
-                                                            "newForm" {:type "string"}
-                                                            "code" {:type "string"}
-                                                            "content" {:type "string"}}
-                                               :required ["type" "filePath"]}}}
-                 :required ["edits"]
-                 :priority 7}))
-
-(def load-file-tool-listing
-  (tool-listing {:tool-name "clojure_load_file"
-                 :properties {"filePath" {:type "string"}
-                              "replSessionKey" {:type "string"}
-                              "who" {:type "string"}}
-                 :required ["filePath" "replSessionKey" "who"]
-                 :priority 8}))
-
-(defn- skill-manifests []
-  (try
-    (let [extension (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver")]
-      (if extension
-        (let [^js skills (some-> extension
-                                 .-packageJSON
-                                 .-contributes
-                                 .-chatSkills)]
-          (when skills
-            (->> skills
-                 (keep (fn [^js entry]
-                         (when-let [[_ skill-name] (re-find #"\./assets/skills/([^/]+)/SKILL\.md" (.-path entry))]
-                           {:skill/name skill-name
-                            :skill/path (.-path entry)}))))))
-        (do
-          (js/console.warn "[Server] Extension not found when looking for skill manifests")
-          [])))
-    (catch :default err
-      (js/console.error "[Server] Error getting skill manifests:" (.-message err))
-      [])))
-
-(defn- get-skills []
-  (let [manifests (skill-manifests)
-        extension (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver")
-        ext-path (when extension (.. extension -extensionUri -fsPath))]
-    (when ext-path
-      (->> manifests
-           (keep (fn [{:skill/keys [name] :as manifest}]
-                   (try
-                     (let [rel-path (string/replace-first (:skill/path manifest) "./" "")
-                           abs-path (path/join ext-path rel-path)
-                           content (str (fs/readFileSync abs-path "utf8"))
-                           {:keys [description]} (skills/parse-skill-frontmatter content)]
-                       {:skill/name name
-                        :skill/description (or description "")
-                        :skill/uri (str "/skills/" name "/SKILL.md")
-                        :skill/content content})
-                     (catch :default err
-                       (js/console.warn "[Server] Error reading skill" name ":" (.-message err))
-                       nil))))
-           vec))))
+(defn- settings-map [options]
+  (let [{:mcp/keys [provide-bd-skill? provide-edit-skill?]} options]
+    {"config.calva-backseat-driver.provideBdSkill" provide-bd-skill?
+     "config.calva-backseat-driver.provideEditSkill" provide-edit-skill?
+     ":calva-mcp-extension/activated?" true}))
 
 
 
@@ -324,8 +173,7 @@
         (catch :default e
           (error-response id -32603 (exception-message e)))))))
 
-(defn- handle-resources-read [{:keys [id params] :as _request}
-                              {:mcp/keys [provide-bd-skill? provide-edit-skill?] :as options}]
+(defn- handle-resources-read [{:keys [id params] :as _request} options]
   (let [{:keys [uri]} params]
     (cond
       (string/starts-with? uri "/symbol-info/")
@@ -348,25 +196,20 @@
          :result {:contents [{:uri uri
                               :text (js/JSON.stringify info)}]}})
 
-      (string/starts-with? uri "/skills/")
-      (let [[_ skill-name] (re-find #"^/skills/([^/]+)/SKILL\.md$" uri)
-            filtered-skills (skills/filter-skills (get-skills)
-                                                  {:provide-bd-skill? provide-bd-skill?
-                                                   :provide-edit-skill? provide-edit-skill?})
-            skill (some #(when (= (:skill/name %) skill-name) %) filtered-skills)]
-        (if skill
+      (string/starts-with? uri "skill://")
+      (let [resource (manifest/read-resource (extension-context) uri {:settings (settings-map options)})]
+        (if resource
           {:jsonrpc "2.0"
            :id id
-           :result {:contents [{:uri uri
-                                :text (:skill/content skill)
-                                :mimeType "text/markdown"}]}}
+           :result {:contents [(dissoc resource :skill-path)]}}
           (error-response id -32602 (str "Skill not found: " uri))))
 
       :else
       (error-response id -32602 "Unknown resource URI"))))
 
 (defn- handle-initialize [options id]
-  (let [{:mcp/keys [repl-enabled? provide-bd-skill? provide-edit-skill?]} options]
+  (let [{:mcp/keys [repl-enabled?]} options
+        skills (manifest/get-resources (extension-context) {:settings (settings-map options)})]
     {:jsonrpc "2.0"
      :id id
      :result {:serverInfo {:name "calva-backseat-driver"
@@ -374,28 +217,19 @@
               :protocolVersion "2024-11-05"
               :capabilities {:tools {:listChanged true}
                              :resources {:listChanged true}}
-              :instructions (skills/compose-instructions repl-enabled?
-                                                         (skills/filter-skills (get-skills)
-                                                                               {:provide-bd-skill? provide-bd-skill?
-                                                                                :provide-edit-skill? provide-edit-skill?}))
+              :instructions (skills/compose-instructions repl-enabled? skills)
               :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (unless disabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."}}))
 
 (defn- handle-tools-list [options id]
-  (let [{:mcp/keys [repl-enabled?]} options]
+  (let [{:mcp/keys [repl-enabled?]} options
+        all-tools (manifest/get-tools (extension-context) {:settings (settings-map options)})]
     {:jsonrpc "2.0"
      :id id
-     :result {:tools (cond-> [bracket-balance-tool-listing
-                              list-sessions-tool-listing
-                              symbol-info-tool-listing
-                              clojuredocs-tool-listing
-                              output-log-tool-info
-                              edit-files-tool-listing]
-                       (true? repl-enabled?)
-                       (conj evaluate-code-tool-listing
-                             load-file-tool-listing))}}))
+     :result {:tools (cond->> all-tools
+                       (not repl-enabled?)
+                       (remove (comp #{"clojure_evaluate_code" "clojure_load_file"} :name)))}}))
 
-(defn handle-request-fn [{:ex/keys [dispatch!] :as options
-                          :mcp/keys [provide-bd-skill? provide-edit-skill?]}
+(defn handle-request-fn [{:ex/keys [dispatch!] :as options}
                          {:keys [id method] :as request}]
   (dispatch! [[:app/ax.log :debug "[Server] handle-request " (pr-str request)]])
   (case method
@@ -406,29 +240,24 @@
     (handle-tools-list options id)
 
     "resources/list"
-    (let [filtered-skills (skills/filter-skills (get-skills)
-                                                {:provide-bd-skill? provide-bd-skill?
-                                                 :provide-edit-skill? provide-edit-skill?})]
+    (let [skills (manifest/get-resources (extension-context) {:settings (settings-map options)})]
       {:jsonrpc "2.0"
        :id id
-       :result {:resources (mapv (fn [{:skill/keys [name description uri]}]
-                                   {:uri uri
-                                    :name name
-                                    :description description
-                                    :mimeType "text/markdown"})
-                                 filtered-skills)}})
+       :result {:resources skills}})
 
     "resources/templates/list"
-    {:jsonrpc "2.0"
-     :id id
-     :result {:resourceTemplates [{:uriTemplate "/symbol-info/{symbol}@{session-key}@{namespace}"
-                                   :name "symbol-info"
-                                   :description (tool-description "clojure_symbol_info")
-                                   :mimeType "application/json"}
-                                  {:uriTemplate "/clojuredocs/{symbol}"
-                                   :name "clojuredocs"
-                                   :description (tool-description "clojuredocs_info")
-                                   :mimeType "application/json"}]}}
+    (let [all-tools (manifest/get-tools (extension-context) {:settings (settings-map options)})
+          tool-desc (fn [t-name] (:description (first (filter #(= (:name %) t-name) all-tools))))]
+      {:jsonrpc "2.0"
+       :id id
+       :result {:resourceTemplates [{:uriTemplate "/symbol-info/{symbol}@{session-key}@{namespace}"
+                                     :name "symbol-info"
+                                     :description (tool-desc "clojure_symbol_info")
+                                     :mimeType "application/json"}
+                                    {:uriTemplate "/clojuredocs/{symbol}"
+                                     :name "clojuredocs"
+                                     :description (tool-desc "clojuredocs_info")
+                                     :mimeType "application/json"}]}})
 
     "tools/call"
     (handle-tools-call request options)
