@@ -79,7 +79,7 @@
       (js/setTimeout #(run-when-ws-activated nss-syms (inc tries)) 10)
       (:running @db/!state))))
 
-(defn run-all-tests [src-path]
+(defn ^:export run-all-tests [src-path]
   (let [running (p/deferred)]
     (swap! db/!state assoc :running running)
     (p/let [nss-syms (find-test-nss+ src-path)

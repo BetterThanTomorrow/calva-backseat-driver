@@ -1,7 +1,7 @@
 (ns tests.mcp.a-activation-test
   (:require
    ["vscode" :as vscode]
-   [cljs.test :refer [deftest is testing]]
+   [cljs.test :refer [is testing]]
    [e2e.macros :refer [deftest-async]]
    [e2e.utils :refer [wait-for+]]
    [promesa.core :as p]))

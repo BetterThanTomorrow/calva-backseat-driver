@@ -4,7 +4,6 @@
 
 (def cursor-mcp-server-name "backseat-driver")
 (def cursor-mcp-extension-segment "extension")
-(def cursor-mcp-reload-client-command-id "mcp.reloadClient")
 
 (defn cursor-mcp-settings-display-name []
   (str cursor-mcp-extension-segment "-" cursor-mcp-server-name))

@@ -116,7 +116,7 @@
 
 (defn- edit-with-decoy-and-verify+
   "Activate decoy editor, perform edit, verify active editor unchanged and file not visible."
-  [socket file-path tool-call-fn prev-content]
+  [_socket _file-path tool-call-fn prev-content]
   (p/let [_ (activate-decoy-editor+)
           active-before (active-editor-path)
           result (tool-call-fn)
@@ -142,7 +142,7 @@
       "Edit should not leave more than 1 consecutive blank line"))
 
 (defn- test-replace-trims-whitespace+ [socket file-path]
-  (p/let [{:keys [result content] :as ctx}
+  (p/let [ctx
           (edit-with-decoy-and-verify+
            socket file-path
            #(mcp/call-tool socket 101 "clojure_edit_files"
@@ -173,7 +173,7 @@
 
 (defn- test-insert-proper-spacing+ [socket file-path]
   (p/let [content-before (read-test-file+ nil)
-          {:keys [result content] :as ctx}
+          {:keys [_result content] :as ctx}
           (edit-with-decoy-and-verify+
            socket file-path
            #(mcp/call-tool socket 103 "clojure_edit_files"
@@ -252,15 +252,15 @@
 
 (defn- test-delete-first-form+ [socket file-path]
   (delete-and-verify-gone+ socket file-path
-    {:id 106 :line 3 :target-text "(defn multiply-numbers"
-     :form-name "(defn multiply-numbers"
-     :test-label "delete first form keeps spacing stable"}))
+                           {:id 106 :line 3 :target-text "(defn multiply-numbers"
+                            :form-name "(defn multiply-numbers"
+                            :test-label "delete first form keeps spacing stable"}))
 
 (defn- test-delete-last-form+ [socket file-path]
   (delete-and-verify-gone+ socket file-path
-    {:id 107 :line 8 :target-text "(defn divide-numbers"
-     :form-name "(defn divide-numbers"
-     :test-label "delete last form keeps spacing stable"}))
+                           {:id 107 :line 8 :target-text "(defn divide-numbers"
+                            :form-name "(defn divide-numbers"
+                            :test-label "delete last form keeps spacing stable"}))
 
 (defn- test-wrong-target-text+ [socket file-path]
   (p/let [result (mcp/call-tool socket 108 "clojure_edit_files"
@@ -340,29 +340,29 @@
 
 (defn- test-continue-on-runtime-failure+ [socket]
   (test-continue-on-failure+ socket
-    {:test-label "batch continues past runtime failure"
-     :id-create 120 :id-batch 121
-     :valid-edit {:type "replace" :filePath (continue-file-path)
-                  :line 3 :targetLineText "(defn add-numbers"
-                  :newForm "(defn add-numbers\n  \"Adds two numbers\"\n  [a b]\n  (+ a b))"}
-     :invalid-edit {:type "replace" :filePath (continue-file-path)
-                    :line 8 :targetLineText "(defn nonexistent-function"
-                    :newForm "(defn replaced [] :replaced)"}
-     :expected-content "Adds two numbers"
-     :expected-error "Target line text not found"}))
+                             {:test-label "batch continues past runtime failure"
+                              :id-create 120 :id-batch 121
+                              :valid-edit {:type "replace" :filePath (continue-file-path)
+                                           :line 3 :targetLineText "(defn add-numbers"
+                                           :newForm "(defn add-numbers\n  \"Adds two numbers\"\n  [a b]\n  (+ a b))"}
+                              :invalid-edit {:type "replace" :filePath (continue-file-path)
+                                             :line 8 :targetLineText "(defn nonexistent-function"
+                                             :newForm "(defn replaced [] :replaced)"}
+                              :expected-content "Adds two numbers"
+                              :expected-error "Target line text not found"}))
 
 (defn- test-continue-on-edit-validation-failure+ [socket]
   (test-continue-on-failure+ socket
-    {:test-label "batch continues past edit-level validation failure"
-     :id-create 122 :id-batch 123
-     :valid-edit {:type "replace" :filePath (continue-file-path)
-                  :line 3 :targetLineText "(defn add-numbers"
-                  :newForm "(defn add-numbers\n  \"Modified\"\n  [a b]\n  (+ a b))"}
-     :invalid-edit {:type "replace" :filePath (continue-file-path)
-                    :line 8 :targetLineText "; this is a comment"
-                    :newForm "(defn replaced [] :replaced)"}
-     :expected-content "\"Modified\""
-     :expected-error "comment"}))
+                             {:test-label "batch continues past edit-level validation failure"
+                              :id-create 122 :id-batch 123
+                              :valid-edit {:type "replace" :filePath (continue-file-path)
+                                           :line 3 :targetLineText "(defn add-numbers"
+                                           :newForm "(defn add-numbers\n  \"Modified\"\n  [a b]\n  (+ a b))"}
+                              :invalid-edit {:type "replace" :filePath (continue-file-path)
+                                             :line 8 :targetLineText "; this is a comment"
+                                             :newForm "(defn replaced [] :replaced)"}
+                              :expected-content "\"Modified\""
+                              :expected-error "comment"}))
 
 ;; --- Test orchestrator ---
 

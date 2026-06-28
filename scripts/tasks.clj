@@ -8,17 +8,14 @@
 
 (def vsix-test-workspace "./e2e-test-vsix")
 
-#_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
-(defn publish! [args]
+(defn ^:export publish! [args]
   (publish/yolo! args))
 
-#_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
-(defn print-release-notes! [{:keys [version]}]
+(defn ^:export print-release-notes! [{:keys [version]}]
   (let [changelog-text (publish/get-changelog-text-for-version version)]
     (println changelog-text)))
 
-#_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
-(defn bump-version! [{:keys [bump-branch user-email user-name dry force]}]
+(defn ^:export bump-version! [{:keys [bump-branch user-email user-name dry force]}]
   (if force
     (do
       (println "Bumping version")
@@ -98,8 +95,7 @@
         (println (format "Status: TESTS FAILED (%d problems, exit code %d, %.1fs)" problems exit-code elapsed-s))
         (throw (ex-info "E2E tests failed" {:babashka/exit exit-code}))))))
 
-#_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
-(defn run-e2e-tests-with-vsix! [{:keys [vsix calva-vsix]}]
+(defn ^:export run-e2e-tests-with-vsix! [{:keys [vsix calva-vsix]}]
   (println "Running end-to-end tests using vsix:" vsix)
   (apply util/shell false "node" "./e2e-test-ws/launch.js" (str "--vsix=" vsix)
          (when calva-vsix [(str "--calva-vsix=" calva-vsix)])))
@@ -116,8 +112,7 @@
         (fs/copy src (fs/path e2e-tmp-dir item)))))
   e2e-tmp-dir)
 
-#_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
-(defn run-e2e-tests-from-working-dir! [{:keys [is-ci calva-vsix]}]
+(defn ^:export run-e2e-tests-from-working-dir! [{:keys [is-ci calva-vsix]}]
   (println "Running end-to-end tests using working directory")
   (if is-ci
     (util/shell false "node" "./e2e-test-ws/launch.js")
@@ -126,7 +121,6 @@
       (apply run-e2e-launch! (str "--test-workspace=" tmp-ws)
              (when calva-vsix [(str "--calva-vsix=" calva-vsix)])))))
 
-#_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
 (defn package-pre-release! [{:keys [slug dry]}]
   (let [current-version (-> (util/sh false "node" "-p" "require('./package').version")
                             :out string/trim)
@@ -147,8 +141,7 @@
     (util/shell dry "npm" "version" "--no-git-tag-version" current-version)
     {:vsix-file vsix-file}))
 
-#_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
-(defn package-and-test-prerelease! [{:keys [slug dry]}]
+(defn ^:export package-and-test-prerelease! [{:keys [slug dry]}]
   (let [opts {:slug slug :dry dry}
         vsix-result (package-pre-release! opts)
         vsix-file (:vsix-file vsix-result)]
@@ -156,8 +149,7 @@
     (println "Running e2e tests on the packaged VSIX...")
     (run-e2e-tests-with-vsix! {:vsix vsix-file})))
 
-#_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
-(defn launch-with-vsix! [{:keys [vsix]}]
+(defn ^:export launch-with-vsix! [{:keys [vsix]}]
   (println "Uninstalling any existing Calva Backseat Driver extension...")
   (util/shell false "code-insiders" "--uninstall-extension" "betterthantomorrow.calva-backseat-driver")
 
@@ -167,8 +159,7 @@
   (println "Launching VS Code Insiders with test workspace...")
   (util/shell false "code-insiders" vsix-test-workspace))
 
-#_{:clj-kondo/ignore [:clojure-lsp/unused-public-var]}
-(defn run-mcp-inspector! [{:keys [vsix port-file]}]
+(defn ^:export run-mcp-inspector! [{:keys [vsix port-file]}]
   (let [server-script (if vsix
                         (let [vsix-basename (fs/strip-ext (fs/file-name vsix))
                               extension-path (str (fs/home)

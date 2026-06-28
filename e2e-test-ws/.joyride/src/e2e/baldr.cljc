@@ -1,4 +1,4 @@
-(ns pez.baldr
+(ns e2e.baldr
   (:require #?(:cljs [cljs.test :as t]
                :clj [clojure.test :as t])
             [clojure.string :as string]))
@@ -35,7 +35,7 @@
                                                    (context-color ctx)))
                                             new-contexts))
       :always (conj (str (indent (+ 2 (count contexts)))
-                         (str (bullet-color bullet) " " (color message)))))))
+                         (bullet-color bullet) " " (color message))))))
 
 (defn- report! [m config]
   (let [contexts #?(:cljs (:testing-contexts (t/get-current-env))
