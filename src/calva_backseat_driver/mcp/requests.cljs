@@ -7,7 +7,7 @@
    [clojure.string :as string]
    [promesa.core :as p]
    [vscode-mcp.manifest :as manifest]
-   [vscode-mcp.responses :refer [text-response clj-response content-response error-response]]))
+   [vscode-mcp.responses :as responses]))
 
 (defn- get-extension-version [options]
   (some-> ^js (:vscode/extension-context options) .-extension .-packageJSON .-version))
@@ -29,7 +29,7 @@
          ns :namespace} arguments
         who-error (calva/validate-who who)]
     (if who-error
-      (clj-response id {:error who-error})
+      (responses/clj-response id {:error who-error})
       (p/let [result (calva/evaluate-code+ (merge options
                                                   {:calva/code code
                                                    :calva/repl-session-key replSessionKey
@@ -37,13 +37,13 @@
                                                    :calva/description description}
                                                   (when ns {:calva/ns ns})
                                                   (when targetRuntimeId {:calva/target-runtime-id targetRuntimeId})))]
-        (content-response id (tools/mcp-content-with-images result :max-images (if (some? maxImages) maxImages 10)))))))
+        (responses/content-response id (tools/mcp-content-with-images result :max-images (if (some? maxImages) maxImages 10)))))))
 
 (defn- handle-list-sessions [options id arguments]
   (let [{:keys [includeAllRuntimes]} arguments]
     (p/let [result (calva/list-sessions+ (merge options
                                                 {:calva/include-all-runtimes? (true? includeAllRuntimes)}))]
-      (clj-response id result))))
+      (responses/clj-response id result))))
 
 (defn- handle-symbol-info [options id arguments]
   (p/let [{:keys [clojureSymbol replSessionKey]
@@ -52,25 +52,25 @@
                                               {:calva/clojure-symbol clojureSymbol
                                                :calva/repl-session-key replSessionKey
                                                :calva/ns ns}))]
-    (text-response id info)))
+    (responses/text-response id info)))
 
 (defn- handle-clojuredocs [options id arguments]
   (p/let [{:keys [clojureSymbol]} arguments
           info (calva/get-clojuredocs+ (merge options
                                               {:calva/clojure-symbol clojureSymbol}))]
-    (text-response id info)))
+    (responses/text-response id info)))
 
 (defn- handle-output-log [options id arguments]
   (let [{:keys [query inputs maxImages]} arguments
         output (calva/query-output (merge options
                                           {:calva/query-edn-str query
                                            :calva/inputs inputs}))]
-    (content-response id (tools/mcp-content-with-images output :max-images (if (some? maxImages) maxImages 0)))))
+    (responses/content-response id (tools/mcp-content-with-images output :max-images (if (some? maxImages) maxImages 0)))))
 
 (defn- handle-balance-brackets [options id arguments]
   (let [{:keys [text]} arguments
         result (bracket-balance/infer-parens-response (merge options {:calva/text text}))]
-    (text-response id result)))
+    (responses/text-response id result)))
 
 (defn- blank-session-key? [k]
   (or (nil? k) (and (string? k) (string/blank? k))))
@@ -80,10 +80,10 @@
         who-error (calva/validate-who who)]
     (cond
       (blank-session-key? replSessionKey)
-      (clj-response id {:error "The `replSessionKey` parameter is required. Use `clojure_list_sessions` to discover available sessions."})
+      (responses/clj-response id {:error "The `replSessionKey` parameter is required. Use `clojure_list_sessions` to discover available sessions."})
 
       who-error
-      (clj-response id {:error who-error})
+      (responses/clj-response id {:error who-error})
 
       :else
       (p/let [result (calva/load-file+ (merge options
@@ -96,12 +96,12 @@
            :result {:content [{:type "text"
                                :text (js/JSON.stringify (clj->js {:error (:error result)}))}]
                     :isError true}}
-          (clj-response id result))))))
+          (responses/clj-response id result))))))
 
 (defn- handle-edit-files [options id arguments]
   (p/let [{:keys [edits]} arguments
           result (calva/edit-files+ (merge options {:calva/edits edits}))]
-    (clj-response id result)))
+    (responses/clj-response id result)))
 
 (def ^:private tool-handlers
   {"clojure_evaluate_code"    {:handler handle-evaluate-code :repl-required? true}
@@ -116,13 +116,13 @@
 (defn- handle-tools-call [{:keys [id params] :as _request}
                           {:mcp/keys [repl-enabled?] :as options}]
   (let [{:keys [arguments] tool :name} params
-        {:keys [handler repl-required?]} (get tool-handlers tool)]
+        {:keys [handler repl-required?]} (tool-handlers tool)]
     (cond
       (nil? handler)
-      (error-response id -32601 "Unknown tool")
+      (responses/error-response id -32601 "Unknown tool")
 
       (and repl-required? (not (true? repl-enabled?)))
-      (error-response id -32601 "Unknown tool")
+      (responses/error-response id -32601 "Unknown tool")
 
       :else
       (try
@@ -132,10 +132,10 @@
             ;; below won't see it; recover here to keep the request's id.
             (p/catch result
                      (fn [e]
-                       (error-response id -32603 (exception-message e))))
+                       (responses/error-response id -32603 (exception-message e))))
             result))
         (catch :default e
-          (error-response id -32603 (exception-message e)))))))
+          (responses/error-response id -32603 (exception-message e)))))))
 
 (defn- handle-resources-read [{:keys [id params] :as _request} options]
   (let [{:keys [uri]} params]
@@ -166,10 +166,10 @@
           {:jsonrpc "2.0"
            :id id
            :result {:contents [(dissoc resource :skill-path)]}}
-          (error-response id -32602 (str "Skill not found: " uri))))
+          (responses/error-response id -32602 (str "Skill not found: " uri))))
 
       :else
-      (error-response id -32602 "Unknown resource URI"))))
+      (responses/error-response id -32602 "Unknown resource URI"))))
 
 (defn- handle-initialize [options id]
   (let [{:mcp/keys [repl-enabled?]} options
@@ -234,6 +234,6 @@
     {:jsonrpc "2.0" :id id :result {}}
 
     (if id
-      (error-response id -32601 "Method not found")
+      (responses/error-response id -32601 "Method not found")
       nil)))
 
