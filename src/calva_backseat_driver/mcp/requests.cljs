@@ -174,24 +174,24 @@
 (defn- handle-initialize [options id]
   (let [{:mcp/keys [repl-enabled?]} options
         skills (manifest/get-resources (:vscode/extension-context options) {:settings (settings-map options)})]
-    {:jsonrpc "2.0"
-     :id id
-     :result {:serverInfo {:name "calva-backseat-driver"
-                           :version (get-extension-version options)}
-              :protocolVersion "2024-11-05"
-              :capabilities {:tools {:listChanged true}
-                             :resources {:listChanged true}}
-              :instructions (skills/compose-instructions repl-enabled? skills)
-              :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (unless disabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."}}))
+    (responses/success-response
+     id
+     {:serverInfo {:name "calva-backseat-driver"
+                   :version (get-extension-version options)}
+      :protocolVersion "2024-11-05"
+      :capabilities {:tools {:listChanged true}
+                     :resources {:listChanged true}}
+      :instructions (skills/compose-instructions repl-enabled? skills)
+      :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (unless disabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."})))
 
 (defn- handle-tools-list [options id]
   (let [{:mcp/keys [repl-enabled?]} options
         all-tools (manifest/get-tools (:vscode/extension-context options) {:settings (settings-map options)})]
-    {:jsonrpc "2.0"
-     :id id
-     :result {:tools (cond->> all-tools
-                       (not repl-enabled?)
-                       (remove (comp #{"clojure_evaluate_code" "clojure_load_file"} :name)))}}))
+    (responses/success-response
+     id
+     {:tools (cond->> all-tools
+               (not repl-enabled?)
+               (remove (comp #{"clojure_evaluate_code" "clojure_load_file"} :name)))})))
 
 (defn handle-request-fn [{:ex/keys [dispatch!] :as options}
                          {:keys [id method] :as request}]
@@ -206,23 +206,23 @@
     "resources/list"
     (let [skills (manifest/get-resources (:vscode/extension-context options) {:settings (settings-map options)})
           public-skills (map #(dissoc % :skill-path) skills)]
-      {:jsonrpc "2.0"
-       :id id
-       :result {:resources public-skills}})
+      (responses/success-response
+       id
+       {:resources public-skills}))
 
     "resources/templates/list"
     (let [all-tools (manifest/get-tools (:vscode/extension-context options) {:settings (settings-map options)})
           tool-desc (fn [t-name] (:description (first (filter #(= (:name %) t-name) all-tools))))]
-      {:jsonrpc "2.0"
-       :id id
-       :result {:resourceTemplates [{:uriTemplate "/symbol-info/{symbol}@{session-key}@{namespace}"
-                                     :name "symbol-info"
-                                     :description (tool-desc "clojure_symbol_info")
-                                     :mimeType "application/json"}
-                                    {:uriTemplate "/clojuredocs/{symbol}"
-                                     :name "clojuredocs"
-                                     :description (tool-desc "clojuredocs_info")
-                                     :mimeType "application/json"}]}})
+      (responses/success-response
+       id
+       {:resourceTemplates [{:uriTemplate "/symbol-info/{symbol}@{session-key}@{namespace}"
+                             :name "symbol-info"
+                             :description (tool-desc "clojure_symbol_info")
+                             :mimeType "application/json"}
+                            {:uriTemplate "/clojuredocs/{symbol}"
+                             :name "clojuredocs"
+                             :description (tool-desc "clojuredocs_info")
+                             :mimeType "application/json"}]}))
 
     "tools/call"
     (handle-tools-call request options)
@@ -231,7 +231,7 @@
     (handle-resources-read request options)
 
     "ping"
-    {:jsonrpc "2.0" :id id :result {}}
+    (responses/success-response id {})
 
     (if id
       (responses/error-response id -32601 "Method not found")
