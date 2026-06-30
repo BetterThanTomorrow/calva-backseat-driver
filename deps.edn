@@ -7,6 +7,7 @@
         funcool/promesa {:mvn/version "11.0.678"}
         thheller/shadow-cljs {:mvn/version "3.4.4"}
         io.github.pez/baldr {:mvn/version "1.0.9"}
-        io.github.betterthantomorrow/vscode-mcp {:git/url "https://github.com/BetterThanTomorrow/vscode-mcp.git"
-                                                 :git/sha "592621c4794299e4b28cc9f9bc5ed90af6e0e213"}}
+        io.github.betterthantomorrow/vscode-mcp {;:local/root "../vscode-mcp"
+                                                 :git/url "https://github.com/BetterThanTomorrow/vscode-mcp.git"
+                                                 :git/sha "9911a0da71c845d4fd04a8552253652861a2999e"}}
  :aliases {:e2e-test-joyride {:extra-deps {joyride/workspace {:local/root "e2e-test-ws/.joyride"}}}}}
