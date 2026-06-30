@@ -323,7 +323,7 @@
                       (is (= -32602 (get-in read-result [:error :code]))
                           "Error code should be -32602 for disabled skill")
 
-                      ;; Test initialize — instructions should not mention disabled skill
+                      ;; Test initialize — instructions should not mention disabled skill content
                       (p/let [init-response (mcp/send-request socket
                                                               {:jsonrpc "2.0"
                                                                :id 4
@@ -332,10 +332,10 @@
                                                (js->clj :keywordize-keys true)
                                                (get-in [:result :instructions]))
                               _ (js/console.log "[conditional-skills] Instructions length:" (count instructions))]
-                        (is (not (re-find #"backseat-driver" instructions))
-                            "Instructions should not mention disabled backseat-driver skill")
-                        (is (re-find #"editing-clojure-files" instructions)
-                            "Instructions should mention enabled editing-clojure-files skill")))
+                        (is (not (re-find #"Effective use of the Backseat Driver" instructions))
+                            "Instructions should not include the disabled backseat-driver skill description")
+                        (is (re-find #"Structural editing of Clojure files" instructions)
+                            "Instructions should include the enabled editing-clojure-files skill description")))
                   _ (mcp/stop-mcp-session! socket)]
             nil)
           (p/finally (fn []
