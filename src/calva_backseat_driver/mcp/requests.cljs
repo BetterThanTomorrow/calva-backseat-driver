@@ -3,7 +3,6 @@
    [calva-backseat-driver.bracket-balance :as bracket-balance]
    [calva-backseat-driver.tools :as tools]
    [calva-backseat-driver.integrations.calva.features :as calva]
-   [calva-backseat-driver.mcp.skills :as skills]
    [clojure.string :as string]
    [promesa.core :as p]
    [vscode-mcp.manifest :as manifest]
@@ -173,7 +172,14 @@
 
 (defn- handle-initialize [options id]
   (let [{:mcp/keys [repl-enabled?]} options
-        skills (manifest/get-resources (:vscode/extension-context options) {:settings (settings-map options)})]
+        skills (manifest/get-resources (:vscode/extension-context options) {:settings (settings-map options)})
+        tools (manifest/get-tools (:vscode/extension-context options) {:settings (settings-map options)})
+        base-text (str "You have access to the `clojure_edit_files` structural editing tool (replace, insert, append, create) with automatic bracket balancing."
+                       (when repl-enabled?
+                         " You can evaluate Clojure/ClojureScript code via the `clojure_evaluate_code` tool, load entire files into the REPL with `clojure_load_file`, check REPL output with `clojure_repl_output_log`, look up symbol info, and query clojuredocs.org."))
+        instructions (manifest/build-server-instructions {:base-text base-text
+                                                          :tools tools
+                                                          :resources skills})]
     (responses/success-response
      id
      {:serverInfo {:name "calva-backseat-driver"
@@ -181,7 +187,7 @@
       :protocolVersion "2024-11-05"
       :capabilities {:tools {:listChanged true}
                      :resources {:listChanged true}}
-      :instructions (skills/compose-instructions repl-enabled? skills)
+      :instructions instructions
       :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (unless disabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."})))
 
 (defn- handle-tools-list [options id]
