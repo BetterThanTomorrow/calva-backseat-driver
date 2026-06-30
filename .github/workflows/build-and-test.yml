@@ -105,6 +105,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     needs: build
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Download Test Artifact
         uses: actions/download-artifact@v8
         with:
