@@ -1,37 +1,45 @@
 (ns calva-backseat-driver.mcp.skills-test
   (:require [cljs.test :refer [deftest testing is]]
-            [calva-backseat-driver.mcp.skills :as skills]))
+            ["fs" :as fs]
+            ["path" :as path]
+            [vscode-mcp.manifest :as manifest]))
 
-(deftest compose-instructions-test
-  (let [test-skills [{:name "backseat-driver"
-                      :description "REPL tools usage"}
-                     {:name "editing-clojure-files"
-                      :description "Structural editing"}]]
+(def package-json
+  (js/JSON.parse (fs/readFileSync (path/resolve "package.json") "utf8")))
 
-    (testing "repl enabled with skills mentions REPL tools and lists skills"
-      (let [result (skills/compose-instructions true test-skills)]
-        (is (string? result))
-        (is (re-find #"clojure_evaluate_code" result) "mentions REPL eval tool")
-        (is (re-find #"clojure_load_file" result) "mentions load file tool")
-        (is (re-find #"resources/list" result) "mentions resources/list")
-        (is (re-find #"resources/read" result) "mentions resources/read")
-        (is (re-find #"backseat-driver" result) "lists first skill")
-        (is (re-find #"editing-clojure-files" result) "lists second skill")))
+(def mock-context
+  #js {:extensionPath (js/process.cwd)
+       :extension #js {:packageJSON package-json}})
 
-    (testing "repl disabled with skills omits REPL text but lists skills"
-      (let [result (skills/compose-instructions false test-skills)]
-        (is (nil? (re-find #"clojure_evaluate_code" result)) "no REPL eval mention")
-        (is (nil? (re-find #"clojure_load_file" result)) "no load file mention")
-        (is (re-find #"resources/list" result) "still mentions resources/list")
-        (is (re-find #"backseat-driver" result) "still lists skills")))
+(defn settings-map [{:mcp/keys [provide-bd-skill? provide-edit-skill?]}]
+  {"config.calva-backseat-driver.provideBdSkill" provide-bd-skill?
+   "config.calva-backseat-driver.provideEditSkill" provide-edit-skill?
+   ":calva-mcp-extension/activated?" true})
 
-    (testing "empty skills omits skills section"
-      (let [result (skills/compose-instructions true [])]
-        (is (re-find #"structural editing" result) "has base content")
-        (is (nil? (re-find #"resources/list" result)) "no resources mention")
-        (is (nil? (re-find #"backseat-driver" result)) "no skill listed")))
+(defn get-skills [options]
+  (manifest/get-resources mock-context {:settings (settings-map options)}))
 
-    (testing "nil skills omits skills section"
-      (let [result (skills/compose-instructions true nil)]
-        (is (re-find #"structural editing" result) "has base content")
-        (is (nil? (re-find #"resources/list" result)) "no resources mention")))))
+(deftest skills-provision-test
+  (testing "when both skills are enabled"
+    (let [skills (get-skills {:mcp/provide-bd-skill? true
+                              :mcp/provide-edit-skill? true})]
+      (is (= 2 (count skills)))
+      (is (some #(= "backseat-driver" (:name %)) skills))
+      (is (some #(= "editing-clojure-files" (:name %)) skills))))
+
+  (testing "when only backseat-driver is enabled"
+    (let [skills (get-skills {:mcp/provide-bd-skill? true
+                              :mcp/provide-edit-skill? false})]
+      (is (= 1 (count skills)))
+      (is (= "backseat-driver" (:name (first skills))))))
+
+  (testing "when only editing-clojure-files is enabled"
+    (let [skills (get-skills {:mcp/provide-bd-skill? false
+                              :mcp/provide-edit-skill? true})]
+      (is (= 1 (count skills)))
+      (is (= "editing-clojure-files" (:name (first skills))))))
+
+  (testing "when both skills are disabled"
+    (let [skills (get-skills {:mcp/provide-bd-skill? false
+                              :mcp/provide-edit-skill? false})]
+      (is (empty? skills)))))
