@@ -7,7 +7,12 @@
   (btt-cursor/cursor-mcp-available?))
 
 (defn register-and-reload-mcp-client!+ [extension-context server-info]
-  (btt-cursor/register-and-reload-mcp-client!+ config/cursor-mcp-server-name extension-context "dist/calva-mcp-server.js" (:server/port-file-uri server-info)))
+  (btt-cursor/register-and-reload-mcp-client!+
+   {:cursor/server-name config/cursor-mcp-server-name
+    :vscode/extension-context extension-context
+    :cursor/script-relative-path "dist/calva-mcp-server.js"
+    :server/port-file-uri (:server/port-file-uri server-info)
+    :server/host (:server/host server-info)}))
 
 (defn unregister-mcp-server!+ []
-  (btt-cursor/unregister-mcp-server!+ config/cursor-mcp-server-name))
+  (btt-cursor/unregister-mcp-server!+ {:cursor/server-name config/cursor-mcp-server-name}))

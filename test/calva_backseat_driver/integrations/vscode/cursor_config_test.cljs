@@ -7,21 +7,22 @@
   (testing "valid paths produce expected stdio config"
     (let [{:keys [ok config]} (config/build-stdio-server-config
                                "/ext/dist/calva-mcp-server.js"
-                               "/proj/.calva/mcp-server/port")]
+                               "/proj/.calva/mcp-server/port"
+                               "127.0.0.1")]
       (is ok)
       (is (= "backseat-driver" (:name config)))
       (is (= "node" (get-in config [:server :command])))
-      (is (= ["/ext/dist/calva-mcp-server.js" "/proj/.calva/mcp-server/port"]
+      (is (= ["/ext/dist/calva-mcp-server.js" "/proj/.calva/mcp-server/port" "127.0.0.1"]
              (get-in config [:server :args])))
       (is (= {} (get-in config [:server :env])))))
 
   (testing "missing wrapper path"
     (is (= {:ok false :reason :missing-wrapper-path}
-           (config/build-stdio-server-config nil "/proj/port"))))
+           (config/build-stdio-server-config nil "/proj/port" "127.0.0.1"))))
 
   (testing "missing port file path"
     (is (= {:ok false :reason :missing-port-file-path}
-           (config/build-stdio-server-config "/ext/wrapper.js" nil)))))
+           (config/build-stdio-server-config "/ext/wrapper.js" nil "127.0.0.1")))))
 
 (deftest wrapper-script-path-test
   (testing "joins extensionPath with dist wrapper"
@@ -42,11 +43,13 @@
 (deftest build-cursor-mcp-registration-config-test
   (testing "combines extension wrapper path and server port file"
     (let [ctx #js {:extensionPath "/ext/root"}
-          server-info {:server/port-file-uri #js {:fsPath "/ws/.calva/mcp-server/port"}}
+          server-info {:server/port-file-uri #js {:fsPath "/ws/.calva/mcp-server/port"}
+                       :server/host "127.0.0.1"}
           {:keys [ok config]} (config/build-cursor-mcp-registration-config ctx server-info)]
       (is ok)
       (is (= [(path/join "/ext/root" "dist" "calva-mcp-server.js")
-              "/ws/.calva/mcp-server/port"]
+              "/ws/.calva/mcp-server/port"
+              "127.0.0.1"]
              (get-in config [:server :args]))))))
 
 (deftest should-auto-start-mcp-server?-test

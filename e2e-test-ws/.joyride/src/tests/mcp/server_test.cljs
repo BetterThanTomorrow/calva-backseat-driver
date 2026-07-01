@@ -18,14 +18,16 @@
                              :message "[server-lifecycle] Extension not active within 15s")
                 _ (js/console.log "[server-lifecycle] Attempting to start MCP server...")
                 server-info+ (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer")
-                {:keys [instance port]} (js->clj server-info+ :keywordize-keys true)
+                server-info (js->clj server-info+ :keywordize-keys true)
+                instance (:instance server-info)
+                assigned-port (or (:server/assigned-port server-info) (:assigned-port server-info))
 
                 _ (js/console.log "[server-lifecycle] Attempting to stop MCP server...")
                 success?+ (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")]
           (is (not= nil
                     instance)
               "Server instance is something")
-          (is (number? port)
+          (is (number? assigned-port)
               "Server started on a port")
           (is (= true
                  success?+)

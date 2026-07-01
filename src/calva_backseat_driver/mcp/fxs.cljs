@@ -11,10 +11,10 @@
    [promesa.core :as p]))
 
 (defn- show-server-started-message! [server-info wrapper-config-path]
-  (let [{:server/keys [port ^js port-file-uri port-note]} server-info
+  (let [{:server/keys [assigned-port ^js port-file-uri port-note]} server-info
         script-path (path/join wrapper-config-path "calva-mcp-server.js")]
     (p/let [button (vscode/window.showInformationMessage
-                    (str port-note " MCP socket server started on port: " port
+                    (str port-note " MCP socket server started on port: " assigned-port
                          ". Now your MCP client can run the `calva` stdio server command."
                          " (See Backseat Driver README and the docs of your AI Agent for how to do this.)")
                     "Copy command + port"
@@ -22,7 +22,7 @@
       (case button
         "Copy command + port"
         (vscode/env.clipboard.writeText
-         (str "node " script-path " " port))
+         (str "node " script-path " " assigned-port))
 
         "Copy command + port-file"
         (let [port-file-path (.-fsPath port-file-uri)]

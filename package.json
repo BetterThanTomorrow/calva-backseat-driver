@@ -55,13 +55,19 @@
         "calva-backseat-driver.autoRegisterCursorMcp": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "In Cursor, automatically register the Backseat Driver MCP server with the IDE Agent (via `vscode.cursor.mcp.registerServer`). Requires a workspace folder. When enabled, the MCP socket server starts silently on activation. Disable if you prefer manual `.cursor/mcp.json` configuration. Takes effect after window reload.",
+          "markdownDescription": "In Cursor, automatically register the Backseat Driver MCP server with the Cursor Agent.",
           "scope": "resource"
         },
         "calva-backseat-driver.mcpSocketServerPort": {
           "type": "number",
           "default": 1664,
           "markdownDescription": "Port to start the socket server on. Use `0` to let the server choose a high available port.",
+          "scope": "resource"
+        },
+        "calva-backseat-driver.mcpHost": {
+          "type": "string",
+          "default": "127.0.0.1",
+          "markdownDescription": "Host address for the MCP socket server to bind to.",
           "scope": "resource"
         },
         "calva-backseat-driver.editor.fuzzyLineTargetingPadding": {

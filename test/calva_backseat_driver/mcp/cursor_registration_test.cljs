@@ -55,7 +55,7 @@
               (assoc (mock-state true) :mcp/cursor-mcp-available? false))))))
 
 (deftest server-started-fxs-test
-  (let [server-info {:server/port 1664
+  (let [server-info {:server/assigned-port 1664
                      :server/port-file-uri #js {:fsPath "/ws/port"}}]
     (testing "silent Cursor start registers without copy-command effect"
       (let [fxs (reg/server-started-fxs server-info true "/home/config" true)]
