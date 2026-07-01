@@ -8,11 +8,20 @@
    [calva-backseat-driver.mcp.requests :as requests]
    [calva-backseat-driver.mcp.server :as server]
    [cljs.core.match :refer [match]]
-   [promesa.core :as p]))
+   [promesa.core :as p]
+   [vscode-mcp.stdio-config :as stdio-config]))
+
+(defn copy-command-strings
+  "Returns {:port ... :port-file ...} shell commands for manual MCP setup copy buttons."
+  [{:server/keys [assigned-port host port-file-uri]} wrapper-config-path]
+  (let [script-path (path/join wrapper-config-path "calva-mcp-server.js")
+        port-file-path (.-fsPath port-file-uri)]
+    {:port (stdio-config/stdio-command-string "node" script-path assigned-port host)
+     :port-file (stdio-config/stdio-command-string "node" script-path port-file-path host)}))
 
 (defn- show-server-started-message! [server-info wrapper-config-path]
-  (let [{:server/keys [assigned-port ^js port-file-uri port-note]} server-info
-        script-path (path/join wrapper-config-path "calva-mcp-server.js")]
+  (let [{:server/keys [assigned-port port-note]} server-info
+        {:keys [port port-file]} (copy-command-strings server-info wrapper-config-path)]
     (p/let [button (vscode/window.showInformationMessage
                     (str port-note " MCP socket server started on port: " assigned-port
                          ". Now your MCP client can run the `calva` stdio server command."
@@ -21,13 +30,10 @@
                     "Copy command + port-file")]
       (case button
         "Copy command + port"
-        (vscode/env.clipboard.writeText
-         (str "node " script-path " " assigned-port))
+        (vscode/env.clipboard.writeText port)
 
         "Copy command + port-file"
-        (let [port-file-path (.-fsPath port-file-uri)]
-          (vscode/env.clipboard.writeText
-           (str "node " script-path " " port-file-path)))
+        (vscode/env.clipboard.writeText port-file)
 
         nil))))
 
