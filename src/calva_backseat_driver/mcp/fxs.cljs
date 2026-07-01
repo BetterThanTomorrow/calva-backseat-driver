@@ -9,31 +9,7 @@
    [calva-backseat-driver.mcp.server :as server]
    [cljs.core.match :refer [match]]
    [promesa.core :as p]
-   [vscode-mcp.stdio-config :as stdio-config]))
-
-(defn copy-command-strings
-  "Returns {:port ... :port-file ...} shell commands for manual MCP setup copy buttons."
-  [{:server/keys [assigned-port host port-file-uri]} wrapper-config-path]
-  (let [script-path (path/join wrapper-config-path "calva-mcp-server.js")
-        port-file-path (.-fsPath port-file-uri)]
-    {:port (stdio-config/stdio-command-string "node" script-path assigned-port host)
-     :port-file (stdio-config/stdio-command-string "node" script-path port-file-path host)}))
-
-(defn- show-server-started-message! [server-info wrapper-config-path]
-  (let [{:server/keys [assigned-port port-note]} server-info
-        {:keys [port port-file]} (copy-command-strings server-info wrapper-config-path)]
-    (p/let [button (vscode/window.showInformationMessage
-                    (str port-note " MCP socket server started on port: " assigned-port)
-                    "Copy command + port"
-                    "Copy command + port-file")]
-      (case button
-        "Copy command + port"
-        (vscode/env.clipboard.writeText port)
-
-        "Copy command + port-file"
-        (vscode/env.clipboard.writeText port-file)
-
-        nil))))
+   [vscode-mcp.manual-setup.dialog :as manual-setup-dialog]))
 
 (defn- copy-wrapper-script! [wrapper-config-path]
   (let [extension-uri (-> (vscode/extensions.getExtension
@@ -111,7 +87,9 @@
                     (dispatch! context (ax/enrich-with-args on-success success?))))))
 
     [:mcp/fx.show-server-started-message server-info wrapper-config-path]
-    (show-server-started-message! server-info wrapper-config-path)
+    (manual-setup-dialog/show-manual-start-dialog!+
+     (path/join wrapper-config-path "calva-mcp-server.js")
+     server-info)
 
     [:mcp/fx.send-notification notification]
     (server/send-notification-params {:ex/dispatch! (partial dispatch! context)} notification)
