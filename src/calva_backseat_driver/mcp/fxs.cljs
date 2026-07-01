@@ -23,9 +23,7 @@
   (let [{:server/keys [assigned-port port-note]} server-info
         {:keys [port port-file]} (copy-command-strings server-info wrapper-config-path)]
     (p/let [button (vscode/window.showInformationMessage
-                    (str port-note " MCP socket server started on port: " assigned-port
-                         ". Now your MCP client can run the `calva` stdio server command."
-                         " (See Backseat Driver README and the docs of your AI Agent for how to do this.)")
+                    (str port-note " MCP socket server started on port: " assigned-port)
                     "Copy command + port"
                     "Copy command + port-file")]
       (case button
