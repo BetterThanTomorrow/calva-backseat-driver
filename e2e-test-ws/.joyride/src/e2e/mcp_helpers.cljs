@@ -14,16 +14,20 @@
 (def settings-path
   (.-fsPath (vscode/Uri.joinPath workspace-uri ".vscode" "settings.json")))
 
-(defn connect-to-mcp-server [port]
-  (p/create
-   (fn [resolve reject]
-     (let [socket (.connect net #js {:port port})]
+(def default-mcp-host "127.0.0.1")
+
+(defn connect-to-mcp-server
+  ([port] (connect-to-mcp-server port default-mcp-host))
+  ([port host]
+   (p/create
+    (fn [resolve reject]
+      (let [socket (.connect net #js {:port port :host host})]
        (.on socket "error" (fn [err]
                               (js/console.error "[MCP client] Socket error:" err)
                               (reject err)))
        (.on socket "connect" (fn []
-                                (js/console.log "[MCP client] Connected to server port:" port)
-                                (resolve socket)))))))
+                                (js/console.log "[MCP client] Connected to server on" host "port:" port)
+                                (resolve socket))))))))
 
 (defn- try-parse-json [s]
   (try (.parse js/JSON s) (catch :default _ nil)))
@@ -85,8 +89,12 @@
                        :message "[MCP helpers] startMcpServer command not registered within 15s")
           server-info+ (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer")
           server-info (js->clj server-info+ :keywordize-keys true)
-          port (:port server-info)
-          socket (connect-to-mcp-server port)
+          port (or (:server/assigned-port server-info) (:assigned-port server-info))
+          host (or (:server/host server-info) (:host server-info) default-mcp-host)
+          _ (when (or (nil? port) (js/isNaN port) (<= port 0))
+              (throw (js/Error. (str "[MCP helpers] Invalid MCP port after start: " port
+                                     " server-info: " (pr-str server-info)))))
+          socket (connect-to-mcp-server port host)
           _ (send-request socket {:jsonrpc "2.0" :id 0 :method "initialize"})]
     {:socket socket :port port}))
 
@@ -109,6 +117,7 @@
   {"enableMcpReplEvaluation" true
    "autoStartMCPServer" false
    "mcpSocketServerPort" 1664
+   "mcpHost" "127.0.0.1"
    "provideBdSkill" true
    "provideEditSkill" true})
 
@@ -146,6 +155,7 @@
     (p/let [_ (.update config "enableMcpReplEvaluation" (restored-js-value (get restored-settings "enableMcpReplEvaluation")) vscode/ConfigurationTarget.Workspace)
             _ (.update config "autoStartMCPServer" (restored-js-value (get restored-settings "autoStartMCPServer")) vscode/ConfigurationTarget.Workspace)
             _ (.update config "mcpSocketServerPort" (restored-js-value (get restored-settings "mcpSocketServerPort")) vscode/ConfigurationTarget.Workspace)
+            _ (.update config "mcpHost" (restored-js-value (get restored-settings "mcpHost")) vscode/ConfigurationTarget.Workspace)
             _ (.update config "provideBdSkill" (restored-js-value (get restored-settings "provideBdSkill")) vscode/ConfigurationTarget.Workspace)
             _ (.update config "provideEditSkill" (restored-js-value (get restored-settings "provideEditSkill")) vscode/ConfigurationTarget.Workspace)
             _ (wait-for+ #(let [current-config (vscode/workspace.getConfiguration "calva-backseat-driver")]
@@ -170,12 +180,13 @@
 
 (defn spawn-stdio-wrapper!
   "Spawn the stdio MCP wrapper relay connected to port. Returns a client map."
-  [port]
-  (p/create
-   (fn [resolve reject]
-     (try
-       (let [script (wrapper-script-path)
-             proc (.spawn child-process "node" #js [script (str port)] #js {:stdio #js ["pipe" "pipe" "pipe"]})
+  ([port] (spawn-stdio-wrapper! port default-mcp-host))
+  ([port host]
+   (p/create
+    (fn [resolve reject]
+      (try
+        (let [script (wrapper-script-path)
+              proc (.spawn child-process "node" #js [script (str port) host] #js {:stdio #js ["pipe" "pipe" "pipe"]})
              stdin (.-stdin proc)
              stdout (.-stdout proc)
              stderr (.-stderr proc)
@@ -187,8 +198,8 @@
                 (js/console.error "[stdio wrapper stderr]" chunk)))
          (.on proc "error" reject)
          (resolve {:proc proc :stdin stdin :stdout stdout :buffer buffer}))
-       (catch :default err
-         (reject err))))))
+        (catch :default err
+          (reject err)))))))
 
 (defn send-stdio-request!
   "Send a JSON-RPC request through the stdio wrapper and wait for a matching id."
