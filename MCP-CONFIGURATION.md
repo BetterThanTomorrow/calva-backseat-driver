@@ -6,10 +6,7 @@ If you are using Backseat Driver with harnesses _other than_ Copilot or [Cursor]
 
 Backseat Driver runs a socket server inside the VS Code Extension Host and writes a port file when it starts. Your MCP client starts a small Node **stdio wrapper** that connects to that socket. The wrapper accepts either a port number or a path to the port file.
 
-There is one Backseat Driver MCP server per workspace. The port file will be created at `<workspace-root>/.calva/mcp-server/port`.
-
-* Default socket port is `1664`. If that port is busy, a random available port is used instead.
-* Change the preferred port with `calva-backseat-driver.mcpSocketServerPort`. Use `0` to always pick a random port.
+There is one Backseat Driver MCP server per workspace. The port file will be created at `<workspace-root>/.calva/mcp-server/port`. Change the preferred port with `calva-backseat-driver.mcpSocketServerPort`. Use `0` (default) to always pick a random available port.
 
 ## What you need to do
 
