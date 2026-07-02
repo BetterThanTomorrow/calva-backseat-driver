@@ -1,6 +1,5 @@
 (ns calva-backseat-driver.mcp.axs
   (:require
-   [calva-backseat-driver.integrations.vscode.cursor-config :as cursor-config]
    [cljs.core.match :refer [match]]
    [vscode-mcp.core :as vscode-mcp]))
 
@@ -40,7 +39,7 @@
    :ex/fxs [[:app/fx.log
              (select-keys state [:app/min-log-level :app/log-file-uri :app/log-dir-initialized+])
              :info
-             ["Cursor MCP server registered:" (cursor-config/cursor-mcp-settings-display-name) result]]]})
+             ["Cursor MCP server registered:" result]]]})
 
 (defn- handle-cursor-mcp-registration-failed [state failure]
   {:ex/db (update state :mcp/lifecycle-state assoc :lifecycle/cursor-register-called? true)

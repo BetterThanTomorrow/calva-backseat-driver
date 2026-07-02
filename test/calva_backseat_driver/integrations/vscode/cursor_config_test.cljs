@@ -1,36 +1,6 @@
 (ns calva-backseat-driver.integrations.vscode.cursor-config-test
-  (:require ["path" :as path]
-            [cljs.test :refer [deftest testing is]]
+  (:require [cljs.test :refer [deftest testing is]]
             [calva-backseat-driver.integrations.vscode.cursor-config :as config]))
-
-(deftest build-stdio-server-config-test
-  (testing "valid paths produce expected stdio config"
-    (let [{:keys [ok config]} (config/build-stdio-server-config
-                               "/ext/dist/calva-mcp-server.js"
-                               "/proj/.calva/mcp-server/port"
-                               "127.0.0.1")]
-      (is ok)
-      (is (= "backseat-driver" (:name config)))
-      (is (= "node" (get-in config [:server :command])))
-      (is (= ["/ext/dist/calva-mcp-server.js" "/proj/.calva/mcp-server/port" "127.0.0.1"]
-             (get-in config [:server :args])))
-      (is (= {} (get-in config [:server :env])))))
-
-  (testing "missing wrapper path"
-    (is (= {:ok false :reason :missing-wrapper-path}
-           (config/build-stdio-server-config nil "/proj/port" "127.0.0.1"))))
-
-  (testing "missing port file path"
-    (is (= {:ok false :reason :missing-port-file-path}
-           (config/build-stdio-server-config "/ext/wrapper.js" nil "127.0.0.1")))))
-
-(deftest wrapper-script-path-test
-  (testing "joins extensionPath with dist wrapper"
-    (is (= (path/join "/Users/dev/backseat-driver" "dist" "calva-mcp-server.js")
-           (config/wrapper-script-path #js {:extensionPath "/Users/dev/backseat-driver"}))))
-
-  (testing "nil context yields nil"
-    (is (nil? (config/wrapper-script-path nil)))))
 
 (deftest port-file-fs-path-test
   (testing "reads fsPath from port-file-uri"
@@ -39,18 +9,6 @@
 
   (testing "missing uri yields nil"
     (is (nil? (config/port-file-fs-path {})))))
-
-(deftest build-cursor-mcp-registration-config-test
-  (testing "combines extension wrapper path and server port file"
-    (let [ctx #js {:extensionPath "/ext/root"}
-          server-info {:server/port-file-uri #js {:fsPath "/ws/.calva/mcp-server/port"}
-                       :server/host "127.0.0.1"}
-          {:keys [ok config]} (config/build-cursor-mcp-registration-config ctx server-info)]
-      (is ok)
-      (is (= [(path/join "/ext/root" "dist" "calva-mcp-server.js")
-              "/ws/.calva/mcp-server/port"
-              "127.0.0.1"]
-             (get-in config [:server :args]))))))
 
 (deftest should-auto-start-mcp-server?-test
   (testing "autoStartMCPServer alone"
@@ -65,21 +23,15 @@
   (testing "both off"
     (is (not (config/should-auto-start-mcp-server? false false false)))))
 
-(deftest mcp-client-identifier-test
-  (testing "builds Cursor MCP service identifier from extension id and server name"
-    (is (= "user-betterthantomorrow.calva-backseat-driver-extension-backseat-driver"
-           (config/mcp-client-identifier
-            #js {:extension #js {:id "betterthantomorrow.calva-backseat-driver"}}))))
-
-  (testing "nil context yields nil"
-    (is (nil? (config/mcp-client-identifier nil))))
-
-  (testing "missing extension id yields nil"
-    (is (nil? (config/mcp-client-identifier #js {:extension #js {}})))))
+(deftest cursor-mcp-server-name-test
+  (testing "registerServer name is the base name suffixed with the instance slug"
+    (is (= "backseat-driver-my-project-a3f2"
+           (config/cursor-mcp-server-name "my-project-a3f2")))))
 
 (deftest cursor-mcp-settings-display-name-test
-  (testing "Cursor Settings label prefixes extension- to registerServer name"
-    (is (= "extension-backseat-driver" (config/cursor-mcp-settings-display-name)))))
+  (testing "Cursor Settings label prefixes extension- to the registerServer name"
+    (is (= "extension-backseat-driver-my-project-a3f2"
+           (config/cursor-mcp-settings-display-name "backseat-driver-my-project-a3f2")))))
 
 (deftest should-register-cursor-mcp?-test
   (let [server-info {:server/port-file-uri #js {:fsPath "/ws/port"}}]

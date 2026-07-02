@@ -8,15 +8,15 @@
    instead of through `vscode-mcp.core`. Production start/stop/registration
    goes through `mcp/fxs.cljs`'s `lifecycle-start`/`lifecycle-stop` effects."
   (:require
-   [vscode-mcp.cursor :as btt-cursor]
-   [calva-backseat-driver.integrations.vscode.cursor-config :as config]))
+   [calva-backseat-driver.integrations.vscode.cursor-config :as config]
+   [vscode-mcp.cursor :as btt-cursor]))
 
 (defn cursor-mcp-available? []
   (btt-cursor/cursor-mcp-available?))
 
 (defn register-and-reload-mcp-client!+ [extension-context server-info]
   (btt-cursor/register-and-reload-mcp-client!+
-   {:cursor/server-name config/cursor-mcp-server-name
+   {:cursor/server-name (config/cursor-mcp-server-name (:server/instance-slug server-info))
     :vscode/extension-context extension-context
     :cursor/script-relative-path "dist/calva-mcp-server.js"
     :server/port-file-uri (:server/port-file-uri server-info)

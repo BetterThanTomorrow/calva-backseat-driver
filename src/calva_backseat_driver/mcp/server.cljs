@@ -21,25 +21,8 @@
 (defn- get-port-file-uri+ [ctx-or-base-uri]
   (vscode/Uri.joinPath (get-server-dir+ ctx-or-base-uri) "port"))
 
-(defn random-anon-id []
-  (str "anon-" (subs (str (random-uuid)) 0 8)))
-
-(defn- cursor-unique-id [workspace-root-path-or-nil storage-uri-path-or-nil]
-  (cond
-    workspace-root-path-or-nil
-    (str "ws-" (hash workspace-root-path-or-nil))
-
-    storage-uri-path-or-nil
-    (str "win-" (hash storage-uri-path-or-nil))
-
-    :else
-    (random-anon-id)))
-
-(defn- get-cursor-port-file-uri [_wrapper-config-path workspace-root-uri storage-uri]
-  (let [unique-id (cursor-unique-id (some-> workspace-root-uri .-fsPath)
-                                    (some-> storage-uri .-fsPath))
-        port-file-path (.join path (os/tmpdir) "calva-mcp-server" unique-id "port")]
-    (vscode/Uri.file port-file-path)))
+(defn- get-cursor-port-file-uri [instance-slug]
+  (vscode/Uri.file (path/join (os/tmpdir) "calva-mcp-server" instance-slug "port")))
 
 (defn build-lifecycle-config
   "Builds a `vscode-mcp.core` config from current settings and BD's
@@ -50,7 +33,7 @@
   (let [settings (vscode/workspace.getConfiguration "calva-backseat-driver")]
     (vscode-mcp/create-config
      {:vscode/extension-context context
-      :cursor/server-name cursor-config/cursor-mcp-server-name
+      :cursor/server-name cursor-config/cursor-mcp-base-server-name
       :cursor/script-relative-path "dist/calva-mcp-server.js"
       :mcp/auto-start? (.get settings "autoStartMCPServer")
       :mcp/auto-register? (.get settings "autoRegisterCursorMcp")
@@ -59,11 +42,9 @@
                         (dispatch! context [[:mcp/ax.handle-request request]]))
       :mcp/on-log (fn [level & args]
                     (dispatch! context [[:app/ax.log level (apply str (interpose " " args))]]))
-      :lifecycle/port-file-uri+ (fn [^js ctx {:lifecycle/keys [cursor-mode?]}]
+      :lifecycle/port-file-uri+ (fn [^js ctx {:lifecycle/keys [cursor-mode? instance-slug]}]
                                   (if cursor-mode?
-                                    (get-cursor-port-file-uri wrapper-config-path
-                                                              (get-workspace-root-uri-or-nil)
-                                                              (.-storageUri ctx))
+                                    (get-cursor-port-file-uri instance-slug)
                                     (get-port-file-uri+ ctx)))
       :lifecycle/request-port (fn [_ctx {:lifecycle/keys [cursor-mode?]}]
                                 (if cursor-mode? 0 (.get settings "mcpSocketServerPort")))
@@ -77,7 +58,7 @@
                                      (dispatch! context [[:app/ax.set-when-context :calva-backseat-driver/started? running?]]))
       :lifecycle/on-cursor-registered (fn [result]
                                        (dispatch! context [[:app/ax.log :info "Cursor MCP server registered:"
-                                                            (cursor-config/cursor-mcp-settings-display-name) result]]))
+                                                            (cursor-config/cursor-mcp-settings-display-name (get-in result [:config :name])) result]]))
       :lifecycle/on-cursor-registration-failed (fn [failure]
                                                 (dispatch! context [[:app/ax.log :warn "Cursor MCP auto-registration failed:" failure]]))
       :lifecycle/on-error (fn [err]
