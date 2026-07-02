@@ -9,7 +9,7 @@
    [calva-backseat-driver.mcp.server :as server]
    [cljs.core.match :refer [match]]
    [promesa.core :as p]
-   [vscode-mcp.lifecycle :as lifecycle]
+   [vscode-mcp.core :as vscode-mcp]
    [vscode-mcp.server :as btt-mcp-server]))
 
 (defn- copy-wrapper-script! [wrapper-config-path]
@@ -34,8 +34,8 @@
            :lifecycle/keys [silent?]
            :mcp/keys [wrapper-config-path lifecycle-state]} options
           config (server/build-lifecycle-config dispatch! context wrapper-config-path)
-          start!+ (if silent? lifecycle/maybe-start!+ lifecycle/start!+)]
-      (p/then (start!+ config lifecycle-state)
+          start!+ (if silent? vscode-mcp/maybe-start!+ vscode-mcp/start!+)]
+      (p/then (start!+ config lifecycle-state silent?)
               (fn [new-lifecycle-state]
                 (dispatch! context (ax/enrich-with-args on-success new-lifecycle-state)))))
 
@@ -43,12 +43,12 @@
     (let [{:ex/keys [on-success]
            :mcp/keys [wrapper-config-path lifecycle-state]} options
           config (server/build-lifecycle-config dispatch! context wrapper-config-path)]
-      (-> (lifecycle/stop!+ config lifecycle-state {:lifecycle/silent? false})
+      (-> (vscode-mcp/stop!+ config lifecycle-state false)
           (p/then (fn [new-lifecycle-state]
                     (dispatch! context (ax/enrich-with-args on-success new-lifecycle-state))))
           (p/catch (fn [e]
                      (dispatch! context [[:mcp/ax.server-error e]])
-                     (dispatch! context (ax/enrich-with-args on-success (lifecycle/init-state)))))))
+                     (dispatch! context (ax/enrich-with-args on-success (vscode-mcp/init-state)))))))
 
     [:mcp/fx.register-cursor-mcp-server server-info options]
     (let [{:ex/keys [on-success on-error]} options]
