@@ -2,7 +2,7 @@
   (:require
    [calva-backseat-driver.integrations.vscode.cursor-config :as cursor-config]
    [cljs.core.match :refer [match]]
-   [vscode-mcp.lifecycle :as lifecycle]))
+   [vscode-mcp.core :as vscode-mcp]))
 
 (defn- handle-start-server [state action]
   (let [silent? (some-> action second :silent?)]
@@ -14,7 +14,7 @@
 
 (defn- handle-lifecycle-updated [state lifecycle-state]
   {:ex/db (assoc state :mcp/lifecycle-state lifecycle-state)
-   :ex/fxs [[:app/fx.return (clj->js (lifecycle/server-info lifecycle-state))]]})
+   :ex/fxs [[:app/fx.return (clj->js (vscode-mcp/server-info lifecycle-state))]]})
 
 (defn- handle-stop-server [state]
   {:ex/fxs [[:mcp/fx.lifecycle-stop
@@ -27,7 +27,7 @@
    :ex/fxs [[:app/fx.return true]]})
 
 (defn- handle-ensure-cursor-mcp-registered [state]
-  (let [server-info (lifecycle/server-info (:mcp/lifecycle-state state))]
+  (let [server-info (vscode-mcp/server-info (:mcp/lifecycle-state state))]
     (when server-info
       {:ex/fxs [[:mcp/fx.register-cursor-mcp-server server-info
                  {:ex/on-success [[:mcp/ax.cursor-mcp-registered :ex/action-args]]

@@ -4,7 +4,7 @@
    ["path" :as path]
    ["vscode" :as vscode]
    [calva-backseat-driver.integrations.vscode.cursor-config :as cursor-config]
-   [vscode-mcp.lifecycle :as lifecycle]))
+   [vscode-mcp.core :as vscode-mcp]))
 
 (defn- get-workspace-root-uri-or-nil []
   (some-> vscode/workspace.workspaceFolders
@@ -42,13 +42,13 @@
     (vscode/Uri.file port-file-path)))
 
 (defn build-lifecycle-config
-  "Builds a `vscode-mcp.lifecycle` config from current settings and BD's
+  "Builds a `vscode-mcp.core` config from current settings and BD's
    port-file/wrapper-path/when-context conventions. Cheap to rebuild — callers
    don't need to cache it (see plan Decision Q6: settings are read fresh on
    each start/stop, same as the rest of BD's Ex config-keyword enrichment)."
   [dispatch! ^js context wrapper-config-path]
   (let [settings (vscode/workspace.getConfiguration "calva-backseat-driver")]
-    (lifecycle/create-config
+    (vscode-mcp/create-config
      {:vscode/extension-context context
       :cursor/server-name cursor-config/cursor-mcp-server-name
       :cursor/script-relative-path "dist/calva-mcp-server.js"
