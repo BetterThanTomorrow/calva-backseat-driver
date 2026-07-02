@@ -8,7 +8,8 @@
    [calva-backseat-driver.integrations.calva.api :as calva-api]
    [calva-backseat-driver.integrations.calva.version :as version]
    [calva-backseat-driver.integrations.vscode.cursor :as cursor]
-   [calva-backseat-driver.mcp.cursor-registration :as cursor-reg]))
+   [calva-backseat-driver.integrations.vscode.cursor-config :as cursor-config]
+   [vscode-mcp.lifecycle :as lifecycle]))
 
 (defn- extension-context []
   (:vscode/extension-context @db/!app-db))
@@ -20,6 +21,7 @@
    :app/min-log-level :debug
    :mcp/wrapper-config-path (path/join (os/homedir) ".config" "calva" "backseat-driver")
    :mcp/cursor-mcp-available? (cursor/cursor-mcp-available?)
+   :mcp/lifecycle-state (lifecycle/init-state)
    :calva/history-storage-uri (some-> (.-storageUri context)
                                       (vscode/Uri.joinPath "eval-history.transit.json"))})
 
@@ -41,7 +43,6 @@
     (swap! db/!app-db assoc
            :vscode/extension-context context
            :app/getConfiguration vscode/workspace.getConfiguration))
-  (swap! db/!app-db dissoc :mcp/cursor-registered? :mcp/cursor-register-server-called?)
   (ex/dispatch! context [[:app/ax.activate (initial-state context)]])
 
   (js/console.timeLog "activation" "Calva Backseat Driver activate END")
@@ -77,9 +78,15 @@
                                       :auto-register-cursor-mcp? :vscode/config.autoRegisterCursorMcp}]])))
 
 (defn- maybe-register-cursor-mcp! [ctx]
-  (when-let [server-info (:app/server-info @db/!app-db)]
-    (when (cursor-reg/should-call-register-server? @db/!app-db server-info)
-      (ex/dispatch! ctx [[:mcp/ax.ensure-cursor-mcp-registered]]))))
+  (let [lifecycle-state (:mcp/lifecycle-state @db/!app-db)
+        server-info (lifecycle/server-info lifecycle-state)]
+    (when server-info
+      (let [auto-register? (some-> (vscode/workspace.getConfiguration "calva-backseat-driver")
+                                    (.get "autoRegisterCursorMcp"))
+            register-allowed? (cursor-config/should-register-cursor-mcp?
+                               auto-register? (cursor/cursor-mcp-available?) server-info)]
+        (when (lifecycle/should-call-register-server? lifecycle-state {:lifecycle/silent? true} register-allowed?)
+          (ex/dispatch! ctx [[:mcp/ax.ensure-cursor-mcp-registered]]))))))
 
 (defn- ensure-cursor-mcp-ready! []
   (when-let [ctx (extension-context)]
