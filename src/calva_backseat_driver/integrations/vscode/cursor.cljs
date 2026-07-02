@@ -20,4 +20,5 @@
     :vscode/extension-context extension-context
     :cursor/script-relative-path "dist/calva-mcp-server.js"
     :server/port-file-uri (:server/port-file-uri server-info)
-    :server/host (:server/host server-info)}))
+    :server/host (:server/host server-info)
+    :lifecycle/silent? true}))
