@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- The MCP default port changes from `1664` to `0` (random available port)
+
 ## [v0.0.37] - 2026-06-22
 
 - Backseat Driver is now also a Cursor extension making its Clojure tools available to the agent with Zero Config.
