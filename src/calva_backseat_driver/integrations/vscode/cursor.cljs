@@ -13,6 +13,3 @@
     :cursor/script-relative-path "dist/calva-mcp-server.js"
     :server/port-file-uri (:server/port-file-uri server-info)
     :server/host (:server/host server-info)}))
-
-(defn unregister-mcp-server!+ []
-  (btt-cursor/unregister-mcp-server!+ {:cursor/server-name config/cursor-mcp-server-name}))

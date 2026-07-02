@@ -9,7 +9,8 @@
    [calva-backseat-driver.mcp.server :as server]
    [cljs.core.match :refer [match]]
    [promesa.core :as p]
-   [vscode-mcp.manual-setup.dialog :as manual-setup-dialog]))
+   [vscode-mcp.lifecycle :as lifecycle]
+   [vscode-mcp.server :as btt-mcp-server]))
 
 (defn- copy-wrapper-script! [wrapper-config-path]
   (let [extension-uri (-> (vscode/extensions.getExtension
@@ -28,16 +29,26 @@
 
 (defn perform-effect! [dispatch! ^js context effect]
   (match effect
-    [:mcp/fx.start-server options]
-    (let [{:ex/keys [on-success on-error]} options]
-      (-> (server/start-server!+ (assoc options :ex/dispatch!
-                                        (partial dispatch! context)
-                                        :vscode/extension-context context))
-          (p/then (fn [server-info]
-                    (dispatch! context (ax/enrich-with-args on-success server-info))))
-          (p/catch
-           (fn [e]
-             (dispatch! context (ax/enrich-with-args on-error e))))))
+    [:mcp/fx.lifecycle-start options]
+    (let [{:ex/keys [on-success]
+           :lifecycle/keys [silent?]
+           :mcp/keys [wrapper-config-path lifecycle-state]} options
+          config (server/build-lifecycle-config dispatch! context wrapper-config-path)
+          start!+ (if silent? lifecycle/maybe-start!+ lifecycle/start!+)]
+      (p/then (start!+ config lifecycle-state)
+              (fn [new-lifecycle-state]
+                (dispatch! context (ax/enrich-with-args on-success new-lifecycle-state)))))
+
+    [:mcp/fx.lifecycle-stop options]
+    (let [{:ex/keys [on-success]
+           :mcp/keys [wrapper-config-path lifecycle-state]} options
+          config (server/build-lifecycle-config dispatch! context wrapper-config-path)]
+      (-> (lifecycle/stop!+ config lifecycle-state {:lifecycle/silent? false})
+          (p/then (fn [new-lifecycle-state]
+                    (dispatch! context (ax/enrich-with-args on-success new-lifecycle-state))))
+          (p/catch (fn [e]
+                     (dispatch! context [[:mcp/ax.server-error e]])
+                     (dispatch! context (ax/enrich-with-args on-success (lifecycle/init-state)))))))
 
     [:mcp/fx.register-cursor-mcp-server server-info options]
     (let [{:ex/keys [on-success on-error]} options]
@@ -60,39 +71,8 @@
                      (dispatch! context [[:app/ax.log :error "[Cursor MCP] registerServer error:" e]])
                      (dispatch! context (ax/enrich-with-args on-error e))))))
 
-    [:mcp/fx.stop-server options]
-    (let [{:ex/keys [on-success on-error]
-           :keys [mcp/cursor-registered?]} options
-          stop-server+ (fn []
-                         (p/catch
-                          (server/stop-server!+ (assoc options :ex/dispatch!
-                                                       (partial dispatch! context)
-                                                       :vscode/extension-context context))
-                          (fn [e]
-                            (dispatch! context (ax/enrich-with-args on-error (.-message e)))
-                            false)))]
-      (-> (if cursor-registered?
-            (-> (cursor/unregister-mcp-server!+)
-                (p/then (fn [result]
-                          (when-not (:ok result)
-                            (let [err (:error result)]
-                              (when (or (nil? err) (not= "Canceled" (.-name err)))
-                                (dispatch! context [[:app/ax.log :debug "[Cursor MCP] unregisterServer:" result]]))))
-                          result)))
-            (p/resolved true))
-          (p/then (fn [_] (stop-server+)))
-          (p/then (fn [success?]
-                    (when cursor-registered?
-                      (dispatch! context [[:mcp/ax.cursor-mcp-unregistered {:ok true}]]))
-                    (dispatch! context (ax/enrich-with-args on-success success?))))))
-
-    [:mcp/fx.show-server-started-message server-info wrapper-config-path]
-    (manual-setup-dialog/show-manual-start-dialog!+
-     (path/join wrapper-config-path "calva-mcp-server.js")
-     server-info)
-
-    [:mcp/fx.send-notification notification]
-    (server/send-notification-params {:ex/dispatch! (partial dispatch! context)} notification)
+    [:mcp/fx.send-notification server-info notification]
+    (btt-mcp-server/send-notification-params server-info notification)
 
     [:mcp/fx.handle-request options request]
     (requests/handle-request-fn (assoc options :ex/dispatch! (partial dispatch! context)

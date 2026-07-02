@@ -3,10 +3,8 @@
    ["os" :as os]
    ["path" :as path]
    ["vscode" :as vscode]
-   [vscode-mcp.server :as btt-mcp]
-   [promesa.core :as p]))
-
-(defonce ^:private current-server-info (atom nil))
+   [calva-backseat-driver.integrations.vscode.cursor-config :as cursor-config]
+   [vscode-mcp.lifecycle :as lifecycle]))
 
 (defn- get-workspace-root-uri-or-nil []
   (some-> vscode/workspace.workspaceFolders
@@ -43,55 +41,44 @@
         port-file-path (.join path (os/tmpdir) "calva-mcp-server" unique-id "port")]
     (vscode/Uri.file port-file-path)))
 
-(defn- mcp-on-log-fn [dispatch!]
-  (fn [level & args]
-    (dispatch! [[:app/ax.log level (apply str (interpose " " args))]])))
-
-(defn- resolve-stop-server-info [info {:keys [server/instance server/port-file-uri ex/dispatch!]}]
-  (let [resolved-instance (or instance (:server/instance info))
-        resolved-port-file-uri (or port-file-uri (:server/port-file-uri info))]
-    (merge info
-           {:server/instance resolved-instance
-            :server/port-file-uri resolved-port-file-uri
-            :mcp/on-log (mcp-on-log-fn dispatch!)})))
-
-(defn start-server!+
-  "Creates a socket server and writes the port to a file.
-   Returns a promise that resolves to a map with server info when the MCP server starts successfully."
-  [{:ex/keys [dispatch!] :keys [server/request-port server/host vscode/extension-context mcp/use-global-port-file? mcp/wrapper-config-path]}]
-  (let [^js port-file-uri (if use-global-port-file?
-                            (get-cursor-port-file-uri wrapper-config-path
-                                                      (get-workspace-root-uri-or-nil)
-                                                      (some-> ^js extension-context .-storageUri))
-                            (get-port-file-uri+ extension-context))]
-    (-> (btt-mcp/start-server!+
-         {:server/request-port request-port
-          :server/host host
-          :server/port-file-uri port-file-uri
-          :mcp/on-log (mcp-on-log-fn dispatch!)
-          :mcp/on-request (fn [req]
-                            (dispatch! [[:mcp/ax.handle-request req]]))})
-        (p/then (fn [server-info]
-                  (reset! current-server-info server-info)
-                  server-info)))))
-
-(defn stop-server!+
-  "Stops the MCP server and removes the port file.
-   Returns a promise that resolves to a boolean indicating success."
-  [{:keys [ex/dispatch!] :as options}]
-  (let [info @current-server-info]
-    (if-not info
-      (do
-        (dispatch! [[:app/ax.log :info "No server instance to stop."]])
-        (p/resolved false))
-      (-> (btt-mcp/stop-server!+ (resolve-stop-server-info info options))
-          (p/then (fn [res]
-                    (reset! current-server-info nil)
-                    res))))))
-
-(defn send-notification-params [{:ex/keys [dispatch!]} notification]
-  (if-let [info @current-server-info]
-    (btt-mcp/send-notification-params
-     (assoc info :mcp/on-log (mcp-on-log-fn dispatch!))
-     notification)
-    (dispatch! [[:app/ax.log :warn "Cannot send notification, no server running."]])))
+(defn build-lifecycle-config
+  "Builds a `vscode-mcp.lifecycle` config from current settings and BD's
+   port-file/wrapper-path/when-context conventions. Cheap to rebuild — callers
+   don't need to cache it (see plan Decision Q6: settings are read fresh on
+   each start/stop, same as the rest of BD's Ex config-keyword enrichment)."
+  [dispatch! ^js context wrapper-config-path]
+  (let [settings (vscode/workspace.getConfiguration "calva-backseat-driver")]
+    (lifecycle/create-config
+     {:vscode/extension-context context
+      :cursor/server-name cursor-config/cursor-mcp-server-name
+      :cursor/script-relative-path "dist/calva-mcp-server.js"
+      :mcp/auto-start? (.get settings "autoStartMCPServer")
+      :mcp/auto-register? (.get settings "autoRegisterCursorMcp")
+      :server/host (.get settings "mcpHost")
+      :mcp/on-request (fn [request]
+                        (dispatch! context [[:mcp/ax.handle-request request]]))
+      :mcp/on-log (fn [level & args]
+                    (dispatch! context [[:app/ax.log level (apply str (interpose " " args))]]))
+      :lifecycle/port-file-uri+ (fn [^js ctx {:lifecycle/keys [cursor-mode?]}]
+                                  (if cursor-mode?
+                                    (get-cursor-port-file-uri wrapper-config-path
+                                                              (get-workspace-root-uri-or-nil)
+                                                              (.-storageUri ctx))
+                                    (get-port-file-uri+ ctx)))
+      :lifecycle/request-port (fn [_ctx {:lifecycle/keys [cursor-mode?]}]
+                                (if cursor-mode? 0 (.get settings "mcpSocketServerPort")))
+      :lifecycle/wrapper-path (fn [_ctx _server-info]
+                                (path/join wrapper-config-path "calva-mcp-server.js"))
+      :lifecycle/on-starting-changed (fn [starting?]
+                                       (dispatch! context [[:app/ax.set-when-context :calva-backseat-driver/starting? starting?]]))
+      :lifecycle/on-stopping-changed (fn [stopping?]
+                                       (dispatch! context [[:app/ax.set-when-context :calva-backseat-driver/stopping? stopping?]]))
+      :lifecycle/on-running-changed (fn [running? _server-info]
+                                     (dispatch! context [[:app/ax.set-when-context :calva-backseat-driver/started? running?]]))
+      :lifecycle/on-cursor-registered (fn [result]
+                                       (dispatch! context [[:app/ax.log :info "Cursor MCP server registered:"
+                                                            (cursor-config/cursor-mcp-settings-display-name) result]]))
+      :lifecycle/on-cursor-registration-failed (fn [failure]
+                                                (dispatch! context [[:app/ax.log :warn "Cursor MCP auto-registration failed:" failure]]))
+      :lifecycle/on-error (fn [err]
+                            (dispatch! context [[:mcp/ax.server-error err]]))})))
