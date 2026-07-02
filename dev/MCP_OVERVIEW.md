@@ -45,8 +45,8 @@ Considerations:
 
 We solve this by implementing the server running inside the Calva MCP Extension, using TCP sockets (a backend server). Then in front of that a node script witch which the AI Agent system can start an MCP **stdio** Transport “relay”/wrapper that the AI Agent uses.
 
-* Backend server: [mcp/server.cljs](../src/calva_mcp_server/mcp/server.cljs)
-* Relay/wrapper: [stdio/wrapper.cljs](../src/calva_mcp_server/stdio/wrapper.cljs)
+* Backend server: [mcp/server.cljs](../src/calva_backseat_driver/mcp/server.cljs)
+* Relay/wrapper: [vscode-mcp stdio wrapper](https://github.com/BetterThanTomorrow/vscode-mcp) (`vscode-mcp.stdio.wrapper`), bundled via shadow-cljs `:stdio-wrapper` build to `dist/calva-mcp-server.js`. Connect-retry: waits up to 60 s for the port file and TCP connect, re-reading the port file each attempt; stdin buffered during wait, flushed on connect.
 
 ### ClojureScript Implementation Approach
 

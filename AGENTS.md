@@ -152,7 +152,7 @@ When making multiple edits, work from highest line number to lowest (line number
 ### Socket Server Pattern
 - Backend server runs in Extension Host (TCP socket)
 - Port file: `${workspaceFolder}/.calva/mcp-server/port`
-- stdio wrapper (`dist/calva-mcp-server.js`) relays stdio ↔ socket
+- stdio wrapper (`dist/calva-mcp-server.js`) relays stdio ↔ socket — built from `vscode-mcp` via shadow-cljs `:stdio-wrapper` (`vscode-mcp.stdio.wrapper/main`). Connect-retry: waits up to 60 s for port file + TCP connect, re-reading the port file each attempt; stdin is buffered during the wait and flushed on connect. Conditional reload: silent activations skip `mcp.reloadClient` when config is unchanged (via `vscode-mcp`); the dev hot-reload path passes `:lifecycle/silent? true` in `integrations/vscode/cursor.cljs`
 - One server per workspace folder
 
 ### Skills and Instructions as Bundled Assets
