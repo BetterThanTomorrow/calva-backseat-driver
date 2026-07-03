@@ -37,6 +37,7 @@
       :cursor/script-relative-path "dist/calva-mcp-server.js"
       :mcp/auto-start? (.get settings "autoStartMCPServer")
       :mcp/auto-register? (.get settings "autoRegisterCursorMcp")
+      :manual-setup/extension-name "Backseat Driver"
       :server/host (.get settings "mcpHost")
       :mcp/on-request (fn [request]
                         (dispatch! context [[:mcp/ax.handle-request request]]))
@@ -55,11 +56,11 @@
       :lifecycle/on-stopping-changed (fn [stopping?]
                                        (dispatch! context [[:app/ax.set-when-context :calva-backseat-driver/stopping? stopping?]]))
       :lifecycle/on-running-changed (fn [running? _server-info]
-                                     (dispatch! context [[:app/ax.set-when-context :calva-backseat-driver/started? running?]]))
+                                      (dispatch! context [[:app/ax.set-when-context :calva-backseat-driver/started? running?]]))
       :lifecycle/on-cursor-registered (fn [result]
-                                       (dispatch! context [[:app/ax.log :info "Cursor MCP server registered:"
-                                                            (cursor-config/cursor-mcp-settings-display-name (get-in result [:config :name])) result]]))
+                                        (dispatch! context [[:app/ax.log :info "Cursor MCP server registered:"
+                                                             (cursor-config/cursor-mcp-settings-display-name (get-in result [:config :name])) result]]))
       :lifecycle/on-cursor-registration-failed (fn [failure]
-                                                (dispatch! context [[:app/ax.log :warn "Cursor MCP auto-registration failed:" failure]]))
+                                                 (dispatch! context [[:app/ax.log :warn "Cursor MCP auto-registration failed:" failure]]))
       :lifecycle/on-error (fn [err]
                             (dispatch! context [[:mcp/ax.server-error err]]))})))
