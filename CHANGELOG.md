@@ -5,6 +5,7 @@ Changes to Calva Backseat Driver
 ## [Unreleased]
 
 - The MCP default port changes from `1664` to `0` (random available port)
+- Isolate Cursor auto-registered MCP servers per VS Code window
 
 ## [v0.0.37] - 2026-06-22
 
