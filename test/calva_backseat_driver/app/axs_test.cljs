@@ -12,7 +12,10 @@
       (is (vector? (:ex/dxs result)))
       (is (some #(= :calva-mcp-extension/activated? (second %))
                 (:ex/dxs result))
-          "sets activated context")))
+          "sets activated context")
+      (is (some #(= :mcp/ax.sync-cursor-mcp-when-contexts (first %))
+                (:ex/dxs result))
+          "syncs Cursor MCP when-contexts on init")))
 
   (testing "auto-start when Cursor auto-register enabled"
     (let [state {:mcp/cursor-mcp-available? true}

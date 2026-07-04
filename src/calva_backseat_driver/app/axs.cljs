@@ -33,6 +33,7 @@
               [:calva/ax.when-activated [[:app/ax.init-output-listener]]]
               [:app/ax.set-when-context :calva-mcp-extension/activated?
                true]
+              [:mcp/ax.sync-cursor-mcp-when-contexts]
               (when (should-auto-start-mcp-server? auto-start-mcp? auto-register-cursor-mcp? (:mcp/cursor-mcp-available? state))
                 [:mcp/ax.start-server {:silent? true}])]}
 

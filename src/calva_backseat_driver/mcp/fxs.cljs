@@ -58,11 +58,18 @@
     (let [{:ex/keys [on-success on-error]
            :mcp/keys [wrapper-config-path lifecycle-state]} options
           config (server/build-lifecycle-config dispatch! context wrapper-config-path)]
-      (-> (vscode-mcp/register-with-cursor!+ config lifecycle-state)
+      (-> (vscode-mcp/register-or-start-with-cursor!+ config lifecycle-state)
           (p/then (fn [result]
                     (if (:ok result)
                       (dispatch! context (ax/enrich-with-args on-success (:state result)))
-                      (dispatch! context (ax/enrich-with-args on-error result)))))
+                      (do
+                        (dispatch! context [[:vscode/fx.show-information-message
+                                             (case (:reason result)
+                                               :server-not-running "Start the MCP server first, or disable auto-register and use Register to start and register in one step."
+                                               :cursor-api-unavailable "Cursor MCP registration API is not available in this editor."
+                                               :already-registered "Backseat Driver MCP server is already registered with Cursor."
+                                               "Could not register Backseat Driver MCP server with Cursor.")]])
+                        (dispatch! context (ax/enrich-with-args on-error result))))))
           (p/catch (fn [e]
                      (dispatch! context [[:app/ax.log :error "[Cursor MCP] register-with-cursor error:" e]])
                      (dispatch! context (ax/enrich-with-args on-error e))))))
