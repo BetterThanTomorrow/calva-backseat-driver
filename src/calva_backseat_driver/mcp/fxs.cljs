@@ -41,14 +41,31 @@
 
     [:mcp/fx.lifecycle-stop options]
     (let [{:ex/keys [on-success]
-           :mcp/keys [wrapper-config-path lifecycle-state]} options
+           :mcp/keys [wrapper-config-path lifecycle-state]
+           :lifecycle/keys [silent?]
+           :cursor/keys [unregister?]
+           :or {silent? false unregister? true}} options
           config (server/build-lifecycle-config dispatch! context wrapper-config-path)]
-      (-> (vscode-mcp/stop!+ config lifecycle-state false)
+      (-> (vscode-mcp/stop!+ config lifecycle-state {:lifecycle/silent? silent?
+                                                     :cursor/unregister? unregister?})
           (p/then (fn [new-lifecycle-state]
                     (dispatch! context (ax/enrich-with-args on-success new-lifecycle-state))))
           (p/catch (fn [e]
                      (dispatch! context [[:mcp/ax.server-error e]])
                      (dispatch! context (ax/enrich-with-args on-success (vscode-mcp/init-state)))))))
+
+    [:mcp/fx.register-with-cursor options]
+    (let [{:ex/keys [on-success on-error]
+           :mcp/keys [wrapper-config-path lifecycle-state]} options
+          config (server/build-lifecycle-config dispatch! context wrapper-config-path)]
+      (-> (vscode-mcp/register-with-cursor!+ config lifecycle-state)
+          (p/then (fn [result]
+                    (if (:ok result)
+                      (dispatch! context (ax/enrich-with-args on-success (:state result)))
+                      (dispatch! context (ax/enrich-with-args on-error result)))))
+          (p/catch (fn [e]
+                     (dispatch! context [[:app/ax.log :error "[Cursor MCP] register-with-cursor error:" e]])
+                     (dispatch! context (ax/enrich-with-args on-error e))))))
 
     [:mcp/fx.register-cursor-mcp-server server-info options]
     (let [{:ex/keys [on-success on-error]} options]

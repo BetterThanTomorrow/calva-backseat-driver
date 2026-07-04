@@ -15,15 +15,24 @@
   {:ex/db (assoc state :mcp/lifecycle-state lifecycle-state)
    :ex/fxs [[:app/fx.return (clj->js (vscode-mcp/server-info lifecycle-state))]]})
 
-(defn- handle-stop-server [state]
-  {:ex/fxs [[:mcp/fx.lifecycle-stop
-             {:mcp/wrapper-config-path (:mcp/wrapper-config-path state)
-              :mcp/lifecycle-state (:mcp/lifecycle-state state)
-              :ex/on-success [[:mcp/ax.lifecycle-stopped :ex/action-args]]}]]})
+(defn- handle-stop-server [state action]
+  (let [opts (or (second action) {})]
+    {:ex/fxs [[:mcp/fx.lifecycle-stop
+               (merge {:mcp/wrapper-config-path (:mcp/wrapper-config-path state)
+                       :mcp/lifecycle-state (:mcp/lifecycle-state state)
+                       :ex/on-success [[:mcp/ax.lifecycle-stopped :ex/action-args]]}
+                      opts)]]}))
 
 (defn- handle-lifecycle-stopped [state lifecycle-state]
   {:ex/db (assoc state :mcp/lifecycle-state lifecycle-state)
    :ex/fxs [[:app/fx.return true]]})
+
+(defn- handle-register-with-cursor [state]
+  {:ex/fxs [[:mcp/fx.register-with-cursor
+             {:mcp/wrapper-config-path (:mcp/wrapper-config-path state)
+              :mcp/lifecycle-state (:mcp/lifecycle-state state)
+              :ex/on-success [[:mcp/ax.lifecycle-updated :ex/action-args]]
+              :ex/on-error [[:mcp/ax.cursor-mcp-registration-failed :ex/action-args]]}]]})
 
 (defn- handle-ensure-cursor-mcp-registered [state]
   (let [server-info (vscode-mcp/server-info (:mcp/lifecycle-state state))]
@@ -79,8 +88,11 @@
     [:mcp/ax.cursor-mcp-registration-failed failure]
     (handle-cursor-mcp-registration-failed state failure)
 
-    [:mcp/ax.stop-server]
-    (handle-stop-server state)
+    [:mcp/ax.register-with-cursor]
+    (handle-register-with-cursor state)
+
+    [:mcp/ax.stop-server & _]
+    (handle-stop-server state action)
 
     [:mcp/ax.lifecycle-stopped lifecycle-state]
     (handle-lifecycle-stopped state lifecycle-state)

@@ -24,6 +24,8 @@
                [[:mcp/ax.start-server]]]
               [:app/ax.register-command "calva-backseat-driver.stopMcpServer"
                [[:mcp/ax.stop-server]]]
+              [:app/ax.register-command "calva-backseat-driver.registerMcpServerWithCursor"
+               [[:mcp/ax.register-with-cursor]]]
               [:app/ax.register-command "calva-backseat-driver.openLogFile"
                [[:mcp/ax.open-server-log]]]
               [:app/ax.register-language-model-tools]
@@ -66,7 +68,7 @@
 
     [:app/ax.deactivate]
     {:ex/fxs [[:calva/fx.flush-history]]
-     :ex/dxs [[:mcp/ax.stop-server]
+     :ex/dxs [[:mcp/ax.stop-server {:lifecycle/silent? true :cursor/unregister? false}]
               [:app/ax.cleanup]]}
 
     :else nil))
