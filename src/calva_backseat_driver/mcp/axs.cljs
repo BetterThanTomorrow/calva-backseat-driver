@@ -1,5 +1,6 @@
 (ns calva-backseat-driver.mcp.axs
   (:require
+   ["vscode" :as vscode]
    [cljs.core.match :refer [match]]
    [vscode-mcp.core :as vscode-mcp]))
 
@@ -11,9 +12,24 @@
                 :mcp/lifecycle-state (:mcp/lifecycle-state state)
                 :ex/on-success [[:mcp/ax.lifecycle-updated :ex/action-args]]}]]}))
 
+(defn- handle-sync-cursor-mcp-when-contexts [state]
+  (let [lifecycle (:mcp/lifecycle-state state)
+        auto-register? (some-> (vscode/workspace.getConfiguration "calva-backseat-driver")
+                                (.get "autoRegisterCursorMcp"))
+        cursor-available? (:mcp/cursor-mcp-available? state)
+        server-running? (boolean (vscode-mcp/server-info lifecycle))
+        cursor-registered? (boolean (:lifecycle/cursor-registered? lifecycle))
+        can-register? (and cursor-available?
+                           (not cursor-registered?)
+                           (or (not auto-register?) server-running?))]
+    {:ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/cursor-mcp-available? cursor-available?]
+              [:app/ax.set-when-context :calva-backseat-driver/cursor-mcp-registered? cursor-registered?]
+              [:app/ax.set-when-context :calva-backseat-driver/can-register-mcp-with-cursor? can-register?]]}))
+
 (defn- handle-lifecycle-updated [state lifecycle-state]
   {:ex/db (assoc state :mcp/lifecycle-state lifecycle-state)
-   :ex/fxs [[:app/fx.return (clj->js (vscode-mcp/server-info lifecycle-state))]]})
+   :ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]
+            [:app/fx.return (clj->js (vscode-mcp/server-info lifecycle-state))]]})
 
 (defn- handle-stop-server [state action]
   (let [opts (or (second action) {})]
@@ -25,7 +41,8 @@
 
 (defn- handle-lifecycle-stopped [state lifecycle-state]
   {:ex/db (assoc state :mcp/lifecycle-state lifecycle-state)
-   :ex/fxs [[:app/fx.return true]]})
+   :ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]
+            [:app/fx.return true]]})
 
 (defn- handle-register-with-cursor [state]
   {:ex/fxs [[:mcp/fx.register-with-cursor
@@ -45,14 +62,16 @@
   {:ex/db (update state :mcp/lifecycle-state assoc
                   :lifecycle/cursor-registered? true
                   :lifecycle/cursor-register-called? true)
-   :ex/fxs [[:app/fx.log
+   :ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]
+            [:app/fx.log
              (select-keys state [:app/min-log-level :app/log-file-uri :app/log-dir-initialized+])
              :info
              ["Cursor MCP server registered:" result]]]})
 
 (defn- handle-cursor-mcp-registration-failed [state failure]
   {:ex/db (update state :mcp/lifecycle-state assoc :lifecycle/cursor-register-called? true)
-   :ex/fxs [[:app/fx.log
+   :ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]
+            [:app/fx.log
              (select-keys state [:app/min-log-level :app/log-file-uri :app/log-dir-initialized+])
              :warn
              ["Cursor MCP auto-registration failed:" failure]]]})
@@ -78,6 +97,9 @@
 
     [:mcp/ax.lifecycle-updated lifecycle-state]
     (handle-lifecycle-updated state lifecycle-state)
+
+    [:mcp/ax.sync-cursor-mcp-when-contexts]
+    (handle-sync-cursor-mcp-when-contexts state)
 
     [:mcp/ax.ensure-cursor-mcp-registered]
     (handle-ensure-cursor-mcp-registered state)

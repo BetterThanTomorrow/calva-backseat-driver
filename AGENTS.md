@@ -155,6 +155,12 @@ When making multiple edits, work from highest line number to lowest (line number
 - stdio wrapper (`dist/calva-mcp-server.js`) relays stdio ↔ socket — built from `vscode-mcp` via shadow-cljs `:stdio-wrapper` (`vscode-mcp.stdio.wrapper/main`). Connect-retry: waits up to 60 s for port file + TCP connect, re-reading the port file each attempt; stdin is buffered during the wait and flushed on connect. Conditional reload: silent activations skip `mcp.reloadClient` when config is unchanged (via `vscode-mcp`); the dev hot-reload path passes `:lifecycle/silent? true` in `integrations/vscode/cursor.cljs`
 - One server per workspace folder
 
+### Cursor registration lifecycle
+- Manual stop unregisters from Cursor and sets `:lifecycle/needs-cursor-reregister?`; next start waits for socket readiness then forces client reload (`vscode-mcp.server-readiness`, `policy/should-reload-client?`)
+- Deactivate uses `stop!+` with `{:cursor/unregister? false}` — never unregister on window shutdown
+- Register command: `calva-backseat-driver.registerMcpServerWithCursor` via `register-or-start-with-cursor!+` (Option C: start+register when auto-register off; repair when on). Enablement: `:calva-backseat-driver/can-register-mcp-with-cursor?`
+- When-context sync: `[:mcp/ax.sync-cursor-mcp-when-contexts]` sets `:calva-backseat-driver/cursor-mcp-available?`, `cursor-mcp-registered?`, `can-register-mcp-with-cursor?`
+
 ### Skills and Instructions as Bundled Assets
 - `assets/skills/` and `assets/instructions/` are the canonical source for content bundled with the extension. When updating skill or instruction content, edit these files — not the installed extension copies under `~/.vscode*/extensions/`.
 - Skills declared in `package.json` under `contributes.chatSkills` are exposed as MCP resources

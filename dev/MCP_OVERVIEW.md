@@ -48,6 +48,22 @@ We solve this by implementing the server running inside the Calva MCP Extension,
 * Backend server: [mcp/server.cljs](../src/calva_backseat_driver/mcp/server.cljs)
 * Relay/wrapper: [vscode-mcp stdio wrapper](https://github.com/BetterThanTomorrow/vscode-mcp) (`vscode-mcp.stdio.wrapper`), bundled via shadow-cljs `:stdio-wrapper` build to `dist/calva-mcp-server.js`. Connect-retry: waits up to 60 s for the port file and TCP connect, re-reading the port file each attempt; stdin buffered during wait, flushed on connect.
 
+### Cursor registration and commands
+
+Lifecycle is driven by `vscode-mcp.core` via `mcp/fxs.cljs` and `mcp/server.cljs` (`build-lifecycle-config`). Manual stop unregisters from Cursor and sets `:lifecycle/needs-cursor-reregister?` so the next start forces client reload. Extension deactivate passes `{:cursor/unregister? false}` to avoid poisoned Cursor client records on the next window session.
+
+**When-contexts** (set via `[:mcp/ax.sync-cursor-mcp-when-contexts]`):
+
+| Key | Meaning |
+|-----|---------|
+| `:calva-backseat-driver/cursor-mcp-available?` | Cursor MCP API available |
+| `:calva-backseat-driver/cursor-mcp-registered?` | Registered this activation |
+| `:calva-backseat-driver/can-register-mcp-with-cursor?` | Register command enabled |
+
+**Register command** (`calva-backseat-driver.registerMcpServerWithCursor`): Option C — when auto-register is off, starts the server if needed then registers; when auto-register is on, repair-only (server must be running). Enablement: `:calva-backseat-driver/can-register-mcp-with-cursor?`.
+
+See also `joyride-dev-docs/mcp-stop-start-cursor-registration-plan.md` (in-session stop→start) and `mcp-wrapper-retry-and-reload-policy-plan.md` (window reload).
+
 ### ClojureScript Implementation Approach
 
 Note that for now we are trying to build an MCP server implementation from scratch, in ClojureScript, with as few npm dependencies (none so far) as we can get away with.

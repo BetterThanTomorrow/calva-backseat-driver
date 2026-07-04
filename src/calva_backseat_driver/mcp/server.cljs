@@ -56,11 +56,11 @@
       :lifecycle/on-stopping-changed (fn [stopping?]
                                        (dispatch! context [[:app/ax.set-when-context :calva-backseat-driver/stopping? stopping?]]))
       :lifecycle/on-running-changed (fn [running? _server-info]
-                                      (dispatch! context [[:app/ax.set-when-context :calva-backseat-driver/started? running?]]))
+                                      (dispatch! context [[:app/ax.set-when-context :calva-backseat-driver/started? running?]
+                                                          [:mcp/ax.sync-cursor-mcp-when-contexts]]))
       :lifecycle/on-cursor-registered (fn [result]
-                                        (dispatch! context [[:app/ax.log :info "Cursor MCP server registered:"
-                                                             (cursor-config/cursor-mcp-settings-display-name (get-in result [:config :name])) result]]))
+                                        (dispatch! context [[:mcp/ax.cursor-mcp-registered result]]))
       :lifecycle/on-cursor-registration-failed (fn [failure]
-                                                 (dispatch! context [[:app/ax.log :warn "Cursor MCP auto-registration failed:" failure]]))
+                                                 (dispatch! context [[:mcp/ax.cursor-mcp-registration-failed failure]]))
       :lifecycle/on-error (fn [err]
                             (dispatch! context [[:mcp/ax.server-error err]]))})))
