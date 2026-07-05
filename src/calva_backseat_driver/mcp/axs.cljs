@@ -14,17 +14,12 @@
 
 (defn- handle-sync-cursor-mcp-when-contexts [state]
   (let [lifecycle (:mcp/lifecycle-state state)
-        auto-register? (some-> (vscode/workspace.getConfiguration "calva-backseat-driver")
-                                (.get "autoRegisterCursorMcp"))
         cursor-available? (:mcp/cursor-mcp-available? state)
         server-running? (boolean (vscode-mcp/server-info lifecycle))
-        cursor-registered? (boolean (:lifecycle/cursor-registered? lifecycle))
-        can-register? (and cursor-available?
-                           (not cursor-registered?)
-                           (or (not auto-register?) server-running?))]
+        cursor-registered? (and server-running?
+                                (boolean (:lifecycle/cursor-registered? lifecycle)))]
     {:ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/cursor-mcp-available? cursor-available?]
-              [:app/ax.set-when-context :calva-backseat-driver/cursor-mcp-registered? cursor-registered?]
-              [:app/ax.set-when-context :calva-backseat-driver/can-register-mcp-with-cursor? can-register?]]}))
+              [:app/ax.set-when-context :calva-backseat-driver/cursor-mcp-registered? cursor-registered?]]}))
 
 (defn- handle-lifecycle-updated [state lifecycle-state]
   {:ex/db (assoc state :mcp/lifecycle-state lifecycle-state)
