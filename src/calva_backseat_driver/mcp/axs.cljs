@@ -19,7 +19,7 @@
         cursor-registered? (and server-running?
                                 (boolean (:lifecycle/cursor-registered? lifecycle)))]
     {:ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/cursor-mcp-available? cursor-available?]
-              [:app/ax.set-when-context :calva-backseat-driver/cursor-mcp-registered? cursor-registered?]]}))
+              [:app/ax.set-when-context :calva-backseat-driver/mcp-server-registered-with-cursor? cursor-registered?]]}))
 
 (defn- handle-lifecycle-updated [state lifecycle-state]
   {:ex/db (assoc state :mcp/lifecycle-state lifecycle-state)

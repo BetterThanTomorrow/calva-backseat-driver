@@ -57,9 +57,9 @@ Lifecycle is driven by `vscode-mcp.core` via `mcp/fxs.cljs` and `mcp/server.cljs
 | Key | Meaning |
 |-----|---------|
 | `:calva-backseat-driver/cursor-mcp-available?` | Cursor MCP API available |
-| `:calva-backseat-driver/cursor-mcp-registered?` | Registered with Cursor while server is running |
+| `:calva-backseat-driver/mcp-server-registered-with-cursor?` | Registered with Cursor while server is running |
 
-**Register command** (`calva-backseat-driver.registerMcpServerWithCursor`): Option C — when auto-register is off, starts the server if needed then registers; when auto-register is on, repair-only (server must be running). Enablement: `:calva-backseat-driver/cursor-mcp-available? && !:calva-backseat-driver/cursor-mcp-registered?`.
+**Register command** (`calva-backseat-driver.registerMcpServerWithCursor`): Option C — when auto-register is off, starts the server if needed then registers; when auto-register is on, repair-only (server must be running). Enablement: `:calva-backseat-driver/cursor-mcp-available? && !:calva-backseat-driver/mcp-server-registered-with-cursor?`.
 
 See also `joyride-dev-docs/mcp-stop-start-cursor-registration-plan.md` (in-session stop→start) and `mcp-wrapper-retry-and-reload-policy-plan.md` (window reload).
 
