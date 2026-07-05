@@ -43,11 +43,9 @@
     (let [{:ex/keys [on-success]
            :mcp/keys [wrapper-config-path lifecycle-state]
            :lifecycle/keys [silent?]
-           :cursor/keys [unregister?]
-           :or {silent? false unregister? true}} options
+           :or {silent? false}} options
           config (server/build-lifecycle-config dispatch! context wrapper-config-path)]
-      (-> (vscode-mcp/stop!+ config lifecycle-state {:lifecycle/silent? silent?
-                                                     :cursor/unregister? unregister?})
+      (-> (vscode-mcp/stop!+ config lifecycle-state {:lifecycle/silent? silent?})
           (p/then (fn [new-lifecycle-state]
                     (dispatch! context (ax/enrich-with-args on-success new-lifecycle-state))))
           (p/catch (fn [e]

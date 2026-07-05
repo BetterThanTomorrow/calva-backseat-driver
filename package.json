@@ -123,7 +123,7 @@
         "command": "calva-backseat-driver.registerMcpServerWithCursor",
         "title": "Register MCP Server with Cursor",
         "category": "Calva Backseat Driver",
-        "enablement": ":calva-backseat-driver/can-register-mcp-with-cursor?"
+        "enablement": ":calva-backseat-driver/cursor-mcp-available? && !:calva-backseat-driver/cursor-mcp-registered?"
       },
       {
         "command": "calva-backseat-driver.stopMcpServer",

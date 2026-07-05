@@ -69,7 +69,7 @@
 
     [:app/ax.deactivate]
     {:ex/fxs [[:calva/fx.flush-history]]
-     :ex/dxs [[:mcp/ax.stop-server {:lifecycle/silent? true :cursor/unregister? false}]
+     :ex/dxs [[:mcp/ax.stop-server {:lifecycle/silent? true}]
               [:app/ax.cleanup]]}
 
     :else nil))

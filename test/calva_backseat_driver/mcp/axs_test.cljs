@@ -3,8 +3,6 @@
 
 (deftest sync-cursor-mcp-when-context-keys-test
   (testing "when-context keys match package.json enablement strings"
-    (is (= ":calva-backseat-driver/can-register-mcp-with-cursor?"
-           (str :calva-backseat-driver/can-register-mcp-with-cursor?)))
     (is (= ":calva-backseat-driver/cursor-mcp-registered?"
            (str :calva-backseat-driver/cursor-mcp-registered?)))
     (is (= ":calva-backseat-driver/cursor-mcp-available?"
