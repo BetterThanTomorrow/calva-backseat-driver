@@ -158,8 +158,8 @@ When making multiple edits, work from highest line number to lowest (line number
 ### Cursor registration lifecycle
 - Manual stop unregisters from Cursor and sets `:lifecycle/needs-cursor-reregister?`; next start waits for socket readiness then forces client reload (`vscode-mcp.server-readiness`, `policy/should-reload-client?`)
 - Deactivate uses silent `stop!+` (`{:lifecycle/silent? true}`) — same Cursor teardown as manual stop (always unregister, then stop socket)
-- Register command: `calva-backseat-driver.registerMcpServerWithCursor` via `register-or-start-with-cursor!+` (Option C: start+register when auto-register off; repair when on). Enablement: `:calva-backseat-driver/cursor-mcp-available? && !:calva-backseat-driver/cursor-mcp-registered?`
-- When-context sync: `[:mcp/ax.sync-cursor-mcp-when-contexts]` sets `:calva-backseat-driver/cursor-mcp-available?` and `:calva-backseat-driver/cursor-mcp-registered?` (registered only while server is running)
+- Register command: `calva-backseat-driver.registerMcpServerWithCursor` via `register-or-start-with-cursor!+` (Option C: start+register when auto-register off; repair when on). Enablement: `:calva-backseat-driver/cursor-mcp-available? && !:calva-backseat-driver/mcp-server-registered-with-cursor?`
+- When-context sync: `[:mcp/ax.sync-cursor-mcp-when-contexts]` sets `:calva-backseat-driver/cursor-mcp-available?` and `:calva-backseat-driver/mcp-server-registered-with-cursor?` (registered only while server is running)
 
 ### Skills and Instructions as Bundled Assets
 - `assets/skills/` and `assets/instructions/` are the canonical source for content bundled with the extension. When updating skill or instruction content, edit these files — not the installed extension copies under `~/.vscode*/extensions/`.
