@@ -78,7 +78,7 @@
 
 (defn- ensure-cursor-mcp-ready! []
   (when-let [ctx (extension-context)]
-    (swap! db/!app-db assoc :mcp/cursor-mcp-available? (cursor/cursor-mcp-available?))
+    (swap! db/!app-db assoc :mcp/cursor-mcp-available? (vscode-mcp-cursor/cursor-mcp-available?))
     (maybe-init-mcp! ctx)))
 
 (defn ^{:dev/after-load true

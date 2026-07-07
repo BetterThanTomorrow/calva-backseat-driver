@@ -6,6 +6,7 @@
    [clojure.string :as string]
    [promesa.core :as p]
    [vscode-mcp.manifest :as manifest]
+   [vscode-mcp.requests :as mcp-requests]
    [vscode-mcp.responses :as responses]))
 
 (defn- settings-map [options]
@@ -127,33 +128,38 @@
         (catch :default e
           (responses/error-response id -32603 (exception-message e)))))))
 
-(defn- handle-resources-read [{:keys [id params] :as _request} options]
-  (let [{:keys [uri]} params]
-    (cond
-      (string/starts-with? uri "/symbol-info/")
-      (p/let [[_ clojureSymbol session-key ns] (re-find #"^/symbol-info/([^@]+)@([^@]+)@(.+)$" uri)
-              info (calva/get-symbol-info+ (merge options
-                                                  {:calva/clojure-symbol clojureSymbol
-                                                   :calva/repl-session-key session-key
-                                                   :calva/ns ns}))]
-        (responses/success-response id {:contents [{:uri uri
-                                                    :text (js/JSON.stringify info)}]}))
+(defn- bd-read-dynamic-resource [uri options]
+  (cond
+    (string/starts-with? uri "/symbol-info/")
+    (p/let [[_ clojureSymbol session-key ns] (re-find #"^/symbol-info/([^@]+)@([^@]+)@(.+)$" uri)
+            info (calva/get-symbol-info+ (merge options
+                                                {:calva/clojure-symbol clojureSymbol
+                                                 :calva/repl-session-key session-key
+                                                 :calva/ns ns}))]
+      {:contents [{:uri uri
+                   :text (js/JSON.stringify info)}]})
 
-      (string/starts-with? uri "/clojuredocs/")
-      (p/let [[_ clojureSymbol] (re-find #"^/clojuredocs/(.+)$" uri)
-              info (calva/get-clojuredocs+ (merge options
-                                                  {:calva/clojure-symbol clojureSymbol}))]
-        (responses/success-response id {:contents [{:uri uri
-                                                    :text (js/JSON.stringify info)}]}))
+    (string/starts-with? uri "/clojuredocs/")
+    (p/let [[_ clojureSymbol] (re-find #"^/clojuredocs/(.+)$" uri)
+            info (calva/get-clojuredocs+ (merge options
+                                                {:calva/clojure-symbol clojureSymbol}))]
+      {:contents [{:uri uri
+                   :text (js/JSON.stringify info)}]})
 
-      (string/starts-with? uri "skill://")
-      (let [resource (manifest/read-resource (:vscode/extension-context options) uri {:settings (settings-map options)})]
-        (if resource
-          (responses/success-response id {:contents [(dissoc resource :skill-path)]})
-          (responses/error-response id -32602 (str "Skill not found: " uri))))
+    :else
+    nil))
 
-      :else
-      (responses/error-response id -32602 "Unknown resource URI"))))
+(defn- bd-resource-templates [options]
+  (let [all-tools (manifest/get-tools (:vscode/extension-context options) {:settings (settings-map options)})
+        tool-desc (fn [t-name] (:description (first (filter #(= (:name %) t-name) all-tools))))]
+    [{:uriTemplate "/symbol-info/{symbol}@{session-key}@{namespace}"
+      :name "symbol-info"
+      :description (tool-desc "clojure_symbol_info")
+      :mimeType "application/json"}
+     {:uriTemplate "/clojuredocs/{symbol}"
+      :name "clojuredocs"
+      :description (tool-desc "clojuredocs_info")
+      :mimeType "application/json"}]))
 
 (defn- initialize-base-text [options]
   (let [{:mcp/keys [repl-enabled?]} options]
@@ -161,60 +167,23 @@
          (when repl-enabled?
            " You can evaluate Clojure/ClojureScript code via the `clojure_evaluate_code` tool, load entire files into the REPL with `clojure_load_file`, check REPL output with `clojure_repl_output_log`, look up symbol info, and query clojuredocs.org."))))
 
-(defn- handle-initialize [options id]
-  (responses/success-response
-   id
-   (merge (manifest/build-initialize-result (:vscode/extension-context options)
-                                            {:base-text (initialize-base-text options)
-                                             :settings (settings-map options)
-                                             :name "calva-backseat-driver"})
-          {:capabilities {:tools {:listChanged true}
-                          :resources {:listChanged true}}
-           :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (unless disabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."})))
+(defn- request-opts [options]
+  {:settings (settings-map options)
+   :initialize-opts {:base-text (initialize-base-text options)
+                     :name "calva-backseat-driver"
+                     :settings (settings-map options)}
+   :initialize-merge {:capabilities {:tools {:listChanged true}
+                                     :resources {:listChanged true}}
+                      :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (unless disabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."}
+   :resource-templates+ (fn [_ctx _opts] (bd-resource-templates options))
+   :read-resource+ (fn [_ctx uri _opts] (bd-read-dynamic-resource uri options))})
 
 (defn handle-request-fn [{:ex/keys [dispatch!] :as options}
-                         {:keys [id method] :as request}]
+                         {:keys [method] :as request}]
   (dispatch! [[:app/ax.log :debug "[Server] handle-request " (pr-str request)]])
-  (case method
-    "initialize"
-    (handle-initialize options id)
-
-    "tools/list"
-    (responses/success-response
-     id
-     {:tools (manifest/get-tools (:vscode/extension-context options) {:settings (settings-map options)})})
-
-    "resources/list"
-    (let [skills (manifest/get-resources (:vscode/extension-context options) {:settings (settings-map options)})
-          public-skills (map #(dissoc % :skill-path) skills)]
-      (responses/success-response
-       id
-       {:resources public-skills}))
-
-    "resources/templates/list"
-    (let [all-tools (manifest/get-tools (:vscode/extension-context options) {:settings (settings-map options)})
-          tool-desc (fn [t-name] (:description (first (filter #(= (:name %) t-name) all-tools))))]
-      (responses/success-response
-       id
-       {:resourceTemplates [{:uriTemplate "/symbol-info/{symbol}@{session-key}@{namespace}"
-                             :name "symbol-info"
-                             :description (tool-desc "clojure_symbol_info")
-                             :mimeType "application/json"}
-                            {:uriTemplate "/clojuredocs/{symbol}"
-                             :name "clojuredocs"
-                             :description (tool-desc "clojuredocs_info")
-                             :mimeType "application/json"}]}))
-
-    "tools/call"
-    (handle-tools-call request options)
-
-    "resources/read"
-    (handle-resources-read request options)
-
-    "ping"
-    (responses/success-response id {})
-
-    (if id
-      (responses/error-response id -32601 "Method not found")
-      nil)))
+  (let [opts (request-opts options)
+        ctx (:vscode/extension-context options)]
+    (case method
+      "tools/call" (handle-tools-call request options)
+      (mcp-requests/handle-manifest-request ctx request opts))))
 
