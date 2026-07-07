@@ -91,7 +91,7 @@
         (if (:error result)
           (responses/success-response id {:content [{:type "text"
                                                      :text (js/JSON.stringify (clj->js {:error (:error result)}))}]
-                                           :isError true})
+                                          :isError true})
           (responses/clj-response id result))))))
 
 (defn- handle-edit-files [options id arguments]
