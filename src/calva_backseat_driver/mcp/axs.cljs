@@ -17,7 +17,7 @@
         cursor-available? (:mcp/cursor-mcp-available? state)
         server-running? (boolean (vscode-mcp/server-info lifecycle))
         cursor-registered? (and server-running?
-                                (boolean (:lifecycle/cursor-registered? lifecycle)))]
+                                (vscode-mcp/cursor-registered? lifecycle))]
     {:ex/dxs [[:app/ax.set-when-context :calva-backseat-driver/cursor-mcp-available? cursor-available?]
               [:app/ax.set-when-context :calva-backseat-driver/mcp-server-registered-with-cursor? cursor-registered?]]}))
 
@@ -46,26 +46,15 @@
               :ex/on-success [[:mcp/ax.lifecycle-updated :ex/action-args]]
               :ex/on-error [[:mcp/ax.cursor-mcp-registration-failed :ex/action-args]]}]]})
 
-(defn- handle-ensure-cursor-mcp-registered [state]
-  (let [server-info (vscode-mcp/server-info (:mcp/lifecycle-state state))]
-    (when server-info
-      {:ex/fxs [[:mcp/fx.register-cursor-mcp-server server-info
-                 {:ex/on-success [[:mcp/ax.cursor-mcp-registered :ex/action-args]]
-                  :ex/on-error [[:mcp/ax.cursor-mcp-registration-failed :ex/action-args]]}]]})))
-
 (defn- handle-cursor-mcp-registered [state result]
-  {:ex/db (update state :mcp/lifecycle-state assoc
-                  :lifecycle/cursor-registered? true
-                  :lifecycle/cursor-register-called? true)
-   :ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]
+  {:ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]
             [:app/fx.log
              (select-keys state [:app/min-log-level :app/log-file-uri :app/log-dir-initialized+])
              :info
              ["Cursor MCP server registered:" result]]]})
 
 (defn- handle-cursor-mcp-registration-failed [state failure]
-  {:ex/db (update state :mcp/lifecycle-state assoc :lifecycle/cursor-register-called? true)
-   :ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]
+  {:ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]
             [:app/fx.log
              (select-keys state [:app/min-log-level :app/log-file-uri :app/log-dir-initialized+])
              :warn
@@ -95,9 +84,6 @@
 
     [:mcp/ax.sync-cursor-mcp-when-contexts]
     (handle-sync-cursor-mcp-when-contexts state)
-
-    [:mcp/ax.ensure-cursor-mcp-registered]
-    (handle-ensure-cursor-mcp-registered state)
 
     [:mcp/ax.cursor-mcp-registered result]
     (handle-cursor-mcp-registered state result)
