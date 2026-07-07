@@ -14,11 +14,11 @@
         wrapper-path (path/join "/home/config" "calva-mcp-server.js")
         commands (manual-setup/copy-command-strings wrapper-path server-info)]
     (testing "port variant uses stdio-config format with host"
-      (is (= "node /home/config/calva-mcp-server.js 1664 127.0.0.1"
+      (is (= (str "node " wrapper-path " 1664 127.0.0.1")
              (:manual-setup/port commands))))
 
     (testing "port-file variant uses stdio-config format with host"
-      (is (= "node /home/config/calva-mcp-server.js /ws/.calva/mcp-server/port 127.0.0.1"
+      (is (= (str "node " wrapper-path " /ws/.calva/mcp-server/port 127.0.0.1")
              (:manual-setup/port-file commands))))))
 
 (deftest copy-command-strings-custom-host-test
@@ -28,7 +28,7 @@
         wrapper-path (path/join "/home/config" "calva-mcp-server.js")
         commands (manual-setup/copy-command-strings wrapper-path server-info)]
     (testing "custom host preserved in both variants"
-      (is (= "node /home/config/calva-mcp-server.js 1664 0.0.0.0"
+      (is (= (str "node " wrapper-path " 1664 0.0.0.0")
              (:manual-setup/port commands)))
-      (is (= "node /home/config/calva-mcp-server.js /ws/port 0.0.0.0"
+      (is (= (str "node " wrapper-path " /ws/port 0.0.0.0")
              (:manual-setup/port-file commands))))))
