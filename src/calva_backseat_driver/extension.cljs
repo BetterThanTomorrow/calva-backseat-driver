@@ -8,7 +8,6 @@
    [calva-backseat-driver.integrations.calva.api :as calva-api]
    [calva-backseat-driver.integrations.calva.version :as version]
    [calva-backseat-driver.integrations.vscode.cursor :as cursor]
-   [calva-backseat-driver.integrations.vscode.cursor-config :as cursor-config]
    [vscode-mcp.core :as vscode-mcp]))
 
 (defn- extension-context []
@@ -77,25 +76,10 @@
     (ex/dispatch! ctx [[:app/ax.init {:auto-start-mcp? :vscode/config.autoStartMCPServer
                                       :auto-register-cursor-mcp? :vscode/config.autoRegisterCursorMcp}]])))
 
-;; Dev-only hot-reload re-registration — see docstring on
-;; `calva-backseat-driver.integrations.vscode.cursor` for why this reaches
-;; around `vscode-mcp.core` directly.
-(defn- maybe-register-cursor-mcp! [ctx]
-  (let [mcp-state (:mcp/lifecycle-state @db/!app-db)
-        server-info (vscode-mcp/server-info mcp-state)]
-    (when server-info
-      (let [auto-register? (some-> (vscode/workspace.getConfiguration "calva-backseat-driver")
-                                    (.get "autoRegisterCursorMcp"))
-            register-allowed? (cursor-config/should-register-cursor-mcp?
-                               auto-register? (cursor/cursor-mcp-available?) server-info)]
-        (when (vscode-mcp/should-call-register-server? mcp-state {:lifecycle/silent? true} register-allowed?)
-          (ex/dispatch! ctx [[:mcp/ax.ensure-cursor-mcp-registered]]))))))
-
 (defn- ensure-cursor-mcp-ready! []
   (when-let [ctx (extension-context)]
     (swap! db/!app-db assoc :mcp/cursor-mcp-available? (cursor/cursor-mcp-available?))
-    (maybe-init-mcp! ctx)
-    (maybe-register-cursor-mcp! ctx)))
+    (maybe-init-mcp! ctx)))
 
 (defn ^{:dev/after-load true
         :export true}

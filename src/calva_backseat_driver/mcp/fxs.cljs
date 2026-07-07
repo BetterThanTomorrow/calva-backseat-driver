@@ -4,7 +4,6 @@
    ["path" :as path]
    ["vscode" :as vscode]
    [calva-backseat-driver.ex.ax :as ax]
-   [calva-backseat-driver.integrations.vscode.cursor :as cursor]
    [calva-backseat-driver.mcp.requests :as requests]
    [calva-backseat-driver.mcp.server :as server]
    [cljs.core.match :refer [match]]
@@ -56,41 +55,18 @@
     (let [{:ex/keys [on-success on-error]
            :mcp/keys [wrapper-config-path lifecycle-state]} options
           config (server/build-lifecycle-config dispatch! context wrapper-config-path)]
-      (-> (vscode-mcp/register-or-start-with-cursor!+ config lifecycle-state)
+      (-> (vscode-mcp/register-with-cursor!+ config lifecycle-state)
           (p/then (fn [result]
                     (if (:ok result)
                       (dispatch! context (ax/enrich-with-args on-success (:state result)))
                       (do
                         (dispatch! context [[:vscode/fx.show-information-message
                                              (case (:reason result)
-                                               :server-not-running "Start the MCP server first, or disable auto-register and use Register to start and register in one step."
                                                :cursor-api-unavailable "Cursor MCP registration API is not available in this editor."
-                                               :already-registered "Backseat Driver MCP server is already registered with Cursor."
                                                "Could not register Backseat Driver MCP server with Cursor.")]])
                         (dispatch! context (ax/enrich-with-args on-error result))))))
           (p/catch (fn [e]
                      (dispatch! context [[:app/ax.log :error "[Cursor MCP] register-with-cursor error:" e]])
-                     (dispatch! context (ax/enrich-with-args on-error e))))))
-
-    [:mcp/fx.register-cursor-mcp-server server-info options]
-    (let [{:ex/keys [on-success on-error]} options]
-      (-> (cursor/register-and-reload-mcp-client!+ context server-info)
-          (p/then (fn [result]
-                    (cond
-                      (not (:ok result))
-                      (do
-                        (dispatch! context [[:app/ax.log :warn "[Cursor MCP] registerServer failed:" result]])
-                        (dispatch! context (ax/enrich-with-args on-error result)))
-
-                      (and (:reload result) (not (:ok (:reload result))))
-                      (do
-                        (dispatch! context [[:app/ax.log :warn "[Cursor MCP] reloadClient failed:" (:reload result)]])
-                        (dispatch! context (ax/enrich-with-args on-success result)))
-
-                      :else
-                      (dispatch! context (ax/enrich-with-args on-success result)))))
-          (p/catch (fn [e]
-                     (dispatch! context [[:app/ax.log :error "[Cursor MCP] registerServer error:" e]])
                      (dispatch! context (ax/enrich-with-args on-error e))))))
 
     [:mcp/fx.send-notification server-info notification]
