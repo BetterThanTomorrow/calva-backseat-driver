@@ -23,8 +23,8 @@
 
 (defn- handle-lifecycle-updated [state lifecycle-state]
   {:ex/db (assoc state :mcp/lifecycle-state lifecycle-state)
-   :ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]
-            [:app/fx.return (clj->js (vscode-mcp/server-info lifecycle-state))]]})
+   :ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]]
+   :ex/fxs [[:app/fx.return (clj->js (vscode-mcp/server-info lifecycle-state))]]})
 
 (defn- handle-stop-server [state action]
   (let [opts (or (second action) {})]
@@ -36,8 +36,8 @@
 
 (defn- handle-lifecycle-stopped [state lifecycle-state]
   {:ex/db (assoc state :mcp/lifecycle-state lifecycle-state)
-   :ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]
-            [:app/fx.return true]]})
+   :ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]]
+   :ex/fxs [[:app/fx.return true]]})
 
 (defn- handle-register-with-cursor [state]
   {:ex/fxs [[:mcp/fx.register-with-cursor
