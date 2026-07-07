@@ -70,8 +70,8 @@
 
 (defn- handle-mcp-request [request]
   {:ex/fxs [[:mcp/fx.handle-request {:mcp/repl-enabled? :vscode/config.enableMcpReplEvaluation
-                                      :mcp/provide-bd-skill? :vscode/config.provideBdSkill
-                                      :mcp/provide-edit-skill? :vscode/config.provideEditSkill} request]]})
+                                     :mcp/provide-bd-skill? :vscode/config.provideBdSkill
+                                     :mcp/provide-edit-skill? :vscode/config.provideEditSkill} request]]})
 
 (defn handle-action [state _context action]
   (match action
