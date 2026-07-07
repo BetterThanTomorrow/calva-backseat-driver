@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.38] - 2026-07-07
+
 - The MCP default host explicitly set to `127.0.0.1`
   - Setting added for selecting MCP host
 - The MCP default port changes from `1664` to `0` (random available port)
