@@ -1,6 +1,5 @@
 (ns calva-backseat-driver.mcp.axs
   (:require
-   ["vscode" :as vscode]
    [cljs.core.match :refer [match]]
    [vscode-mcp.core :as vscode-mcp]))
 
@@ -66,8 +65,8 @@
               :ex/then [[:vscode/ax.show-text-document :ex/action-args]]}]]})
 
 (defn- handle-server-error [err]
-  (do (js/console.error err)
-      {:ex/fxs [[:vscode/fx.show-error-message (str "MCP server error: " err)]]}))
+  (js/console.error err)
+  {:ex/fxs [[:vscode/fx.show-error-message (str "MCP server error: " err)]]})
 
 (defn- handle-mcp-request [request]
   {:ex/fxs [[:mcp/fx.handle-request {:mcp/repl-enabled? :vscode/config.enableMcpReplEvaluation
