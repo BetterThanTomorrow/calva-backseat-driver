@@ -9,6 +9,6 @@
         io.github.pez/baldr {:mvn/version "1.0.9"}
         io.github.betterthantomorrow/vscode-mcp {;:local/root "../vscode-mcp" 
                                                  :git/url "https://github.com/BetterThanTomorrow/vscode-mcp.git"
-                                                 :git/sha "f7dfcc81158f67ac8ef76e55e992daaea14d0336"
+                                                 :git/sha "a3764db5c22fbe6d6921205c300e7a4d0d1cab47"
                                                  }}
  :aliases {:e2e-test-joyride {:extra-deps {joyride/workspace {:local/root "e2e-test-ws/.joyride"}}}}}

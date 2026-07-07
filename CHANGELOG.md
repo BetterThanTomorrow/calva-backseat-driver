@@ -7,7 +7,8 @@ Changes to Calva Backseat Driver
 - The MCP default host explicitly set to `127.0.0.1`
   - Setting added for selecting MCP host
 - The MCP default port changes from `1664` to `0` (random available port)
-- Isolate Cursor auto-registered MCP servers per VS Code window
+- Isolate and stabilize Cursor auto-registered MCP servers per VS Code window
+- Add command for registering the MCP server with Cursor on demand
 
 ## [v0.0.37] - 2026-06-22
 

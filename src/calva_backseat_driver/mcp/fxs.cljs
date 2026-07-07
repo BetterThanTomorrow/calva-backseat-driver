@@ -9,7 +9,7 @@
    [cljs.core.match :refer [match]]
    [promesa.core :as p]
    [vscode-mcp.core :as vscode-mcp]
-   [vscode-mcp.server :as btt-mcp-server]))
+   [vscode-mcp.server :as mcp-server]))
 
 (defn- copy-wrapper-script! [wrapper-config-path]
   (let [extension-uri (-> (vscode/extensions.getExtension
@@ -70,7 +70,7 @@
                      (dispatch! context (ax/enrich-with-args on-error e))))))
 
     [:mcp/fx.send-notification server-info notification]
-    (btt-mcp-server/send-notification-params server-info notification)
+    (mcp-server/send-notification-params server-info notification)
 
     [:mcp/fx.handle-request options request]
     (requests/handle-request-fn (assoc options :ex/dispatch! (partial dispatch! context)

@@ -180,7 +180,7 @@
         "userDescription": "Evaluate Clojure or ClojureScript code in the connected REPL.",
         "canBeReferencedInPrompt": true,
         "icon": "$(terminal-bash)",
-        "when": ":calva-mcp-extension/activated?",
+        "when": "config.calva-backseat-driver.enableMcpReplEvaluation",
         "inputSchema": {
           "type": "object",
           "properties": {
@@ -469,7 +469,7 @@
         "userDescription": "Load and evaluate a Clojure file in the connected REPL.",
         "canBeReferencedInPrompt": true,
         "icon": "$(file-code)",
-        "when": ":calva-mcp-extension/activated?",
+        "when": "config.calva-backseat-driver.enableMcpReplEvaluation",
         "inputSchema": {
           "type": "object",
           "properties": {

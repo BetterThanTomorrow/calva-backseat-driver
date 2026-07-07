@@ -7,8 +7,8 @@
    [calva-backseat-driver.app.db :as db]
    [calva-backseat-driver.integrations.calva.api :as calva-api]
    [calva-backseat-driver.integrations.calva.version :as version]
-   [calva-backseat-driver.integrations.vscode.cursor :as cursor]
-   [vscode-mcp.core :as vscode-mcp]))
+   [vscode-mcp.core :as vscode-mcp]
+   [vscode-mcp.cursor :as vscode-mcp-cursor]))
 
 (defn- extension-context []
   (:vscode/extension-context @db/!app-db))
@@ -19,7 +19,7 @@
     (.-logUri context) "mcp-server.log")
    :app/min-log-level :debug
    :mcp/wrapper-config-path (path/join (os/homedir) ".config" "calva" "backseat-driver")
-   :mcp/cursor-mcp-available? (cursor/cursor-mcp-available?)
+   :mcp/cursor-mcp-available? (vscode-mcp-cursor/cursor-mcp-available?)
    :mcp/lifecycle-state (vscode-mcp/init-state)
    :calva/history-storage-uri (some-> (.-storageUri context)
                                       (vscode/Uri.joinPath "eval-history.transit.json"))})

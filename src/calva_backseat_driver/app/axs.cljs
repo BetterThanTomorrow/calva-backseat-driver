@@ -1,11 +1,13 @@
 (ns calva-backseat-driver.app.axs
   (:require
-   [calva-backseat-driver.integrations.vscode.cursor-config :as cursor-config]
+   [vscode-mcp.policy :as mcp-policy]
    [cljs.core.match :refer [match]]))
 
 (defn should-auto-start-mcp-server?
   [auto-start-mcp? auto-register-cursor-mcp? cursor-mcp-available?]
-  (cursor-config/should-auto-start-mcp-server? auto-start-mcp? auto-register-cursor-mcp? cursor-mcp-available?))
+  (mcp-policy/should-auto-start? {:mcp/auto-start? auto-start-mcp?
+                                  :mcp/auto-register? auto-register-cursor-mcp?
+                                  :mcp/cursor-available? cursor-mcp-available?}))
 
 (defn handle-action [state _context action]
   (match action

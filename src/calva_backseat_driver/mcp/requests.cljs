@@ -8,13 +8,11 @@
    [vscode-mcp.manifest :as manifest]
    [vscode-mcp.responses :as responses]))
 
-(defn- get-extension-version [options]
-  (some-> ^js (:vscode/extension-context options) .-extension .-packageJSON .-version))
-
 (defn- settings-map [options]
-  (let [{:mcp/keys [provide-bd-skill? provide-edit-skill?]} options]
+  (let [{:mcp/keys [provide-bd-skill? provide-edit-skill? repl-enabled?]} options]
     {"config.calva-backseat-driver.provideBdSkill" provide-bd-skill?
      "config.calva-backseat-driver.provideEditSkill" provide-edit-skill?
+     "config.calva-backseat-driver.enableMcpReplEvaluation" (true? repl-enabled?)
      ":calva-mcp-extension/activated?" true}))
 
 
@@ -90,11 +88,9 @@
                                                :calva/repl-session-key replSessionKey
                                                :calva/who who}))]
         (if (:error result)
-          {:jsonrpc "2.0"
-           :id id
-           :result {:content [{:type "text"
-                               :text (js/JSON.stringify (clj->js {:error (:error result)}))}]
-                    :isError true}}
+          (responses/success-response id {:content [{:type "text"
+                                                     :text (js/JSON.stringify (clj->js {:error (:error result)}))}]
+                                           :isError true})
           (responses/clj-response id result))))))
 
 (defn- handle-edit-files [options id arguments]
@@ -103,32 +99,27 @@
     (responses/clj-response id result)))
 
 (def ^:private tool-handlers
-  {"clojure_evaluate_code"    {:handler handle-evaluate-code :repl-required? true}
+  {"clojure_evaluate_code"    {:handler handle-evaluate-code}
    "clojure_list_sessions"    {:handler handle-list-sessions}
    "clojure_symbol_info"      {:handler handle-symbol-info}
    "clojuredocs_info"         {:handler handle-clojuredocs}
    "clojure_repl_output_log"  {:handler handle-output-log}
    "clojure_balance_brackets" {:handler handle-balance-brackets}
    "clojure_edit_files"       {:handler handle-edit-files}
-   "clojure_load_file"        {:handler handle-load-file :repl-required? true}})
+   "clojure_load_file"        {:handler handle-load-file}})
 
-(defn- handle-tools-call [{:keys [id params] :as _request}
-                          {:mcp/keys [repl-enabled?] :as options}]
+(defn- handle-tools-call [{:keys [id params] :as _request} options]
   (let [{:keys [arguments] tool :name} params
-        {:keys [handler repl-required?]} (tool-handlers tool)]
+        allowed (manifest/tool-call-allowed? (:vscode/extension-context options) tool {:settings (settings-map options)})
+        {:keys [handler]} (tool-handlers tool)]
     (cond
-      (nil? handler)
-      (responses/error-response id -32601 "Unknown tool")
-
-      (and repl-required? (not (true? repl-enabled?)))
+      (or (= :disabled allowed) (= :unknown allowed))
       (responses/error-response id -32601 "Unknown tool")
 
       :else
       (try
         (let [result (handler options id arguments)]
           (if (p/promise? result)
-            ;; Async handlers reject asynchronously, so the synchronous catch
-            ;; below won't see it; recover here to keep the request's id.
             (p/catch result
                      (fn [e]
                        (responses/error-response id -32603 (exception-message e))))
@@ -145,59 +136,41 @@
                                                   {:calva/clojure-symbol clojureSymbol
                                                    :calva/repl-session-key session-key
                                                    :calva/ns ns}))]
-        {:jsonrpc "2.0"
-         :id id
-         :result {:contents [{:uri uri
-                              :text (js/JSON.stringify info)}]}})
+        (responses/success-response id {:contents [{:uri uri
+                                                    :text (js/JSON.stringify info)}]}))
 
       (string/starts-with? uri "/clojuredocs/")
       (p/let [[_ clojureSymbol] (re-find #"^/clojuredocs/(.+)$" uri)
               info (calva/get-clojuredocs+ (merge options
                                                   {:calva/clojure-symbol clojureSymbol}))]
-        {:jsonrpc "2.0"
-         :id id
-         :result {:contents [{:uri uri
-                              :text (js/JSON.stringify info)}]}})
+        (responses/success-response id {:contents [{:uri uri
+                                                    :text (js/JSON.stringify info)}]}))
 
       (string/starts-with? uri "skill://")
       (let [resource (manifest/read-resource (:vscode/extension-context options) uri {:settings (settings-map options)})]
         (if resource
-          {:jsonrpc "2.0"
-           :id id
-           :result {:contents [(dissoc resource :skill-path)]}}
+          (responses/success-response id {:contents [(dissoc resource :skill-path)]})
           (responses/error-response id -32602 (str "Skill not found: " uri))))
 
       :else
       (responses/error-response id -32602 "Unknown resource URI"))))
 
-(defn- handle-initialize [options id]
-  (let [{:mcp/keys [repl-enabled?]} options
-        skills (manifest/get-resources (:vscode/extension-context options) {:settings (settings-map options)})
-        tools (manifest/get-tools (:vscode/extension-context options) {:settings (settings-map options)})
-        base-text (str "You have access to the `clojure_edit_files` structural editing tool (replace, insert, append, create) with automatic bracket balancing."
-                       (when repl-enabled?
-                         " You can evaluate Clojure/ClojureScript code via the `clojure_evaluate_code` tool, load entire files into the REPL with `clojure_load_file`, check REPL output with `clojure_repl_output_log`, look up symbol info, and query clojuredocs.org."))
-        instructions (manifest/build-server-instructions {:base-text base-text
-                                                          :tools tools
-                                                          :resources skills})]
-    (responses/success-response
-     id
-     {:serverInfo {:name "calva-backseat-driver"
-                   :version (get-extension-version options)}
-      :protocolVersion "2024-11-05"
-      :capabilities {:tools {:listChanged true}
-                     :resources {:listChanged true}}
-      :instructions instructions
-      :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (unless disabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."})))
+(defn- initialize-base-text [options]
+  (let [{:mcp/keys [repl-enabled?]} options]
+    (str "You have access to the `clojure_edit_files` structural editing tool (replace, insert, append, create) with automatic bracket balancing."
+         (when repl-enabled?
+           " You can evaluate Clojure/ClojureScript code via the `clojure_evaluate_code` tool, load entire files into the REPL with `clojure_load_file`, check REPL output with `clojure_repl_output_log`, look up symbol info, and query clojuredocs.org."))))
 
-(defn- handle-tools-list [options id]
-  (let [{:mcp/keys [repl-enabled?]} options
-        all-tools (manifest/get-tools (:vscode/extension-context options) {:settings (settings-map options)})]
-    (responses/success-response
-     id
-     {:tools (cond->> all-tools
-               (not repl-enabled?)
-               (remove (comp #{"clojure_evaluate_code" "clojure_load_file"} :name)))})))
+(defn- handle-initialize [options id]
+  (responses/success-response
+   id
+   (merge (manifest/build-initialize-result (:vscode/extension-context options)
+                                            {:base-text (initialize-base-text options)
+                                             :settings (settings-map options)
+                                             :name "calva-backseat-driver"})
+          {:capabilities {:tools {:listChanged true}
+                          :resources {:listChanged true}}
+           :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (unless disabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."})))
 
 (defn handle-request-fn [{:ex/keys [dispatch!] :as options}
                          {:keys [id method] :as request}]
@@ -207,7 +180,9 @@
     (handle-initialize options id)
 
     "tools/list"
-    (handle-tools-list options id)
+    (responses/success-response
+     id
+     {:tools (manifest/get-tools (:vscode/extension-context options) {:settings (settings-map options)})})
 
     "resources/list"
     (let [skills (manifest/get-resources (:vscode/extension-context options) {:settings (settings-map options)})
