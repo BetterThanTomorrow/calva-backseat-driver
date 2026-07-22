@@ -30,6 +30,10 @@ Backseat Driver is per-project, so configure it at the project/workspace level w
 
 No config needed for Cursor. Backseat Driver handles this for you, Zero Conf, the MCP server will be named `extension-backseat-driver`. If for some reason you need to configure this manually, you can disable the automatic Cursor config and MCP connect by settting `autoRegisterCursorMcp` to `false`. 
 
+### ECA
+
+No config needed when the ECA extension is installed and a workspace is open. Backseat Driver upserts project-local `.eca/config.json` (server key `backseat-driver`). Only managed fields `command` and `args` are updated; siblings (`disabled`, `env`, …) are preserved. The wrapper path is under the extension install (`dist/calva-mcp-server.js`), not `~/.config/calva/backseat-driver`. Opt out with `calva-backseat-driver.autoRegisterEcaMcp` set to `false`. Stop does not remove the ECA entry. No Register-with-ECA command.
+
 ### Windsurf configuration
 
 Please help with providing info here.
