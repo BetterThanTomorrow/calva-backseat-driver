@@ -7,7 +7,8 @@
     (let [state {:mcp/cursor-mcp-available? true}
           result (app-axs/handle-action state {}
                                         [:app/ax.init {:auto-start-mcp? false
-                                                       :auto-register-cursor-mcp? true}])]
+                                                       :auto-register-cursor-mcp? true
+                                                       :auto-register-eca? false}])]
       (is (some? result) "handler must not fall through to :else nil")
       (is (vector? (:ex/dxs result)))
       (is (some #(= :calva-mcp-extension/activated? (second %))
@@ -21,7 +22,32 @@
     (let [state {:mcp/cursor-mcp-available? true}
           result (app-axs/handle-action state {}
                                         [:app/ax.init {:auto-start-mcp? false
-                                                       :auto-register-cursor-mcp? true}])]
+                                                       :auto-register-cursor-mcp? true
+                                                       :auto-register-eca? false}])]
       (is (some #(and (vector? %) (= :mcp/ax.start-server (first %)))
                 (:ex/dxs result))
-          "dispatches silent MCP start"))))
+          "dispatches silent MCP start")))
+
+  (testing "auto-start when ECA auto-register enabled"
+    (let [state {:mcp/cursor-mcp-available? false
+                 :mcp/eca-available? true
+                 :mcp/workspace-root-present? true}
+          result (app-axs/handle-action state {}
+                                        [:app/ax.init {:auto-start-mcp? false
+                                                       :auto-register-cursor-mcp? false
+                                                       :auto-register-eca? true}])]
+      (is (some #(and (vector? %) (= :mcp/ax.start-server (first %)))
+                (:ex/dxs result))
+          "dispatches silent MCP start for ECA")))
+
+  (testing "no auto-start when ECA setting off"
+    (let [state {:mcp/cursor-mcp-available? false
+                 :mcp/eca-available? true
+                 :mcp/workspace-root-present? true}
+          result (app-axs/handle-action state {}
+                                        [:app/ax.init {:auto-start-mcp? false
+                                                       :auto-register-cursor-mcp? false
+                                                       :auto-register-eca? false}])]
+      (is (not (some #(and (vector? %) (= :mcp/ax.start-server (first %)))
+                     (:ex/dxs result)))
+          "does not start when only ECA is available but setting is off"))))

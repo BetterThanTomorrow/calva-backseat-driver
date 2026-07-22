@@ -58,6 +58,12 @@
           "markdownDescription": "In Cursor, automatically register the Backseat Driver MCP server with the Cursor Agent.",
           "scope": "resource"
         },
+        "calva-backseat-driver.autoRegisterEcaMcp": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "When the ECA extension is installed, automatically register the Backseat Driver MCP server in the project-local `.eca/config.json`.",
+          "scope": "resource"
+        },
         "calva-backseat-driver.mcpSocketServerPort": {
           "type": "number",
           "default": 0,
