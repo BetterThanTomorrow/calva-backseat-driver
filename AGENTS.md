@@ -78,7 +78,7 @@ bb package-pre-release  # Package pre-release VSIX
 
 **Verification after changes**:
 - Full MCP coverage comes from the e2e tests + the `bd-tester` agent in the example/test project used inside the dev Extension Host.
-- For any change affecting the MCP server, tools, port file, or Cursor auto-registration: after the change, launch the dev Extension Host (F5), use `bd-tester` to specifically test the modified behavior, and frequently run its full protocol as a regression check.
+- For any change affecting the MCP server, tools, port file, or Cursor/ECA auto-registration: after the change, launch the dev Extension Host (F5), use `bd-tester` to specifically test the modified behavior, and frequently run its full protocol as a regression check.
 
 **Note**: When running `bb run-e2e-tests-ws`: Detailed output goes to .tmp/e2e-output.log — read that file for details, if needed. The command outputs a very brief summary. Don't pipe or redirect.
 
@@ -161,6 +161,13 @@ When making multiple edits, work from highest line number to lowest (line number
 - Register command: `calva-backseat-driver.registerMcpServerWithCursor` via `register-or-start-with-cursor!+` (Option C: start+register when auto-register off; repair when on). Enablement: `:calva-backseat-driver/cursor-mcp-available? && !:calva-backseat-driver/mcp-server-registered-with-cursor?`
 - When-context sync: `[:mcp/ax.sync-cursor-mcp-when-contexts]` sets `:calva-backseat-driver/cursor-mcp-available?` and `:calva-backseat-driver/mcp-server-registered-with-cursor?` (registered only while server is running)
 
+### ECA registration
+- Project-local `.eca/config.json` only
+- Setting `autoRegisterEcaMcp` (default true); library key `:mcp/auto-register-eca?`
+- Gates: ECA extension `editor-code-assistant.eca` installed (activated before write), workspace folder, port file from `server-info`
+- Managed fields only (`command`, `args`); independent of Cursor; no deregister on stop; no command or when-contexts
+- Wrapper = `extensionPath` + `dist/calva-mcp-server.js` (not `:lifecycle/wrapper-path` / `~/.config` copy)
+
 ### Skills and Instructions as Bundled Assets
 - `assets/skills/` and `assets/instructions/` are the canonical source for content bundled with the extension. When updating skill or instruction content, edit these files — not the installed extension copies under `~/.vscode*/extensions/`.
 - Skills declared in `package.json` under `contributes.chatSkills` are exposed as MCP resources
@@ -176,6 +183,8 @@ Settings read via enrichment:
 :vscode/config.enableMcpReplEvaluation  ; boolean (default true — set false to disable MCP eval)
 :vscode/config.mcpSocketServerPort      ; number (default 1664, 0=random)
 :vscode/config.autoStartMCPServer       ; boolean
+:vscode/config.autoRegisterCursorMcp    ; boolean (default true)
+:vscode/config.autoRegisterEcaMcp       ; boolean (default true)
 :vscode/config.provideBdSkill           ; boolean (default true) — enable/disable Backseat Driver skill
 :vscode/config.provideEditSkill         ; boolean (default true) — enable/disable structural editing skill
 ```
