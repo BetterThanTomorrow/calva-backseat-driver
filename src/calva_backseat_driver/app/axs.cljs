@@ -4,10 +4,14 @@
    [cljs.core.match :refer [match]]))
 
 (defn should-auto-start-mcp-server?
-  [auto-start-mcp? auto-register-cursor-mcp? cursor-mcp-available?]
+  [auto-start-mcp? auto-register-cursor-mcp? cursor-mcp-available?
+   auto-register-eca? eca-available? workspace-root-present?]
   (mcp-policy/should-auto-start? {:mcp/auto-start? auto-start-mcp?
                                   :mcp/auto-register? auto-register-cursor-mcp?
-                                  :mcp/cursor-available? cursor-mcp-available?}))
+                                  :mcp/cursor-available? cursor-mcp-available?
+                                  :mcp/auto-register-eca? auto-register-eca?
+                                  :mcp/eca-available? eca-available?
+                                  :mcp/workspace-root-present? workspace-root-present?}))
 
 (defn handle-action [state _context action]
   (match action
@@ -17,11 +21,13 @@
        :ex/fxs [[:app/fx.init-logging {:app/log-file-uri (:app/log-file-uri new-state)
                                        :ex/uri-action [:db/ax.assoc-in [:app/log-dir-initialized+]]
                                        :ex/then [[:app/ax.init {:auto-start-mcp? :vscode/config.autoStartMCPServer
-                                                                :auto-register-cursor-mcp? :vscode/config.autoRegisterCursorMcp}]]}]
+                                                                :auto-register-cursor-mcp? :vscode/config.autoRegisterCursorMcp
+                                                                :auto-register-eca? :vscode/config.autoRegisterEcaMcp}]]}]
                 [:mcp/fx.copy-wrapper-script-to-config-dir (:mcp/wrapper-config-path new-state)]]})
 
     [:app/ax.init {:auto-start-mcp? auto-start-mcp?
-                   :auto-register-cursor-mcp? auto-register-cursor-mcp?}]
+                   :auto-register-cursor-mcp? auto-register-cursor-mcp?
+                   :auto-register-eca? auto-register-eca?}]
     {:ex/dxs [[:app/ax.register-command "calva-backseat-driver.startMcpServer"
                [[:mcp/ax.start-server]]]
               [:app/ax.register-command "calva-backseat-driver.stopMcpServer"
@@ -36,7 +42,12 @@
               [:app/ax.set-when-context :calva-mcp-extension/activated?
                true]
               [:mcp/ax.sync-cursor-mcp-when-contexts]
-              (when (should-auto-start-mcp-server? auto-start-mcp? auto-register-cursor-mcp? (:mcp/cursor-mcp-available? state))
+              (when (should-auto-start-mcp-server? auto-start-mcp?
+                                                   auto-register-cursor-mcp?
+                                                   (:mcp/cursor-mcp-available? state)
+                                                   auto-register-eca?
+                                                   (:mcp/eca-available? state)
+                                                   (:mcp/workspace-root-present? state))
                 [:mcp/ax.start-server {:silent? true}])]}
 
     [:app/ax.init-output-listener]

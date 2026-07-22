@@ -8,7 +8,8 @@
    [calva-backseat-driver.integrations.calva.api :as calva-api]
    [calva-backseat-driver.integrations.calva.version :as version]
    [vscode-mcp.core :as vscode-mcp]
-   [vscode-mcp.cursor :as vscode-mcp-cursor]))
+   [vscode-mcp.cursor :as vscode-mcp-cursor]
+   [vscode-mcp.eca :as vscode-mcp-eca]))
 
 (defn- extension-context []
   (:vscode/extension-context @db/!app-db))
@@ -20,6 +21,8 @@
    :app/min-log-level :debug
    :mcp/wrapper-config-path (path/join (os/homedir) ".config" "calva" "backseat-driver")
    :mcp/cursor-mcp-available? (vscode-mcp-cursor/cursor-mcp-available?)
+   :mcp/eca-available? (vscode-mcp-eca/eca-available?)
+   :mcp/workspace-root-present? (vscode-mcp-eca/workspace-root-present?)
    :mcp/lifecycle-state (vscode-mcp/init-state)
    :calva/history-storage-uri (some-> (.-storageUri context)
                                       (vscode/Uri.joinPath "eval-history.transit.json"))})
@@ -74,11 +77,15 @@
 (defn- maybe-init-mcp! [ctx]
   (when-not (get-in @db/!app-db [:extension/when-contexts :calva-mcp-extension/activated?])
     (ex/dispatch! ctx [[:app/ax.init {:auto-start-mcp? :vscode/config.autoStartMCPServer
-                                      :auto-register-cursor-mcp? :vscode/config.autoRegisterCursorMcp}]])))
+                                      :auto-register-cursor-mcp? :vscode/config.autoRegisterCursorMcp
+                                      :auto-register-eca? :vscode/config.autoRegisterEcaMcp}]])))
 
 (defn- ensure-cursor-mcp-ready! []
   (when-let [ctx (extension-context)]
-    (swap! db/!app-db assoc :mcp/cursor-mcp-available? (vscode-mcp-cursor/cursor-mcp-available?))
+    (swap! db/!app-db assoc
+           :mcp/cursor-mcp-available? (vscode-mcp-cursor/cursor-mcp-available?)
+           :mcp/eca-available? (vscode-mcp-eca/eca-available?)
+           :mcp/workspace-root-present? (vscode-mcp-eca/workspace-root-present?))
     (maybe-init-mcp! ctx)))
 
 (defn ^{:dev/after-load true

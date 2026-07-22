@@ -36,6 +36,7 @@
       :cursor/script-relative-path "dist/calva-mcp-server.js"
       :mcp/auto-start? (.get settings "autoStartMCPServer")
       :mcp/auto-register? (.get settings "autoRegisterCursorMcp")
+      :mcp/auto-register-eca? (.get settings "autoRegisterEcaMcp")
       :manual-setup/extension-name "Backseat Driver"
       :server/host (.get settings "mcpHost")
       :mcp/on-request (fn [request]
