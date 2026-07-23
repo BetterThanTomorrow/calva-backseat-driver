@@ -165,6 +165,7 @@ When making multiple edits, work from highest line number to lowest (line number
 - Project-local `.eca/config.json` only
 - Setting `autoRegisterEcaMcp` (default true); library key `:mcp/auto-register-eca?`
 - Gates: ECA extension `editor-code-assistant.eca` installed (activated before write), workspace folder, port file from `server-info`
+- ECA `.eca/config.json` uses workspace-stable port file `<workspace>/.calva/mcp-server/port` (not Cursor tmpdir)
 - Managed fields only (`command`, `args`); independent of Cursor; no deregister on stop; no command or when-contexts
 - Wrapper = `extensionPath` + `dist/calva-mcp-server.js` (not `:lifecycle/wrapper-path` / `~/.config` copy)
 

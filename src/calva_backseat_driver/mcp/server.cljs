@@ -47,6 +47,8 @@
                                   (if cursor-mode?
                                     (get-cursor-port-file-uri instance-slug)
                                     (get-port-file-uri+ ctx)))
+      :lifecycle/eca-port-file-uri+ (fn [^js ctx _strategy-opts]
+                                      (get-port-file-uri+ ctx))
       :lifecycle/request-port (fn [_ctx {:lifecycle/keys [cursor-mode?]}]
                                 (if cursor-mode? 0 (.get settings "mcpSocketServerPort")))
       :lifecycle/wrapper-path (fn [_ctx _server-info]
