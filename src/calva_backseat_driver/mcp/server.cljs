@@ -25,7 +25,7 @@
 
 (defn build-lifecycle-config
   "Builds a `vscode-mcp.core` config from current settings and BD's
-   port-file/wrapper-path/when-context conventions. Cheap to rebuild — callers
+   port-file/wrapper-install-dir/when-context conventions. Cheap to rebuild — callers
    don't need to cache it (see plan Decision Q6: settings are read fresh on
    each start/stop, same as the rest of BD's Ex config-keyword enrichment)."
   [dispatch! ^js context wrapper-config-path]
@@ -51,8 +51,7 @@
                                       (get-port-file-uri+ ctx))
       :lifecycle/request-port (fn [_ctx {:lifecycle/keys [cursor-mode?]}]
                                 (if cursor-mode? 0 (.get settings "mcpSocketServerPort")))
-      :lifecycle/wrapper-path (fn [_ctx _server-info]
-                                (path/join wrapper-config-path "calva-mcp-server.js"))
+      :lifecycle/wrapper-install-dir wrapper-config-path
       :lifecycle/on-starting-changed (fn [starting?]
                                        (dispatch! context [[:app/ax.set-when-context :calva-backseat-driver/starting? starting?]]))
       :lifecycle/on-stopping-changed (fn [stopping?]

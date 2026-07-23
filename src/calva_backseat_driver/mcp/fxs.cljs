@@ -1,8 +1,5 @@
 (ns calva-backseat-driver.mcp.fxs
   (:require
-   ["fs" :as fs]
-   ["path" :as path]
-   ["vscode" :as vscode]
    [calva-backseat-driver.ex.ax :as ax]
    [calva-backseat-driver.mcp.requests :as requests]
    [calva-backseat-driver.mcp.server :as server]
@@ -11,25 +8,12 @@
    [vscode-mcp.core :as vscode-mcp]
    [vscode-mcp.server :as mcp-server]))
 
-(defn- copy-wrapper-script! [wrapper-config-path]
-  (let [extension-uri (-> (vscode/extensions.getExtension
-                           "betterthantomorrow.calva-backseat-driver")
-                          .-extensionUri)
-        script-uri (vscode/Uri.joinPath extension-uri "dist" "calva-mcp-server.js")
-        script-path (.-fsPath script-uri)
-        dest-path (path/join wrapper-config-path "calva-mcp-server.js")]
-    (fs/mkdirSync wrapper-config-path #js {:recursive true})
-    (try (fs/unlinkSync dest-path) (catch :default _e))
-    (fs/copyFileSync script-path dest-path)
-    dest-path))
-
 (defn perform-effect! [dispatch! ^js context effect]
   (match effect
     [:mcp/fx.lifecycle-start options]
     (let [{:ex/keys [on-success]
            :lifecycle/keys [silent?]
            :mcp/keys [wrapper-config-path lifecycle-state]} options
-          _ (copy-wrapper-script! wrapper-config-path)
           config (server/build-lifecycle-config dispatch! context wrapper-config-path)
           start!+ (if silent? vscode-mcp/maybe-start!+ vscode-mcp/start!+)]
       (p/then (start!+ config lifecycle-state silent?)
@@ -73,9 +57,6 @@
     [:mcp/fx.handle-request options request]
     (requests/handle-request-fn (assoc options :ex/dispatch! (partial dispatch! context)
                                        :vscode/extension-context context) request)
-
-    [:mcp/fx.copy-wrapper-script-to-config-dir wrapper-config-path]
-    (copy-wrapper-script! wrapper-config-path)
 
     :else
     (js/console.warn "Unknown MCP effect:" (pr-str effect))))

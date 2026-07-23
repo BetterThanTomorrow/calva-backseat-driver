@@ -22,8 +22,7 @@
                                        :ex/uri-action [:db/ax.assoc-in [:app/log-dir-initialized+]]
                                        :ex/then [[:app/ax.init {:auto-start-mcp? :vscode/config.autoStartMCPServer
                                                                 :auto-register-cursor-mcp? :vscode/config.autoRegisterCursorMcp
-                                                                :auto-register-eca? :vscode/config.autoRegisterEcaMcp}]]}]
-                [:mcp/fx.copy-wrapper-script-to-config-dir (:mcp/wrapper-config-path new-state)]]})
+                                                                :auto-register-eca? :vscode/config.autoRegisterEcaMcp}]]}]]})
 
     [:app/ax.init {:auto-start-mcp? auto-start-mcp?
                    :auto-register-cursor-mcp? auto-register-cursor-mcp?
