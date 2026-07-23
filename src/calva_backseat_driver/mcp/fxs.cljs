@@ -20,11 +20,8 @@
         dest-path (path/join wrapper-config-path "calva-mcp-server.js")]
     (fs/mkdirSync wrapper-config-path #js {:recursive true})
     (try (fs/unlinkSync dest-path) (catch :default _e))
-    (if js/goog.DEBUG
-      (try
-        (fs/symlinkSync script-path dest-path)
-        (catch :default _e))
-      (fs/copyFileSync script-path dest-path))))
+    (fs/copyFileSync script-path dest-path)
+    dest-path))
 
 (defn perform-effect! [dispatch! ^js context effect]
   (match effect
@@ -32,6 +29,7 @@
     (let [{:ex/keys [on-success]
            :lifecycle/keys [silent?]
            :mcp/keys [wrapper-config-path lifecycle-state]} options
+          _ (copy-wrapper-script! wrapper-config-path)
           config (server/build-lifecycle-config dispatch! context wrapper-config-path)
           start!+ (if silent? vscode-mcp/maybe-start!+ vscode-mcp/start!+)]
       (p/then (start!+ config lifecycle-state silent?)
