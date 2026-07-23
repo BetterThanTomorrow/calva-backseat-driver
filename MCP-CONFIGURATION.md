@@ -32,7 +32,7 @@ No config needed for Cursor. Backseat Driver handles this for you, Zero Conf, th
 
 ### ECA
 
-No config needed when the ECA extension is installed and a workspace is open. Backseat Driver upserts project-local `.eca/config.json` (server key `backseat-driver`). Only managed fields `command` and `args` are updated; siblings (`disabled`, `env`, …) are preserved. The wrapper path is under the extension install (`dist/calva-mcp-server.js`), not `~/.config/calva/backseat-driver`. Opt out with `calva-backseat-driver.autoRegisterEcaMcp` set to `false`. Stop does not remove the ECA entry. No Register-with-ECA command.
+No config needed when the ECA extension is installed and a workspace is open. Backseat Driver upserts project-local `.eca/config.json` (server key `backseat-driver`). The port file path in that config is always the workspace-stable file at `<workspace>/.calva/mcp-server/port` (not Cursor's tmpdir port file). Only managed fields `command` and `args` are updated; siblings (`disabled`, `env`, …) are preserved. The wrapper path is under the extension install (`dist/calva-mcp-server.js`), not `~/.config/calva/backseat-driver`. Opt out with `calva-backseat-driver.autoRegisterEcaMcp` set to `false`. Stop does not remove the ECA entry. No Register-with-ECA command.
 
 ### Windsurf configuration
 
