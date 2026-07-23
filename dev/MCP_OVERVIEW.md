@@ -63,7 +63,7 @@ Lifecycle is driven by `vscode-mcp.core` via `mcp/fxs.cljs` and `mcp/server.cljs
 
 See also `joyride-dev-docs/mcp-stop-start-cursor-registration-plan.md` (in-session stop→start) and `mcp-wrapper-retry-and-reload-policy-plan.md` (window reload).
 
-**ECA registration** (independent of Cursor): when `:mcp/auto-register-eca?` is on and extension `editor-code-assistant.eca` is installed, the lifecycle hook upserts project-local `.eca/config.json` (server key from `:cursor/server-name`, managed `command`/`args` only, wrapper from `extensionPath` + `dist/calva-mcp-server.js`). Requires a workspace folder; no deregister on stop; no command or when-contexts.
+**ECA registration** (independent of Cursor): when `:mcp/auto-register-eca?` is on and extension `editor-code-assistant.eca` is installed, the lifecycle hook upserts project-local `.eca/config.json` (server key from `:cursor/server-name`, managed `command`/`args` only; portable args via `:lifecycle/wrapper-path` → `${env:HOME}/.config/calva/backseat-driver/calva-mcp-server.js`, workspace-relative `.calva/mcp-server/port`, configured host). Requires a workspace folder; no deregister on stop; no command or when-contexts.
 
 ### ClojureScript Implementation Approach
 
