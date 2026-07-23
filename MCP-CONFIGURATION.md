@@ -32,7 +32,7 @@ No config needed for Cursor. Backseat Driver handles this for you, Zero Conf, th
 
 ### ECA
 
-No config needed when the ECA extension is installed and a workspace is open. Backseat Driver upserts project-local `.eca/config.json` (server key `backseat-driver`). Auto-register writes portable `args`: wrapper `${env:HOME}/.config/calva/backseat-driver/calva-mcp-server.js` (Backseat Driver keeps this file copied from the extension on activate/start), port `.calva/mcp-server/port` (workspace-relative; always written on MCP start), and host as configured (`calva-backseat-driver.mcpHost`). Only managed fields `command` and `args` are updated; siblings (`disabled`, `env`, …) are preserved. Opt out with `calva-backseat-driver.autoRegisterEcaMcp` set to `false`. Stop does not remove the ECA entry. No Register-with-ECA command.
+No config needed when the ECA extension is installed and a workspace is open. Backseat Driver upserts project-local `.eca/config.json` (server key `backseat-driver`). Auto-register writes portable `args`: wrapper `${env:HOME}/.config/calva/backseat-driver/calva-mcp-server.js` (vscode-mcp installs the wrapper into `~/.config/calva/backseat-driver` on MCP start — DEBUG symlink / release copy), port `.calva/mcp-server/port` (workspace-relative; always written on MCP start), and host as configured (`calva-backseat-driver.mcpHost`). Only managed fields `command` and `args` are updated; siblings (`disabled`, `env`, …) are preserved. Opt out with `calva-backseat-driver.autoRegisterEcaMcp` set to `false`. Stop does not remove the ECA entry. No Register-with-ECA command.
 
 ### Windsurf configuration
 
