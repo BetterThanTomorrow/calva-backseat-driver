@@ -25,7 +25,8 @@
                               :mcp/provide-edit-skill? true})]
       (is (= 2 (count skills)))
       (is (some #(= "backseat-driver" (:name %)) skills))
-      (is (some #(= "editing-clojure-files" (:name %)) skills))))
+      (is (some #(= "editing-clojure-files" (:name %)) skills))
+      (is (every? #(.endsWith (:uri %) "/SKILL.md") skills))))
 
   (testing "when only backseat-driver is enabled"
     (let [skills (get-skills {:mcp/provide-bd-skill? true

@@ -22,5 +22,5 @@ In a Joyride context, if the `joyride_evaluate_code` tool is available, "Use the
 
 ## Load the Skills
 
-Always load the `backseat-driver` skill when using Backseat Driver tools.
-Always load the `editing-clojure-files` skill when editing Clojure files.
+Always read MCP resource `skill://backseat-driver/SKILL.md` when using Backseat Driver tools.
+Always read MCP resource `skill://editing-clojure-files/SKILL.md` when editing Clojure files.
