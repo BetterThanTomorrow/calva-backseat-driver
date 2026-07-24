@@ -77,7 +77,7 @@ For subsystem contracts and architecture reference, load the `backseat-driver-in
   | enrichment_over_access: ¬reach_outside_for_state | use_placeholders
   | promise_returning → +_suffix | always_await
   | new_tool → manifest(package.json) + handler(requests.cljs) + vscode_tool(tools.cljs)
-  | new_skill → assets/skills/{name}/SKILL.md + package.json(chatSkills ∧ chatInstructions)
+  | new_skill → assets/skills/{name}/SKILL.md + package.json(chatSkills)
 
 λ when_to_edit_files.
   human_signals_ready ∧ repl_validated → edit_files

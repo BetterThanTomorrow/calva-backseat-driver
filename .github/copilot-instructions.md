@@ -19,7 +19,7 @@ This is ClojureScript on Node.js. Use the `cljs` session, not `clj`.
 
 ## Bundled AI Context (chatSkills / chatInstructions)
 
-Skills are dual-registered in `package.json` as both `chatSkills` (MCP resources) and `chatInstructions` (auto-injected). Skills are conditional on user settings (`provideBdSkill`, `provideEditSkill`); instructions are always injected.
+Skills are registered in `package.json` as `chatSkills` (Copilot skill loader + MCP resources). Short pointer instructions in `chatInstructions` are always injected. Skills are conditional on user settings (`provideBdSkill`, `provideEditSkill`).
 
 ## Key Development Commands
 

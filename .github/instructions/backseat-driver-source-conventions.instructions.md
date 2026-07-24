@@ -101,7 +101,7 @@ Tool manifests live once in `package.json` (`languageModelTools`). Both the MCP 
 ## Skill Authoring
 
 1. Create `assets/skills/{name}/SKILL.md` with YAML frontmatter (`name`, `description`)
-2. Register in `package.json` → `contributes.chatSkills` and `chatInstructions`
+2. Register in `package.json` → `contributes.chatSkills`
 3. MCP server picks it up automatically via `skills.cljs`
 
 ## Error Handling
