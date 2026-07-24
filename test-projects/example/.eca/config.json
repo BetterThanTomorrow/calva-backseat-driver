@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "backseat-driver": {
+      "command": "node",
+      "args": [
+        "${env:HOME}/.config/calva/backseat-driver/calva-mcp-server.js",
+        ".calva/mcp-server/port",
+        "127.0.0.1"
+      ]
+    }
+    //foo
+  }
+}
