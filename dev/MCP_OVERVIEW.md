@@ -30,7 +30,7 @@ Based on the MCP specification, our server will need:
 
 1. **Tool Definitions**: We'll define tools like `evaluate-code` that expose Calva's REPL functionality
 2. **Tool Execution Logic**: The actual implementation that connects to Calva's API
-3. **Resources**: Skills declared in `package.json` under `contributes.chatSkills` are exposed as MCP resources via `resources/list` and `resources/read` at `skill://{name}` URIs
+3. **Resources**: Skills declared in `package.json` under `contributes.chatSkills` are exposed as MCP resources via `resources/list` and `resources/read` at canonical `skill://{name}/SKILL.md` URIs (bare `skill://{name}` is a read alias). Discovery catalog: `skill://index.json` (read-only, not listed). Sibling files under each skill dir are readable via `resources/read` but not listed.
 4. **Dynamic Instructions**: The `initialize` response includes dynamically composed instructions reflecting available tools and skills
 5. **Server Setup**: Code to initialize and run the MCP server
 

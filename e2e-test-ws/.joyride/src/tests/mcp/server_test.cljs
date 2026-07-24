@@ -172,8 +172,8 @@
                 (str "Resource has a description: " (:name resource)))
             (is (= "text/markdown" (:mimeType resource))
                 (str "Resource mimeType is text/markdown: " (:name resource)))
-            (is (re-find #"^skill://.+$" (:uri resource))
-                (str "URI matches skill://{name} pattern: " (:uri resource)))))
+            (is (re-find #"/SKILL\.md$" (:uri resource))
+                (str "URI ends with canonical /SKILL.md: " (:uri resource)))))
         (p/catch (fn [e]
                    (js/console.error "[resources-list] Error:" (.-message e) e)
                    (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
