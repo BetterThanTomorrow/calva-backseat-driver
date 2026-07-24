@@ -4,4 +4,4 @@ description: 'Structural editing rules for Clojure files — read these instruct
 
 # Editing Clojure Files?
 
-You must read MCP resource `skill://editing-clojure-files/SKILL.md` and any user/workspace skill related to Clojure editing.
+You must load the `editing-clojure-files` skill and any user/workspace skill related to Clojure editing.
