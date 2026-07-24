@@ -172,10 +172,10 @@ When making multiple edits, work from highest line number to lowest (line number
 ### Skills and Instructions as Bundled Assets
 - `assets/skills/` and `assets/instructions/` are the canonical source for content bundled with the extension. When updating skill or instruction content, edit these files — not the installed extension copies under `~/.vscode*/extensions/`.
 - Skills declared in `package.json` under `contributes.chatSkills` are exposed as MCP resources
-- Discovery: `resources/list` returns skill name, description, and URI
-- Reading: `resources/read` at `skill://{name}` returns full skill content
-- Dynamic instructions: the `initialize` response includes instructions composed from available tools and skills
-- Implementation: `src/calva_backseat_driver/mcp/requests.cljs` — `skill-manifests`, `get-skills`, `compose-instructions`
+- Discovery: `resources/list` returns one entry per enabled skill (name, description, canonical URI `skill://{name}/SKILL.md`). For the full catalog, read `skill://index.json` via `resources/read` (not listed in `resources/list`; gated like list entries)
+- Reading: `resources/read` at `skill://{name}/SKILL.md` returns the skill entry point; bare `skill://{name}` is a read alias. Sibling files under the skill directory (e.g. `skill://{name}/references/…`) are readable but not listed
+- Dynamic instructions: the `initialize` response includes instructions composed from available tools and skills (full skill URIs; may mention `skill://index.json`)
+- Implementation: `vscode-mcp.manifest` (`get-resources`, `build-server-instructions`, index builder, sibling reads, skills extension capability) — wired from BD via `mcp/requests.cljs` and the vscode-mcp dependency pin
 
 ### Configuration Access
 Settings read via enrichment:
