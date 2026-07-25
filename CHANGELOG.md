@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.39] - 2026-07-25
+
 - Auto-register MCP server with [ECA](https://eca.dev/) (project-local `.eca/config.json`) when `calva-backseat-driver.autoRegisterEcaMcp` is enabled (default `true`)
 
 ## [v0.0.38] - 2026-07-07
