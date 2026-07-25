@@ -32,6 +32,8 @@ Match the user's request to the relevant section(s). When asked to "run a full t
 - **Output Log Queries** — requires some prior REPL evaluations to have populated the log
 - **Symbol Info and ClojureDocs** — requires session listing first
 - **Bracket Balancer** — no prerequisites, no REPL needed
+- **Bundled Skills** — no prerequisites; client-agnostic discovery/load check
+- **Skills Opt-Out** — requires toggling VS Code settings (manual)
 
 ### Delegation via `bd-tester`
 
@@ -560,6 +562,17 @@ Verify graceful degradation — tools should never crash, just provide informati
 - Clean up test files after validation
 - Never modify production source files for testing
 
+## Bundled Skills
+
+Backseat Driver ships `backseat-driver` and `editing-clojure-files` as bundled skills. Clients discover and load them differently (e.g. Copilot chat skills vs MCP resources) — do not prescribe a particular loading mechanism.
+
+**Test protocol**:
+1. Confirm both skills are discoverable through whatever skill/resource surfaces this client exposes for Backseat Driver.
+2. Load each skill's entry content and verify it arrives intact (readable frontmatter and body — not an error or empty payload).
+3. If a skill references sibling material (e.g. a references doc), load at least one sibling and confirm it is reachable the same way.
+
+**Validation**: Discovery and load should be straightforward — no hunting for undocumented entry points or workarounds. Note which surface you used (for diagnosis); the pass criterion is discoverability and successful load, not a specific API.
+
 ## Skills Opt-Out
 
 Backseat Driver provides skills conditionally. The `backseat-driver` and `editing-clojure-files` skills referenced in AGENTS.md are injected by BD into the agent's skills list only when enabled. They can be opted out, in which case they will not appear in the agent's `<skills>` section at all.
@@ -598,5 +611,7 @@ When reporting results, cover only the sections that were tested.
 **Load File**: File loads successfully in clj and bb sessions. Default routing works without explicit session key. Post-load functions are callable. Missing file produces clear error. Who attribution behavior is documented.
 
 **Legacy Calva**: Graceful degradation — informative feedback, no crashes.
+
+**Bundled Skills**: Skills discoverable and loadable via the client's normal skill/resource path; entry content (and at least one sibling, when applicable) intact.
 
 **Skills Opt-Out**: Skills appear/disappear based on settings.
