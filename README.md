@@ -1,5 +1,7 @@
 # Enabling Native AI Interactive Programming in VS Code
 
+[![MCP Toplist](https://mcptoplist.com/badge/mcp.so%2Fcalva-backseat-driver%2FBetterThanTomorrow.svg)](https://mcptoplist.com/server/mcp.so%2Fcalva-backseat-driver%2FBetterThanTomorrow)
+
 Clojure Tools for VS Code Agent harnesses. (Such as Copilot and Cursor.)
 
 [![VS Code Extension](https://img.shields.io/visual-studio-marketplace/v/betterthantomorrow.calva-backseat-driver)](https://marketplace.visualstudio.com/items?itemName=betterthantomorrow.calva-backseat-driver)
