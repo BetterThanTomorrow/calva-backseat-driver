@@ -13,6 +13,31 @@
                                   :mcp/eca-available? eca-available?
                                   :mcp/workspace-root-present? workspace-root-present?}))
 
+(defn- handle-init
+  [state auto-start-mcp? auto-register-cursor-mcp? auto-register-eca?]
+  {:ex/dxs [[:app/ax.register-command "calva-backseat-driver.startMcpServer"
+             [[:mcp/ax.start-server]]]
+            [:app/ax.register-command "calva-backseat-driver.stopMcpServer"
+             [[:mcp/ax.stop-server]]]
+            [:app/ax.register-command "calva-backseat-driver.registerMcpServerWithCursor"
+             [[:mcp/ax.register-with-cursor]]]
+            [:app/ax.register-command "calva-backseat-driver.openLogFile"
+             [[:mcp/ax.open-server-log]]]
+            [:app/ax.register-language-model-tools]
+            [:calva/ax.init-history]
+            [:calva/ax.when-activated [[:app/ax.init-output-listener]
+                                       [:calva/ax.subscribe-to-sessions-changed]]]
+            [:app/ax.set-when-context :calva-mcp-extension/activated?
+             true]
+            [:mcp/ax.sync-cursor-mcp-when-contexts]
+            (when (should-auto-start-mcp-server? auto-start-mcp?
+                                                 auto-register-cursor-mcp?
+                                                 (:mcp/cursor-mcp-available? state)
+                                                 auto-register-eca?
+                                                 (:mcp/eca-available? state)
+                                                 (:mcp/workspace-root-present? state))
+              [:mcp/ax.start-server {:silent? true}])]})
+
 (defn handle-action [state _context action]
   (match action
     [:app/ax.activate initial-state]
@@ -27,27 +52,7 @@
     [:app/ax.init {:auto-start-mcp? auto-start-mcp?
                    :auto-register-cursor-mcp? auto-register-cursor-mcp?
                    :auto-register-eca? auto-register-eca?}]
-    {:ex/dxs [[:app/ax.register-command "calva-backseat-driver.startMcpServer"
-               [[:mcp/ax.start-server]]]
-              [:app/ax.register-command "calva-backseat-driver.stopMcpServer"
-               [[:mcp/ax.stop-server]]]
-              [:app/ax.register-command "calva-backseat-driver.registerMcpServerWithCursor"
-               [[:mcp/ax.register-with-cursor]]]
-              [:app/ax.register-command "calva-backseat-driver.openLogFile"
-               [[:mcp/ax.open-server-log]]]
-              [:app/ax.register-language-model-tools]
-              [:calva/ax.init-history]
-              [:calva/ax.when-activated [[:app/ax.init-output-listener]]]
-              [:app/ax.set-when-context :calva-mcp-extension/activated?
-               true]
-              [:mcp/ax.sync-cursor-mcp-when-contexts]
-              (when (should-auto-start-mcp-server? auto-start-mcp?
-                                                   auto-register-cursor-mcp?
-                                                   (:mcp/cursor-mcp-available? state)
-                                                   auto-register-eca?
-                                                   (:mcp/eca-available? state)
-                                                   (:mcp/workspace-root-present? state))
-                [:mcp/ax.start-server {:silent? true}])]}
+    (handle-init state auto-start-mcp? auto-register-cursor-mcp? auto-register-eca?)
 
     [:app/ax.init-output-listener]
     {:ex/dxs [[:calva/ax.subscribe-to-output]]}

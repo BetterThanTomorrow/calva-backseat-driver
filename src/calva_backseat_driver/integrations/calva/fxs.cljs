@@ -79,6 +79,16 @@
                                                           :calva/on-output on-output})]
       (.push (.-subscriptions context) disposable))
 
+    [:calva/fx.subscribe-to-sessions-changed]
+    (do
+      (when-let [disposable (calva/on-sessions-changed
+                             (fn [event]
+                               (dispatch! context [[:calva/ax.sessions-changed
+                                                    (js->clj event :keywordize-keys true)]])))]
+        (.push (.-subscriptions context) disposable)
+        (dispatch! context [[:db/ax.update-in [:extension/disposables] conj disposable]]))
+      (dispatch! context [[:mcp/ax.update-registry]]))
+
     [:calva/fx.transact-output entity]
     (transact-output! entity)
 

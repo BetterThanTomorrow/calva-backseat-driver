@@ -73,6 +73,10 @@
                                      :mcp/provide-bd-skill? :vscode/config.provideBdSkill
                                      :mcp/provide-edit-skill? :vscode/config.provideEditSkill} request]]})
 
+(defn- handle-update-registry [state]
+  {:ex/fxs [[:mcp/fx.update-registry
+             {:mcp/wrapper-config-path (:mcp/wrapper-config-path state)}]]})
+
 (defn handle-action [state _context action]
   (match action
     [:mcp/ax.start-server & _]
@@ -107,6 +111,9 @@
 
     [:mcp/ax.handle-request request]
     (handle-mcp-request request)
+
+    [:mcp/ax.update-registry]
+    (handle-update-registry state)
 
     :else
     {:ex/fxs [[:node/fx.log-error "Unknown action:" (pr-str action)]]}))

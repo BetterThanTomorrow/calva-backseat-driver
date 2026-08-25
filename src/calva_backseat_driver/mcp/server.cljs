@@ -3,6 +3,9 @@
    ["os" :as os]
    ["path" :as path]
    ["vscode" :as vscode]
+   [calva-backseat-driver.integrations.calva.api :as calva]
+   [calva-backseat-driver.integrations.calva.session-runtimes :as session-runtimes]
+   [promesa.core :as p]
    [vscode-mcp.core :as vscode-mcp]))
 
 (defn- get-workspace-root-uri-or-nil []
@@ -22,6 +25,14 @@
 
 (defn- get-cursor-port-file-uri [instance-slug]
   (vscode/Uri.file (path/join (os/tmpdir) "calva-mcp-server" instance-slug "port")))
+
+(defn- registry-custom-data+
+  [_state]
+  (-> (p/let [list-fn (get-in calva/calva-api [:repl :listSessionsAndRuntimes])
+              sessions-js (when list-fn (list-fn))
+              sessions (or (js->clj sessions-js :keywordize-keys true) [])]
+        {:sessions (mapv session-runtimes/compact-registry-session sessions)})
+      (p/catch (fn [_] {:sessions []}))))
 
 (defn build-lifecycle-config
   "Builds a `vscode-mcp.core` config from current settings and BD's
@@ -52,6 +63,8 @@
       :lifecycle/request-port (fn [_ctx {:lifecycle/keys [cursor-mode?]}]
                                 (if cursor-mode? 0 (.get settings "mcpSocketServerPort")))
       :lifecycle/wrapper-install-dir wrapper-config-path
+      :registry/enabled? true
+      :registry/custom-data+ registry-custom-data+
       :lifecycle/on-starting-changed (fn [starting?]
                                        (dispatch! context [[:app/ax.set-when-context :calva-backseat-driver/starting? starting?]]))
       :lifecycle/on-stopping-changed (fn [stopping?]
