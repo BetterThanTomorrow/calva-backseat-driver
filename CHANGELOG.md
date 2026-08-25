@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- [Add an MCP server registry so external agents can discover running Backseat Driver windows](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/63)
+
 ## [v0.0.39] - 2026-07-25
 
 - Auto-register MCP server with [ECA](https://eca.dev/) (project-local `.eca/config.json`) when `calva-backseat-driver.autoRegisterEcaMcp` is enabled (default `true`)
