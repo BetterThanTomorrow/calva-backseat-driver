@@ -140,6 +140,9 @@
   (testing "file URI becomes filesystem path"
     (is (= "/Users/pez/Projects/my-app"
            (session-runtimes/project-root-fs-path "file:///Users/pez/Projects/my-app"))))
+  (testing "percent-encoded file URI"
+    (is (= "/Users/pez/Projects/my app"
+           (session-runtimes/project-root-fs-path "file:///Users/pez/Projects/my%20app"))))
   (testing "already-absolute path is unchanged"
     (is (= "/Users/pez/Projects/my-app"
            (session-runtimes/project-root-fs-path "/Users/pez/Projects/my-app"))))
