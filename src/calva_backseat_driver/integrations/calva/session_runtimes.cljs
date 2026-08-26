@@ -39,6 +39,15 @@
     (project-build-full build)
     (project-build-compact build)))
 
+(defn- file-url->fs-path
+  [file-url]
+  (try
+    (url/fileURLToPath file-url)
+    (catch :default _
+      (-> file-url
+          (string/replace #"^file://" "")
+          js/decodeURIComponent))))
+
 (defn project-root-fs-path
   "Absolute filesystem path for a Calva `projectRoot` (file URI or path)."
   [project-root]
@@ -46,7 +55,7 @@
     (nil? project-root) nil
     (string? project-root)
     (if (string/starts-with? project-root "file:")
-      (url/fileURLToPath project-root)
+      (file-url->fs-path project-root)
       project-root)
     (map? project-root)
     (or (:fsPath project-root) (:path project-root))
