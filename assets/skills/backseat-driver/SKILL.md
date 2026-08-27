@@ -207,6 +207,10 @@ Use Backseat Driver's structural editing tools for all Clojure file modification
 In a Joyride context, if the `joyride_evaluate_code` tool is available, "Use the REPL" means `joyride_evaluate_code`. In lieu of the `joyride_evaluate_code` tool, use the `clojure_evaluate_tool`. Joyride's REPL runs in the VS Code Extension Host and is promise-aware in ways that Backseat Driver's REPL is not — using Backseat Driver's eval for Joyride code leads to async problems. Other tools of Backseat Driver (ClojureDocs, symbol info, structural editing, output log) remain useful.
 
 
+## External harness attach
+
+When the user asks how to connect an external harness, bot, or other editor to this workstation's Backseat Driver MCP: registry home is `~/.config/vscode-mcp/registry`. Point the agent at that directory. After a normal install, `README.md`, `AGENTS.md`, and `bb.edn` are present. If the first GitHub fetch failed with nothing usable on disk yet, stub docs at registry home explain what happened and point at `windows/` until a later fetch installs the listing tree. The attach steps live in that directory's `AGENTS.md`.
+
 ## Invariants
 
 - Verify core function semantics via `clojuredocs_info` before use
