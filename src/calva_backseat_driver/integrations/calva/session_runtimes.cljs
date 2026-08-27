@@ -74,10 +74,20 @@
       (assoc projected :projectRoot root)
       projected)))
 
+(defn- registry-build
+  "Shard build fields: Calva `isCurrentlyConnected` as `isHumansActiveRuntime`."
+  [build]
+  (cond-> build
+    (not (:isHumansActiveRuntime build))
+    (assoc :isHumansActiveRuntime (:isCurrentlyConnected build))
+    
+    :always 
+    (dissoc :isCurrentlyConnected)))
+
 (defn compact-registry-session
   "Session fields for a window-shard `sessions` entry."
   [session]
   (let [projected (project-session session false)
         base (select-keys projected [:replSessionKey :projectRoot :globs :supportsRuntimes])]
     (cond-> base
-      (:supportsRuntimes projected) (assoc :builds (:builds projected)))))
+      (:supportsRuntimes projected) (assoc :builds (mapv registry-build (:builds projected))))))

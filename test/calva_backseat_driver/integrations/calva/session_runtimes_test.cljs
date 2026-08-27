@@ -177,11 +177,14 @@
   (testing "includes compact builds when supportsRuntimes"
     (let [session {:replSessionKey "cljs"
                    :supportsRuntimes true
-                   :projectRoot "/Users/pez/Projects/my-app"
+                   :projectRoot "file:///Users/pez/Projects/my-app"
                    :globs ["**/*.cljs"]
                    :builds [(assoc sample-build-base :runtimes [sample-runtime-raw])]}
-          result (session-runtimes/compact-registry-session session)]
+          result (session-runtimes/compact-registry-session session)
+          build (first (:builds result))]
       (is (= "cljs" (:replSessionKey result)))
       (is (= 1 (count (:builds result))))
-      (is (nil? (:runtimes (first (:builds result)))))
-      (is (= 1 (:runtimeCount (first (:builds result))))))))
+      (is (nil? (:runtimes build)))
+      (is (= 1 (:runtimeCount build)))
+      (is (true? (:isHumansActiveRuntime build)))
+      (is (not (contains? build :isCurrentlyConnected))))))
