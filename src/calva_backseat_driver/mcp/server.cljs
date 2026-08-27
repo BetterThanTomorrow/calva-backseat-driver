@@ -43,7 +43,7 @@
   (let [settings (vscode/workspace.getConfiguration "calva-backseat-driver")]
     (vscode-mcp/create-config
      {:vscode/extension-context context
-      :cursor/server-name "backseat-driver"
+      :cursor/server-name "calva-backseat-driver"
       :cursor/script-relative-path "dist/calva-mcp-server.js"
       :mcp/auto-start? (.get settings "autoStartMCPServer")
       :mcp/auto-register? (.get settings "autoRegisterCursorMcp")
