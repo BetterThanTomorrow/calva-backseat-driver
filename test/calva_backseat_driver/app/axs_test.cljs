@@ -51,3 +51,17 @@
       (is (not (some #(and (vector? %) (= :mcp/ax.start-server (first %)))
                      (:ex/dxs result)))
           "does not start when only ECA is available but setting is off"))))
+
+(deftest app-init-subscribes-to-session-changes-test
+  (testing "subscribes to Calva session changes after Calva activates"
+    (let [result (app-axs/handle-action {}
+                                        {}
+                                        [:app/ax.init {:auto-start-mcp? false
+                                                       :auto-register-cursor-mcp? false
+                                                       :auto-register-eca? false}])
+          when-activated (some #(when (and (vector? %)
+                                           (= :calva/ax.when-activated (first %)))
+                                  %)
+                               (:ex/dxs result))]
+      (is (some #{[:calva/ax.subscribe-to-sessions-changed]}
+                (second when-activated))))))

@@ -59,6 +59,7 @@ When `clojure_list_sessions` shows `supportsRuntimes: true` on a session:
 - User-defined builds use keyword names (e.g. `:app`); infrastructure builds use bare names (e.g. `node-repl`, `browser-repl`). Both are listed.
 - Optional `includeAllRuntimes: true` on `clojure_list_sessions` adds full `runtimes[]` per build when you need every connected tab/process description.
 - Optional `targetRuntimeId` on `clojure_evaluate_code` evaluates on a specific runtime without changing the editor's connected runtime. Get IDs from `clojure_list_sessions`.
+- NB: Unknown or stale `targetRuntimeId` evaluates on the editor-connected runtime (no error).
 - `lastActivity: null` means no Calva evaluation on that runtime this session yet.
 - When the user must choose among similar runtimes, present each runtime's `description`.
 - Choose default runtime (which is the user's currently selected runtime) or explicit targeting based on context.
@@ -205,6 +206,10 @@ Use Backseat Driver's structural editing tools for all Clojure file modification
 
 In a Joyride context, if the `joyride_evaluate_code` tool is available, "Use the REPL" means `joyride_evaluate_code`. In lieu of the `joyride_evaluate_code` tool, use the `clojure_evaluate_tool`. Joyride's REPL runs in the VS Code Extension Host and is promise-aware in ways that Backseat Driver's REPL is not — using Backseat Driver's eval for Joyride code leads to async problems. Other tools of Backseat Driver (ClojureDocs, symbol info, structural editing, output log) remain useful.
 
+
+## External harness attach
+
+When the user asks how to connect an external harness, bot, or other editor to this workstation's Backseat Driver MCP: registry home is `~/.config/vscode-mcp/registry`. Point the agent at that directory. After a normal install the listing tree includes `README.md`, `AGENTS.md`, `bb-mcp.md`, `bb.edn`, `scripts/list_registry.clj`, `scripts/mcp.clj`, and `scripts/mcp_briefing.clj`. `AGENTS.md` owns session attach. `bb-mcp.md` owns `bb mcp`; the first `bb mcp` command is `--readme`. First-fail stubs still omit `bb mcp` / `bb.edn` and point at `windows/`.
 
 ## Invariants
 
