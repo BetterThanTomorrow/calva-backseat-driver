@@ -63,7 +63,7 @@
       :lifecycle/request-port (fn [_ctx {:lifecycle/keys [cursor-mode?]}]
                                 (if cursor-mode? 0 (.get settings "mcpSocketServerPort")))
       :lifecycle/wrapper-install-dir wrapper-config-path
-      :registry/enabled? true
+      :registry/enabled? (not (false? (.get settings "enableMcpRegistry")))
       :registry/custom-data+ registry-custom-data+
       :lifecycle/on-starting-changed (fn [starting?]
                                        (dispatch! context [[:app/ax.set-when-context :calva-backseat-driver/starting? starting?]]))

@@ -64,6 +64,12 @@
           "markdownDescription": "When the ECA extension is installed, automatically register the Backseat Driver MCP server in the project-local `.eca/config.json`.",
           "scope": "resource"
         },
+        "calva-backseat-driver.enableMcpRegistry": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Write a live registry entry so external agents can discover and understand how to connect this window's MCP server (`bb list` at `~/.config/vscode-mcp/registry`). Enabled by default. Changes takes effect on the next MCP server start.",
+          "scope": "resource"
+        },
         "calva-backseat-driver.mcpSocketServerPort": {
           "type": "number",
           "default": 0,
