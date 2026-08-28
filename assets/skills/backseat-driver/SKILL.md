@@ -209,7 +209,7 @@ In a Joyride context, if the `joyride_evaluate_code` tool is available, "Use the
 
 ## External harness attach
 
-When the user asks how to connect an external harness, bot, or other editor to this workstation's Backseat Driver MCP: registry home is `~/.config/vscode-mcp/registry`. Point the agent at that directory. After a normal install the listing tree includes `README.md`, `AGENTS.md`, `bb-mcp.md`, `bb.edn`, `scripts/list_registry.clj`, and `scripts/mcp.clj`. `AGENTS.md` owns session attach (spawn the wrapper or write client config). `bb-mcp.md` owns `bb mcp` when the agent cannot hold a normal MCP session. First-fail stubs still omit `bb mcp` / `bb.edn`; stub docs at registry home explain that and point at `windows/` until a later fetch installs the listing tree.
+When the user asks how to connect an external harness, bot, or other editor to this workstation's Backseat Driver MCP: registry home is `~/.config/vscode-mcp/registry`. Point the agent at that directory. After a normal install the listing tree includes `README.md`, `AGENTS.md`, `bb-mcp.md`, `bb.edn`, `scripts/list_registry.clj`, `scripts/mcp.clj`, and `scripts/mcp_briefing.clj`. `AGENTS.md` owns session attach. `bb-mcp.md` owns `bb mcp`; the first `bb mcp` command is `--readme`. First-fail stubs still omit `bb mcp` / `bb.edn` and point at `windows/`.
 
 ## Invariants
 
