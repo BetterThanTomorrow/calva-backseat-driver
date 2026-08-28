@@ -163,9 +163,9 @@
 (defn- initialize-base-text [options]
   (let [{:mcp/keys [repl-enabled?]} options]
     (str  "Always load the backseat-driver skill. "
-     "You have access to the `clojure_edit_files` structural editing tool (replace, insert, append, create) with automatic bracket balancing."
-     (when repl-enabled?
-       " You can evaluate Clojure/ClojureScript code via the `clojure_evaluate_code` tool, load entire files into the REPL with `clojure_load_file`, check REPL output with `clojure_repl_output_log`, look up symbol info, and query clojuredocs.org."))))
+          "You have access to the `clojure_edit_files` structural editing tool (replace, insert, append, create) with automatic bracket balancing."
+          (when repl-enabled?
+            " You can evaluate Clojure/ClojureScript code via the `clojure_evaluate_code` tool, load entire files into the REPL with `clojure_load_file`, check REPL output with `clojure_repl_output_log`, look up symbol info, and query clojuredocs.org."))))
 
 (defn- request-opts [options]
   {:settings (settings-map options)
