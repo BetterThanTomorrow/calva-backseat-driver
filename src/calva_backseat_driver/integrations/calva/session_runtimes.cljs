@@ -80,8 +80,8 @@
   (cond-> build
     (not (:isHumansActiveRuntime build))
     (assoc :isHumansActiveRuntime (:isCurrentlyConnected build))
-    
-    :always 
+
+    :always
     (dissoc :isCurrentlyConnected)))
 
 (defn compact-registry-session
