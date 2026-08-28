@@ -13,6 +13,12 @@
     [:calva/ax.subscribe-to-output]
     {:ex/fxs [[:calva/fx.subscribe-to-output [:calva/ax.add-output]]]}
 
+    [:calva/ax.subscribe-to-sessions-changed]
+    {:ex/fxs [[:calva/fx.subscribe-to-sessions-changed]]}
+
+    [:calva/ax.sessions-changed _event]
+    {:ex/dxs [[:mcp/ax.update-registry]]}
+
     [:calva/ax.add-output message]
     (let [line (inc (:calva/output-line-counter state 0))
           shadow-build (calva-values/map-field-value message :shadowBuild)

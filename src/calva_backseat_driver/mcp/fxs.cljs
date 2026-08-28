@@ -8,6 +8,11 @@
    [vscode-mcp.core :as vscode-mcp]
    [vscode-mcp.server :as mcp-server]))
 
+(defn- update-registry!
+  [dispatch! context options]
+  (vscode-mcp/update-registry!+
+   (server/build-lifecycle-config dispatch! context (:mcp/wrapper-config-path options))))
+
 (defn perform-effect! [dispatch! ^js context effect]
   (match effect
     [:mcp/fx.lifecycle-start options]
@@ -57,6 +62,9 @@
     [:mcp/fx.handle-request options request]
     (requests/handle-request-fn (assoc options :ex/dispatch! (partial dispatch! context)
                                        :vscode/extension-context context) request)
+
+    [:mcp/fx.update-registry options]
+    (update-registry! dispatch! context options)
 
     :else
     (js/console.warn "Unknown MCP effect:" (pr-str effect))))

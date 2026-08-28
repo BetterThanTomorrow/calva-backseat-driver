@@ -14,6 +14,12 @@
   []
   (some-> calvaExt .-packageJSON .-version))
 
+(defn on-sessions-changed
+  "Subscribe to Calva session/runtime change notifications. Returns a Disposable, or nil."
+  [listener]
+  (when-let [subscribe (get-in calva-api [:repl :onSessionsChanged])]
+    (subscribe listener)))
+
 (defn when-calva-activated [{:ex/keys [dispatch! then]}]
   (let [!interval-id (atom nil)]
     (reset! !interval-id (js/setInterval (fn []

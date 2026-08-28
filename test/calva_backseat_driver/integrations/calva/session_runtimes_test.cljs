@@ -133,3 +133,58 @@
     (let [session {:replSessionKey "clj" :supportsRuntimes false :currentRoutedTarget false}
           result (session-runtimes/project-session session false)]
       (is (= false (:currentRoutedTarget result))))))
+
+(deftest project-root-fs-path-test
+  (testing "nil stays nil"
+    (is (nil? (session-runtimes/project-root-fs-path nil))))
+  (testing "file URI becomes filesystem path"
+    (is (= "/Users/pez/Projects/my-app"
+           (session-runtimes/project-root-fs-path "file:///Users/pez/Projects/my-app"))))
+  (testing "percent-encoded file URI"
+    (is (= "/Users/pez/Projects/my app"
+           (session-runtimes/project-root-fs-path "file:///Users/pez/Projects/my%20app"))))
+  (testing "already-absolute path is unchanged"
+    (is (= "/Users/pez/Projects/my-app"
+           (session-runtimes/project-root-fs-path "/Users/pez/Projects/my-app"))))
+  (testing "map with fsPath"
+    (is (= "/ws" (session-runtimes/project-root-fs-path {:fsPath "/ws"})))))
+
+(deftest project-session-resolves-project-root-test
+  (testing "file URI projectRoot is stored as fsPath"
+    (let [session {:replSessionKey "clj"
+                   :supportsRuntimes false
+                   :projectRoot "file:///Users/pez/Projects/my-app"
+                   :globs ["**/*.clj"]}
+          result (session-runtimes/project-session session false)]
+      (is (= "/Users/pez/Projects/my-app" (:projectRoot result)))
+      (is (= ["**/*.clj"] (:globs result))))))
+
+(deftest compact-registry-session-test
+  (testing "drops editor-only session fields"
+    (let [session {:replSessionKey "clj"
+                   :supportsRuntimes false
+                   :projectRoot "file:///Users/pez/Projects/my-app"
+                   :globs ["**/*.clj"]
+                   :currentRoutedTarget true
+                   :replType "clj"
+                   :lastActivity 1}
+          result (session-runtimes/compact-registry-session session)]
+      (is (= {:replSessionKey "clj"
+              :projectRoot "/Users/pez/Projects/my-app"
+              :globs ["**/*.clj"]
+              :supportsRuntimes false}
+             result))))
+  (testing "includes compact builds when supportsRuntimes"
+    (let [session {:replSessionKey "cljs"
+                   :supportsRuntimes true
+                   :projectRoot "file:///Users/pez/Projects/my-app"
+                   :globs ["**/*.cljs"]
+                   :builds [(assoc sample-build-base :runtimes [sample-runtime-raw])]}
+          result (session-runtimes/compact-registry-session session)
+          build (first (:builds result))]
+      (is (= "cljs" (:replSessionKey result)))
+      (is (= 1 (count (:builds result))))
+      (is (nil? (:runtimes build)))
+      (is (= 1 (:runtimeCount build)))
+      (is (true? (:isHumansActiveRuntime build)))
+      (is (not (contains? build :isCurrentlyConnected))))))

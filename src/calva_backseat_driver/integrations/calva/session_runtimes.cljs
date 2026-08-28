@@ -1,4 +1,7 @@
-(ns calva-backseat-driver.integrations.calva.session-runtimes)
+(ns calva-backseat-driver.integrations.calva.session-runtimes
+  (:require
+   ["url" :as url]
+   [clojure.string :as string]))
 
 (def ^:private runtime-fields
   [:runtimeId :description :buildId :host :lastActivity])
@@ -36,12 +39,52 @@
     (project-build-full build)
     (project-build-compact build)))
 
+(defn- file-url->fs-path
+  [file-url]
+  (try
+    (url/fileURLToPath file-url)
+    (catch :default _
+      (-> file-url
+          (string/replace #"^file://" "")
+          js/decodeURIComponent))))
+
+(defn project-root-fs-path
+  "Absolute filesystem path for a Calva `projectRoot` (file URI or path)."
+  [project-root]
+  (cond
+    (nil? project-root) nil
+    (string? project-root)
+    (if (string/starts-with? project-root "file:")
+      (file-url->fs-path project-root)
+      project-root)
+    (map? project-root)
+    (or (:fsPath project-root) (:path project-root))
+    :else (str project-root)))
+
 (defn project-session
   "Project a session map; omit :builds when :supportsRuntimes is false."
   [session include-all-runtimes?]
-  (if (:supportsRuntimes session)
-    (-> session
-        (dissoc :builds)
-        (assoc :builds (mapv #(project-build % include-all-runtimes?)
-                             (or (:builds session) []))))
-    (dissoc session :builds)))
+  (let [projected (if (:supportsRuntimes session)
+                    (-> session
+                        (dissoc :builds)
+                        (assoc :builds (mapv #(project-build % include-all-runtimes?)
+                                             (or (:builds session) []))))
+                    (dissoc session :builds))]
+    (if-let [root (project-root-fs-path (:projectRoot session))]
+      (assoc projected :projectRoot root)
+      projected)))
+
+(defn- registry-build
+  "Registry build fields: Calva `isCurrentlyConnected` as `isHumansActiveRuntime`."
+  [build]
+  (-> build
+      (assoc :isHumansActiveRuntime (boolean (:isCurrentlyConnected build)))
+      (dissoc :isCurrentlyConnected)))
+
+(defn compact-registry-session
+  "Session fields for a registry-entry `sessions` entry."
+  [session]
+  (let [projected (project-session session false)
+        base (select-keys projected [:replSessionKey :projectRoot :globs :supportsRuntimes])]
+    (cond-> base
+      (:supportsRuntimes projected) (assoc :builds (mapv registry-build (:builds projected))))))

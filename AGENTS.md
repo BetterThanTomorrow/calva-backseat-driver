@@ -2,6 +2,8 @@
 
 ClojureScript VS Code extension providing REPL access to AI agents via Language Model API and MCP. Enables Interactive Programming where AI evaluates code in the user's running environment rather than guessing.
 
+When authoring code and test, ask yourself: Will this and the tests work on Windows too?
+
 ## Essential Architecture
 
 ### Action/Effect System ("Ex")
@@ -34,7 +36,8 @@ The `app-db` atom contains:
 ### Calva API Integration
 Available at `calva-backseat-driver.integrations.calva.api/calva-api`:
 ```clojure
-{:repl     {:evaluateCode, :currentSessionKey, :onOutputLogged}
+{:repl     {:evaluateCode, :currentSessionKey, :onOutputLogged
+            :listSessionsAndRuntimes, :onSessionsChanged}
  :ranges   {:currentTopLevelForm, :currentEnclosingForm, ...}
  :editor   {:replace}
  :document {:getNamespace, :getNamespaceAndNsForm}
@@ -154,6 +157,7 @@ When making multiple edits, work from highest line number to lowest (line number
 - Port file: `${workspaceFolder}/.calva/mcp-server/port`
 - stdio wrapper (`dist/calva-mcp-server.js`) relays stdio ↔ socket — built from `vscode-mcp` via shadow-cljs `:stdio-wrapper` (`vscode-mcp.stdio.wrapper/main`). Connect-retry: waits up to 60 s for port file + TCP connect, re-reading the port file each attempt; stdin is buffered during the wait and flushed on connect. Conditional reload: silent activations skip `mcp.reloadClient` when config is unchanged (via `vscode-mcp`); the dev hot-reload path passes `:lifecycle/silent? true` in `integrations/vscode/cursor.cljs`
 - One server per workspace folder
+- Window registry: `:registry/enabled?` from setting `enableMcpRegistry` (default true) in `mcp/server.cljs` `build-lifecycle-config`; `:registry/custom-data+` queries Calva `listSessionsAndRuntimes` and writes compact sessions. Entry path: `~/.config/vscode-mcp/registry/windows/backseat-driver-<window-id>.json`. Session changes go through `[:calva/ax.sessions-changed]` → `[:mcp/ax.update-registry]` → `(vscode-mcp.core/update-registry!+ config)`
 
 ### Cursor registration lifecycle
 - Manual stop unregisters from Cursor and sets `:lifecycle/needs-cursor-reregister?`; next start waits for socket readiness then forces client reload (`vscode-mcp.server-readiness`, `policy/should-reload-client?`)
@@ -186,6 +190,7 @@ Settings read via enrichment:
 :vscode/config.autoStartMCPServer       ; boolean
 :vscode/config.autoRegisterCursorMcp    ; boolean (default true)
 :vscode/config.autoRegisterEcaMcp       ; boolean (default true)
+:vscode/config.enableMcpRegistry        ; boolean (default true) — write window registry entries
 :vscode/config.provideBdSkill           ; boolean (default true) — enable/disable Backseat Driver skill
 :vscode/config.provideEditSkill         ; boolean (default true) — enable/disable structural editing skill
 ```

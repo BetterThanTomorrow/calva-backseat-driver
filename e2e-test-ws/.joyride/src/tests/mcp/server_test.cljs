@@ -272,14 +272,14 @@
               "Initialize response has instructions string")
           (is (seq instructions)
               "Instructions are not empty")
+          (is (re-find #"tools/list" instructions)
+              "Instructions mention tools/list")
           (is (re-find #"resources/list" instructions)
               "Instructions mention resources/list")
           (is (re-find #"resources/read" instructions)
               "Instructions mention resources/read")
-          (is (re-find #"backseat-driver" instructions)
-              "Instructions mention backseat-driver skill")
-          (is (re-find #"editing-clojure-files" instructions)
-              "Instructions mention editing-clojure-files skill"))
+          (is (re-find #"skill://index.json" instructions)
+              "Instructions mention skill://index.json"))
         (p/catch (fn [e]
                    (js/console.error "[init-instructions] Error:" (.-message e) e)
                    (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
@@ -325,7 +325,6 @@
                       (is (= -32602 (get-in read-result [:error :code]))
                           "Error code should be -32602 for disabled skill")
 
-                      ;; Test initialize — instructions should not mention disabled skill content
                       (p/let [init-response (mcp/send-request socket
                                                               {:jsonrpc "2.0"
                                                                :id 4
@@ -334,10 +333,12 @@
                                                (js->clj :keywordize-keys true)
                                                (get-in [:result :instructions]))
                               _ (js/console.log "[conditional-skills] Instructions length:" (count instructions))]
-                        (is (not (re-find #"Effective use of the Backseat Driver" instructions))
-                            "Instructions should not include the disabled backseat-driver skill description")
-                        (is (re-find #"Structural editing of Clojure files" instructions)
-                            "Instructions should include the enabled editing-clojure-files skill description")))
+                        (is (re-find #"tools/list" instructions)
+                            "Instructions mention tools/list")
+                        (is (re-find #"resources/list" instructions)
+                            "Instructions mention resources/list")
+                        (is (not (re-find #"Effective use of the Backseat Driver|Structural editing of Clojure files" instructions))
+                            "Instructions do not include skill descriptions")))
                   _ (mcp/stop-mcp-session! socket)]
             nil)
           (p/finally (fn []
