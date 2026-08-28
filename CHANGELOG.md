@@ -4,7 +4,9 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
-- [Add an MCP server registry so external agents can discover running Backseat Driver windows](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/63)
+- [Add an MCP server registry so external agents can discover running Backseat Driver windows](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/63). The registry has an AI agent interface, mainly through:
+  - **bb list**: Discover and find connect information. *Ask your AI agent to connect you, and it will do it.*
+  - **bb mcp**: A one-request-at-the-time command that speaks MCP-ish. For bots and agents that can't run an MCP connector on the VS Code machine (e.g. Grok Bots, at the time of this writing)
 
 ## [v0.0.39] - 2026-07-25
 
