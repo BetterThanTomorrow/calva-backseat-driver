@@ -8,13 +8,13 @@ Backseat Driver runs a socket server inside the VS Code Extension Host and write
 
 There is one Backseat Driver MCP server per workspace. The port file will be created at `<workspace-root>/.calva/mcp-server/port`. Change the preferred port with `calva-backseat-driver.mcpSocketServerPort`. Use `0` (default) to always pick a random available port.
 
-While the socket is running, Backseat Driver also writes a live JSON shard to `~/.config/vscode-mcp/registry/windows/backseat-driver-<window-id>.json`. External agents (bots, phone clients, other machines that can see that home directory) can scan the folder, treat a shard as live when its `pid` is still running and `updatedAt` is less than 60 seconds old, then attach with:
+While the socket is running, Backseat Driver also writes a live JSON entry to `~/.config/vscode-mcp/registry/windows/backseat-driver-<window-id>.json`. External agents (bots, phone clients, other machines that can see that home directory) can scan the folder, treat an entry as live when its `pid` is still running and `updatedAt` is less than 60 seconds old, then attach with:
 
 ```
 node <mcp.wrapperPath> <mcp.portFilePath> <mcp.host>
 ```
 
-`sessions` on the shard is compact (`replSessionKey`, absolute `projectRoot`, `globs`, and a short runtime summary). Query full Shadow-cljs runtimes via MCP after you attach.
+`sessions` on the entry is compact (`replSessionKey`, absolute `projectRoot`, `globs`, and a short runtime summary). Query full Shadow-cljs runtimes via MCP after you attach.
 
 ## What you need to do
 

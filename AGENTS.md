@@ -157,7 +157,7 @@ When making multiple edits, work from highest line number to lowest (line number
 - Port file: `${workspaceFolder}/.calva/mcp-server/port`
 - stdio wrapper (`dist/calva-mcp-server.js`) relays stdio ↔ socket — built from `vscode-mcp` via shadow-cljs `:stdio-wrapper` (`vscode-mcp.stdio.wrapper/main`). Connect-retry: waits up to 60 s for port file + TCP connect, re-reading the port file each attempt; stdin is buffered during the wait and flushed on connect. Conditional reload: silent activations skip `mcp.reloadClient` when config is unchanged (via `vscode-mcp`); the dev hot-reload path passes `:lifecycle/silent? true` in `integrations/vscode/cursor.cljs`
 - One server per workspace folder
-- Window shard registry: `:registry/enabled? true` in `mcp/server.cljs` `build-lifecycle-config`; `:registry/custom-data+` queries Calva `listSessionsAndRuntimes` and writes compact sessions. Shard path: `~/.config/vscode-mcp/registry/windows/backseat-driver-<window-id>.json`. Session changes go through `[:calva/ax.sessions-changed]` → `[:mcp/ax.update-registry]` → `(vscode-mcp.core/update-registry!+ config)`
+- Window registry: `:registry/enabled? true` in `mcp/server.cljs` `build-lifecycle-config`; `:registry/custom-data+` queries Calva `listSessionsAndRuntimes` and writes compact sessions. Entry path: `~/.config/vscode-mcp/registry/windows/backseat-driver-<window-id>.json`. Session changes go through `[:calva/ax.sessions-changed]` → `[:mcp/ax.update-registry]` → `(vscode-mcp.core/update-registry!+ config)`
 
 ### Cursor registration lifecycle
 - Manual stop unregisters from Cursor and sets `:lifecycle/needs-cursor-reregister?`; next start waits for socket readiness then forces client reload (`vscode-mcp.server-readiness`, `policy/should-reload-client?`)
