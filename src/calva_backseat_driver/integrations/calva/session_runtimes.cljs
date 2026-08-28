@@ -77,12 +77,9 @@
 (defn- registry-build
   "Registry build fields: Calva `isCurrentlyConnected` as `isHumansActiveRuntime`."
   [build]
-  (cond-> build
-    (not (:isHumansActiveRuntime build))
-    (assoc :isHumansActiveRuntime (:isCurrentlyConnected build))
-
-    :always
-    (dissoc :isCurrentlyConnected)))
+  (-> build
+      (assoc :isHumansActiveRuntime (boolean (:isCurrentlyConnected build)))
+      (dissoc :isCurrentlyConnected)))
 
 (defn compact-registry-session
   "Session fields for a registry-entry `sessions` entry."
