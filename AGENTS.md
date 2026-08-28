@@ -2,7 +2,7 @@
 
 ClojureScript VS Code extension providing REPL access to AI agents via Language Model API and MCP. Enables Interactive Programming where AI evaluates code in the user's running environment rather than guessing.
 
-Ask yourself: Will this and the tests work on Windows too?
+When authoring code and test, ask yourself: Will this and the tests work on Windows too?
 
 ## Essential Architecture
 
