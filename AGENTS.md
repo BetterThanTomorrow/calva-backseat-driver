@@ -47,11 +47,17 @@ Available at `calva-backseat-driver.integrations.calva.api/calva-api`:
 ## Development Workflow
 
 ### REPL Setup (ClojureScript)
+
+Co-dev tower (vscode-mcp sibling): (1) git pin in `deps.edn`, (2) `:local-dev` overlay, (3) npm scripts — `watch`/`compile` = pin, `watch:local` = local, (4) VS Code tasks — default **Watch** → `watch:local`, pinned → `watch`. Task `"script"` names must exist in `package.json`.
+
 ```bash
-npm run watch           # shadow-cljs + nREPL, auto-runs tests
+npm run watch           # git SHA pin from deps.edn
+npm run watch:local     # shadow-cljs + nREPL via :local-dev (sibling ../vscode-mcp)
 # Connect Calva: Ctrl+Alt+C Ctrl+Alt+C
 # Launch Extension Host: F5
 ```
+
+Day-to-day co-development: run the default **Watch** task (`watch:local`), not `npm run watch`. After vscode-mcp is pushed, bump `:git/sha` in `deps.edn`. Use **Watch (pinned vscode-mcp)** or `npm run watch` to verify the pin.
 
 **Critical**: This is a ClojureScript project running in VS Code Extension Host (Node.js). Use `cljs` REPL session, not `clj`.
 
