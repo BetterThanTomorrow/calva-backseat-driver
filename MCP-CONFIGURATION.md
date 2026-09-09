@@ -4,9 +4,9 @@ If you are using Backseat Driver with harnesses _other than_ Copilot or [Cursor]
 
 ## How it works
 
-Backseat Driver runs a socket server inside the VS Code Extension Host and writes a port file when it starts. Your MCP client starts a small Node **stdio wrapper** that connects to that socket. The wrapper accepts either a port number or a path to the port file.
+Backseat Driver runs a socket server inside the VS Code Extension Host. Your MCP client starts a small Node **stdio wrapper** that connects to that socket (port number, or the path from **Copy command** / `bb list`).
 
-There is one Backseat Driver MCP server per workspace. The **primary** port file lives at `~/.config/vscode-mcp/port-files/calva-backseat-driver-<windowId>.port` (survives reboot). A legacy mirror at `<workspace-root>/.calva/mcp-server/port` is still written for manual configs. Change the preferred port with `calva-backseat-driver.mcpSocketServerPort`. Use `0` (default) to always pick a random available port.
+There is one Backseat Driver MCP server per workspace. Change the preferred port with `calva-backseat-driver.mcpSocketServerPort`. Use `0` (default) to always pick a random available port.
 
 While the socket is running, Backseat Driver also writes a live JSON entry to `~/.config/vscode-mcp/registry/windows/backseat-driver-<window-id>.json` (when `calva-backseat-driver.enableMcpRegistry` is `true`, the default). External agents (bots, phone clients, other machines that can see that home directory) can scan the folder, treat an entry as live when its `pid` is still running and `updatedAt` is less than 60 seconds old, then attach with:
 
@@ -31,7 +31,7 @@ With your project opened in VS Code (or fork):
 
 Backseat Driver is per-project, so configure it at the project/workspace level when your client allows that.
 
-* **Project-level config:** port file is written to `~/.config/vscode-mcp/port-files/calva-backseat-driver-<windowId>.port`). cd to `~/.config/vscode-mcp/registry` and do `bb list` there to find the path. (Better yet, ask Claud to set the MCP server up handing it `~/.config/vscode-mcp/registry`).
+* **Project-level config:** use **Copy command + port-file** from the start dialog, or `bb list` under `~/.config/vscode-mcp/registry`. (Or hand Claude that registry folder and ask it to set the MCP server up.)
 * **No project-level config:** assign different socket ports per project via `mcpSocketServerPort`, then point your client's stdio command at that port for the session you are in.
 
 ### Cursor
@@ -48,7 +48,7 @@ Please help with providing info here.
 
 ### Claude desktop
 
-Claude Desktop doesn't run in VS Code and has no project/workspace concept, so use its global MCP config. The app can open that file for you. Using an absolute path to the port file in the stdio command is usually easiest.
+Claude Desktop doesn't run in VS Code and has no project/workspace concept, so use its global MCP config. The app can open that file for you. Prefer **Copy command + port-file** or `bb list` for the args.
 
 ```json
 {
@@ -57,7 +57,7 @@ Claude Desktop doesn't run in VS Code and has no project/workspace concept, so u
       "command": "node",
       "args": [
         "<absolute path to calva-mcp-server.js>",
-        "<absolute path to primary port file under ~/.config/vscode-mcp/port-files/"
+        "<port file path from Copy command or bb list>"
       ]
     }
   }
