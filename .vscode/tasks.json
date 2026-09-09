@@ -1,16 +1,28 @@
 {
   "version": "2.0.0",
+  // Task script names must exist in package.json (watch:local / watch).
   "tasks": [
     {
       "label": "Watch",
       "type": "npm",
-      "script": "watch",
+      "script": "watch:local",
       "isBackground": true,
       "problemMatcher": [],
       "group": {
         "kind": "build",
         "isDefault": true
       },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "Watch (pinned vscode-mcp)",
+      "type": "npm",
+      "script": "watch",
+      "isBackground": true,
+      "problemMatcher": [],
       "presentation": {
         "reveal": "always",
         "panel": "dedicated"
