@@ -15,10 +15,11 @@ Backseat Driver gives VS Code AI harnesses access to [Calva](https://calva.io)'s
 ## Features
 
 * Tool: **Evaluate Code** Access to the Clojure REPL to evaluate code at will. All active REPL sessions in Calva are available for targeting (and with shadow-cljs, also builds and runtime).
-* Tool: **Create Clojure File** Creates Clojure files with automatic bracket balancing
-* Tool: **Append Code** Appends code to Clojure files with automatic bracket balancing
-* Tool: **Replace Top Level Form** Structural editing, including formatting, bracket balancing and linting
-* Tool: **Insert Top Level Form** Structural editing, including formatting, bracket balancing and linting
+* Tool: **Edit Clojure Files** Structural create and edit files, supporting batches. Includes:
+  * **Create Clojure File** Creates Clojure files with automatic bracket balancing
+  * **Append Code** Appends code to Clojure files with automatic bracket balancing
+  * **Replace Top Level Form** Structural editing, including formatting, bracket balancing and linting
+  * **Insert Top Level Form** Structural editing, including formatting, bracket balancing and linting
 * Tool: **Bracket Balancer** Helps the model get the bracket balance right (powered by [Parinfer](https://github.com/parinfer/parinfer.js))
 * Tool: **Load File** Load/evaluate an entire Clojure file through Calva's connected REPL
 * Tool: **Symbol info lookup**, the AI can look up symbols it is interested in, and will get doc strings, argument info etcetera
