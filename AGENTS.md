@@ -57,7 +57,7 @@ npm run watch:local     # shadow-cljs + nREPL via :local-dev (sibling ../vscode-
 # Launch Extension Host: F5
 ```
 
-Day-to-day co-development: run the default **Watch** task (`watch:local`), not `npm run watch`. After vscode-mcp is pushed, bump `:git/sha` in `deps.edn`. Use **Watch (pinned vscode-mcp)** or `npm run watch` to verify the pin.
+Day-to-day co-development: run the default **Watch** task (`watch:local`), not `npm run watch`. When the library stint is done: commit vscode-mcp, then bump and commit the `:git/sha` pin in `deps.edn` here; the human pushes vscode-mcp first, then Backseat Driver. Use **Watch (pinned vscode-mcp)** or `npm run watch` to verify the pin. Full process: vscode-mcp `AGENTS.md` Co-development.
 
 **Critical**: This is a ClojureScript project running in VS Code Extension Host (Node.js). Use `cljs` REPL session, not `clj`.
 
