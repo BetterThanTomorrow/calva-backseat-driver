@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- [Create MCP wrapper port files in a stable directory]https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/66
+
 ## [v0.0.40] - 2026-08-28
 
 - [Add an MCP server registry so external agents can discover running Backseat Driver windows](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/63). The registry has an AI agent interface, mainly through:
