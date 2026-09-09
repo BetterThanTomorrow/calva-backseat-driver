@@ -31,7 +31,7 @@ With your project opened in VS Code (or fork):
 
 Backseat Driver is per-project, so configure it at the project/workspace level when your client allows that.
 
-* **Project-level config:** prefer the **primary port file** as the wrapper argument (`~/.config/vscode-mcp/port-files/calva-backseat-driver-<windowId>.port`), or the legacy workspace mirror (`.calva/mcp-server/port` in a single-root window).
+* **Project-level config:** port file is written to `~/.config/vscode-mcp/port-files/calva-backseat-driver-<windowId>.port`). cd to `~/.config/vscode-mcp/registry` and do `bb list` there to find the path. (Better yet, ask Claud to set the MCP server up handing it `~/.config/vscode-mcp/registry`).
 * **No project-level config:** assign different socket ports per project via `mcpSocketServerPort`, then point your client's stdio command at that port for the session you are in.
 
 ### Cursor
@@ -40,7 +40,7 @@ No config needed for Cursor. Backseat Driver handles this for you, Zero Conf, th
 
 ### ECA
 
-No config needed when the ECA extension is installed and a workspace is open. Backseat Driver upserts project-local `.eca/config.json` (server key `backseat-driver`). Auto-register writes portable `args`: wrapper `${env:HOME}/.config/calva/backseat-driver/calva-mcp-server.js` (vscode-mcp installs the wrapper into `~/.config/calva/backseat-driver` on MCP start — DEBUG symlink / release copy), **primary** port under `~/.config/vscode-mcp/port-files/` (survives reboot), and host as configured (`calva-backseat-driver.mcpHost`). A `.calva/mcp-server/port` mirror remains for legacy manual configs. Only managed fields `command` and `args` are updated; siblings (`disabled`, `env`, …) are preserved. Opt out with `calva-backseat-driver.autoRegisterEcaMcp` set to `false`. Stop does not remove the ECA entry. No Register-with-ECA command.
+No config needed when the ECA extension is installed and a workspace is open. Backseat Driver upserts project-local `.eca/config.json` (server key `backseat-driver`). Opt out with `calva-backseat-driver.autoRegisterEcaMcp` set to `false`. Stop does not remove the ECA entry. No Register-with-ECA command.
 
 ### Windsurf configuration
 
@@ -57,7 +57,7 @@ Claude Desktop doesn't run in VS Code and has no project/workspace concept, so u
       "command": "node",
       "args": [
         "<absolute path to calva-mcp-server.js>",
-        "<absolute path to primary port file under ~/.config/vscode-mcp/port-files/, or the legacy .calva/mcp-server/port mirror>"
+        "<absolute path to primary port file under ~/.config/vscode-mcp/port-files/"
       ]
     }
   }
@@ -72,4 +72,4 @@ Please help with providing info here.
 
 Please add configuration for other AI clients! 🙏
 
-Cursor auto-registration works without a workspace folder (primary port file still under `~/.config/vscode-mcp/port-files/`). When auto-registration is enabled, a random port is used (the configured static port is respected only when auto-registration is disabled).
+Cursor auto-registration works without a workspace folder. When auto-registration is enabled, a random port is used (the configured static port is respected only when auto-registration is disabled).
