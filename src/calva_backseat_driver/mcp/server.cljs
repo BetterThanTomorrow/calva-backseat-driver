@@ -1,7 +1,5 @@
 (ns calva-backseat-driver.mcp.server
   (:require
-   ["os" :as os]
-   ["path" :as path]
    ["vscode" :as vscode]
    [calva-backseat-driver.integrations.calva.api :as calva]
    [calva-backseat-driver.integrations.calva.session-runtimes :as session-runtimes]
@@ -22,9 +20,6 @@
 
 (defn- get-port-file-uri+ [ctx-or-base-uri]
   (vscode/Uri.joinPath (get-server-dir+ ctx-or-base-uri) "port"))
-
-(defn- get-cursor-port-file-uri [instance-slug]
-  (vscode/Uri.file (path/join (os/tmpdir) "calva-mcp-server" instance-slug "port")))
 
 (defn- registry-custom-data+
   [_state]
@@ -54,10 +49,8 @@
                         (dispatch! context [[:mcp/ax.handle-request request]]))
       :mcp/on-log (fn [level & args]
                     (dispatch! context [[:app/ax.log level (apply str (interpose " " args))]]))
-      :lifecycle/port-file-uri+ (fn [^js ctx {:lifecycle/keys [cursor-mode? instance-slug]}]
-                                  (if cursor-mode?
-                                    (get-cursor-port-file-uri instance-slug)
-                                    (get-port-file-uri+ ctx)))
+      ;; Primary port file is library-owned (~/.config/vscode-mcp/port-files/...).
+      ;; This callback is the legacy workspace mirror for manual configs only.
       :lifecycle/eca-port-file-uri+ (fn [^js ctx _strategy-opts]
                                       (get-port-file-uri+ ctx))
       :lifecycle/request-port (fn [_ctx {:lifecycle/keys [cursor-mode?]}]

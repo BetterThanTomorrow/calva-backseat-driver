@@ -154,7 +154,8 @@ When making multiple edits, work from highest line number to lowest (line number
 
 ### Socket Server Pattern
 - Backend server runs in Extension Host (TCP socket)
-- Port file: `${workspaceFolder}/.calva/mcp-server/port`
+- Primary port file: `~/.config/vscode-mcp/port-files/calva-backseat-driver-<windowId>.port` (library-owned; survives reboot)
+- Legacy mirror: `${workspaceFolder}/.calva/mcp-server/port` (manual configs)
 - stdio wrapper (`dist/calva-mcp-server.js`) relays stdio ↔ socket — built from `vscode-mcp` via shadow-cljs `:stdio-wrapper` (`vscode-mcp.stdio.wrapper/main`). Connect-retry: waits up to 60 s for port file + TCP connect, re-reading the port file each attempt; stdin is buffered during the wait and flushed on connect. Conditional reload: silent activations skip `mcp.reloadClient` when config is unchanged (via `vscode-mcp`); the dev hot-reload path passes `:lifecycle/silent? true` in `integrations/vscode/cursor.cljs`
 - One server per workspace folder
 - Window registry: `:registry/enabled?` from setting `enableMcpRegistry` (default true) in `mcp/server.cljs` `build-lifecycle-config`; `:registry/custom-data+` queries Calva `listSessionsAndRuntimes` and writes compact sessions. Entry path: `~/.config/vscode-mcp/registry/windows/backseat-driver-<window-id>.json`. Session changes go through `[:calva/ax.sessions-changed]` → `[:mcp/ax.update-registry]` → `(vscode-mcp.core/update-registry!+ config)`
@@ -169,9 +170,9 @@ When making multiple edits, work from highest line number to lowest (line number
 - Project-local `.eca/config.json` only
 - Setting `autoRegisterEcaMcp` (default true); library key `:mcp/auto-register-eca?`
 - Gates: ECA extension `editor-code-assistant.eca` installed (activated before write), workspace folder, port file from `server-info`
-- ECA `.eca/config.json` uses workspace-stable port file `<workspace>/.calva/mcp-server/port` (not Cursor tmpdir)
+- ECA `.eca/config.json` points at the **primary** port file under `~/.config/vscode-mcp/port-files/` (survives reboot); `.calva/mcp-server/port` remains a legacy mirror
 - Managed fields only (`command`, `args`); independent of Cursor; no deregister on stop; no command or when-contexts
-- ECA args: wrapper `${env:HOME}/.config/calva/backseat-driver/calva-mcp-server.js` (installed into `~/.config/calva/backseat-driver` by vscode-mcp on MCP start — DEBUG symlink / release copy), workspace-relative port `.calva/mcp-server/port`, host from settings
+- ECA args: wrapper `${env:HOME}/.config/calva/backseat-driver/calva-mcp-server.js` (installed into `~/.config/calva/backseat-driver` by vscode-mcp on MCP start — DEBUG symlink / release copy), primary port path, host from settings
 
 ### Skills and Instructions as Bundled Assets
 - `assets/skills/` and `assets/instructions/` are the canonical source for content bundled with the extension. When updating skill or instruction content, edit these files — not the installed extension copies under `~/.vscode*/extensions/`.

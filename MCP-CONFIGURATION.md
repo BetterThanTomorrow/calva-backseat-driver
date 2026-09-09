@@ -6,7 +6,7 @@ If you are using Backseat Driver with harnesses _other than_ Copilot or [Cursor]
 
 Backseat Driver runs a socket server inside the VS Code Extension Host and writes a port file when it starts. Your MCP client starts a small Node **stdio wrapper** that connects to that socket. The wrapper accepts either a port number or a path to the port file.
 
-There is one Backseat Driver MCP server per workspace. The port file will be created at `<workspace-root>/.calva/mcp-server/port`. Change the preferred port with `calva-backseat-driver.mcpSocketServerPort`. Use `0` (default) to always pick a random available port.
+There is one Backseat Driver MCP server per workspace. The **primary** port file lives at `~/.config/vscode-mcp/port-files/calva-backseat-driver-<windowId>.port` (survives reboot). A legacy mirror at `<workspace-root>/.calva/mcp-server/port` is still written for manual configs. Change the preferred port with `calva-backseat-driver.mcpSocketServerPort`. Use `0` (default) to always pick a random available port.
 
 While the socket is running, Backseat Driver also writes a live JSON entry to `~/.config/vscode-mcp/registry/windows/backseat-driver-<window-id>.json` (when `calva-backseat-driver.enableMcpRegistry` is `true`, the default). External agents (bots, phone clients, other machines that can see that home directory) can scan the folder, treat an entry as live when its `pid` is still running and `updatedAt` is less than 60 seconds old, then attach with:
 
@@ -31,7 +31,7 @@ With your project opened in VS Code (or fork):
 
 Backseat Driver is per-project, so configure it at the project/workspace level when your client allows that.
 
-* **Project-level config:** prefer the **port file** as the wrapper argument (`.calva/mcp-server/port` in a single-root window).
+* **Project-level config:** prefer the **primary port file** as the wrapper argument (`~/.config/vscode-mcp/port-files/calva-backseat-driver-<windowId>.port`), or the legacy workspace mirror (`.calva/mcp-server/port` in a single-root window).
 * **No project-level config:** assign different socket ports per project via `mcpSocketServerPort`, then point your client's stdio command at that port for the session you are in.
 
 ### Cursor
@@ -40,7 +40,7 @@ No config needed for Cursor. Backseat Driver handles this for you, Zero Conf, th
 
 ### ECA
 
-No config needed when the ECA extension is installed and a workspace is open. Backseat Driver upserts project-local `.eca/config.json` (server key `backseat-driver`). Auto-register writes portable `args`: wrapper `${env:HOME}/.config/calva/backseat-driver/calva-mcp-server.js` (vscode-mcp installs the wrapper into `~/.config/calva/backseat-driver` on MCP start — DEBUG symlink / release copy), port `.calva/mcp-server/port` (workspace-relative; always written on MCP start), and host as configured (`calva-backseat-driver.mcpHost`). Only managed fields `command` and `args` are updated; siblings (`disabled`, `env`, …) are preserved. Opt out with `calva-backseat-driver.autoRegisterEcaMcp` set to `false`. Stop does not remove the ECA entry. No Register-with-ECA command.
+No config needed when the ECA extension is installed and a workspace is open. Backseat Driver upserts project-local `.eca/config.json` (server key `backseat-driver`). Auto-register writes portable `args`: wrapper `${env:HOME}/.config/calva/backseat-driver/calva-mcp-server.js` (vscode-mcp installs the wrapper into `~/.config/calva/backseat-driver` on MCP start — DEBUG symlink / release copy), **primary** port under `~/.config/vscode-mcp/port-files/` (survives reboot), and host as configured (`calva-backseat-driver.mcpHost`). A `.calva/mcp-server/port` mirror remains for legacy manual configs. Only managed fields `command` and `args` are updated; siblings (`disabled`, `env`, …) are preserved. Opt out with `calva-backseat-driver.autoRegisterEcaMcp` set to `false`. Stop does not remove the ECA entry. No Register-with-ECA command.
 
 ### Windsurf configuration
 
@@ -57,7 +57,7 @@ Claude Desktop doesn't run in VS Code and has no project/workspace concept, so u
       "command": "node",
       "args": [
         "<absolute path to calva-mcp-server.js>",
-        "<absolute path to your project root's `.calva/mcp-server/port`>"
+        "<absolute path to primary port file under ~/.config/vscode-mcp/port-files/, or the legacy .calva/mcp-server/port mirror>"
       ]
     }
   }
@@ -72,4 +72,4 @@ Please help with providing info here.
 
 Please add configuration for other AI clients! 🙏
 
-Cursor auto-registration works without a workspace folder (single-file or folder-less windows use the extension's global storage for the port file). When auto-registration is enabled, a random port is used (the configured static port is respected only when auto-registration is disabled).
+Cursor auto-registration works without a workspace folder (primary port file still under `~/.config/vscode-mcp/port-files/`). When auto-registration is enabled, a random port is used (the configured static port is respected only when auto-registration is disabled).
