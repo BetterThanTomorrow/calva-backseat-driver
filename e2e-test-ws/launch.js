@@ -94,6 +94,10 @@ async function main(vsixPathOrLabel, testWorkspace, calvaVsix) {
       '--install-extension',
       calvaExtension,
       '--force',
+      // ECA auto-register writes project-local .eca/config.json (eca_config_test).
+      '--install-extension',
+      'editor-code-assistant.eca',
+      '--force',
     ];
     if (vsixPathOrLabel !== 'extension-development') {
       launchArgs.push('--install-extension', vsixPathOrLabel);
