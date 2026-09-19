@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.43] - 2026-09-19
+
 - [Stop writing MCP port under .calva](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/68)
 
 ## [v0.0.42] - 2026-09-10
