@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- [Stop writing MCP port under .calva](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/68)
+
 ## [v0.0.42] - 2026-09-10
 
 - [Prettify Backseat Driver “owned” ECA config](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/67)
