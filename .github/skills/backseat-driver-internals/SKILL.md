@@ -133,7 +133,7 @@ Subsystem contracts, state architecture, and temporal sequences for the Backseat
 λ mcp_server_contract.
   socket_server: TCP | net.createServer | localhost_only
   | port: configured(default 1664) | 0 ≡ random | EADDRINUSE → fallback_to_0
-  | port_file: ${workspaceFolder}/.calva/mcp-server/port
+  | port_file: ~/.config/vscode-mcp/port-files/<serverName>-<windowId>.port
   | protocol: newline_delimited_JSON | buffered_partial_reads
   | active_sockets: atom | tracks_connected_clients
   | notifications: broadcast_to_all_active_sockets
@@ -185,7 +185,7 @@ Subsystem contracts, state architecture, and temporal sequences for the Backseat
     3_fx.start-server → server/start-server!+
       3a_create_server: net.createServer(TCP)
       3b_listen: configured_port | EADDRINUSE → port_0
-      3c_write_port_file: .calva/mcp-server/port
+      3c_write_port_file: ~/.config/vscode-mcp/port-files/…
     4_ax.server-started: store(:app/server-info) | when-context(started? → true, starting? → false)
     5_fx.show-server-started-message: info_notification_with_port
 

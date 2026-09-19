@@ -6,21 +6,6 @@
    [promesa.core :as p]
    [vscode-mcp.core :as vscode-mcp]))
 
-(defn- get-workspace-root-uri-or-nil []
-  (some-> vscode/workspace.workspaceFolders
-          first
-          .-uri))
-
-(defn- get-server-dir+ [ctx-or-base-uri]
-  (let [base (cond
-               (instance? vscode/Uri ctx-or-base-uri) ctx-or-base-uri
-               (get-workspace-root-uri-or-nil) (get-workspace-root-uri-or-nil)
-               :else (.-globalStorageUri ^js ctx-or-base-uri))]
-    (vscode/Uri.joinPath base ".calva" "mcp-server")))
-
-(defn- get-port-file-uri+ [ctx-or-base-uri]
-  (vscode/Uri.joinPath (get-server-dir+ ctx-or-base-uri) "port"))
-
 (defn- registry-custom-data+
   [_state]
   (-> (p/let [list-fn (get-in calva/calva-api [:repl :listSessionsAndRuntimes])
@@ -31,7 +16,7 @@
 
 (defn build-lifecycle-config
   "Builds a `vscode-mcp.core` config from current settings and BD's
-   port-file/wrapper-install-dir/when-context conventions. Cheap to rebuild — callers
+   wrapper-install-dir/when-context conventions. Cheap to rebuild — callers
    don't need to cache it (see plan Decision Q6: settings are read fresh on
    each start/stop, same as the rest of BD's Ex config-keyword enrichment)."
   [dispatch! ^js context wrapper-config-path]
@@ -49,8 +34,6 @@
                         (dispatch! context [[:mcp/ax.handle-request request]]))
       :mcp/on-log (fn [level & args]
                     (dispatch! context [[:app/ax.log level (apply str (interpose " " args))]]))
-      :lifecycle/eca-port-file-uri+ (fn [^js ctx _strategy-opts]
-                                      (get-port-file-uri+ ctx))
       :lifecycle/request-port (fn [_ctx {:lifecycle/keys [cursor-mode?]}]
                                 (if cursor-mode? 0 (.get settings "mcpSocketServerPort")))
       :lifecycle/wrapper-install-dir wrapper-config-path
