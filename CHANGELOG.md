@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- Fix: [Generated ECA config has hardcoded absolute path to MCP port file](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/70) (depends on vscode-mcp #3)
+
 ## [v0.0.43] - 2026-09-19
 
 - [Stop writing MCP port under .calva](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/68)
