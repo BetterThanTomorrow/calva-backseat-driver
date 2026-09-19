@@ -175,7 +175,7 @@ When making multiple edits, work from highest line number to lowest (line number
 - Setting `autoRegisterEcaMcp` (default true); library key `:mcp/auto-register-eca?`
 - Gates: ECA extension `editor-code-assistant.eca` installed (activated before write), workspace folder, port file from `server-info`
 - Managed fields only (`command`, `args`); independent of Cursor; no deregister on stop; no command or when-contexts
-- ECA args: wrapper `${env:HOME}/.config/calva/backseat-driver/calva-mcp-server.js` (installed into `~/.config/calva/backseat-driver` by vscode-mcp on MCP start — DEBUG symlink / release copy), port path, host from settings
+- ECA args: wrapper `${env:HOME}/.config/calva/backseat-driver/calva-mcp-server.js` (installed into `~/.config/calva/backseat-driver` by vscode-mcp on MCP start — DEBUG symlink / release copy), port `${env:HOME}/.config/vscode-mcp/port-files/…`, host from settings
 
 ### Skills and Instructions as Bundled Assets
 - `assets/skills/` and `assets/instructions/` are the canonical source for content bundled with the extension. When updating skill or instruction content, edit these files — not the installed extension copies under `~/.vscode*/extensions/`.

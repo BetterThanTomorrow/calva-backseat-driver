@@ -4,7 +4,7 @@
       "command": "node",
       "args": [
         "${env:HOME}/.config/joyride/joyride-mcp-server.js",
-        "/Users/pez/.config/vscode-mcp/port-files/joyride-ws-sgcmef.port",
+        "/Users/pez/.config/vscode-mcp/port-files/joyride-ws-xqu2db.port",
         "127.0.0.1"
       ]
     },
@@ -12,7 +12,7 @@
       "command": "node",
       "args": [
         "${env:HOME}/.config/calva/backseat-driver/calva-mcp-server.js",
-        "/Users/pez/.config/vscode-mcp/port-files/calva-backseat-driver-ws-sgcmef.port",
+        "${env:HOME}/.config/vscode-mcp/port-files/calva-backseat-driver-ws-xqu2db.port",
         "127.0.0.1"
       ]
     }
