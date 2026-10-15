@@ -366,6 +366,149 @@
 
 ;; --- Test orchestrator ---
 
+(defn- activate-target-editor+
+  "Show file-path as the active editor (preview false)."
+  [file-path]
+  (let [uri (vscode/Uri.file file-path)]
+    (p/let [document (vscode/workspace.openTextDocument uri)
+            _ (vscode/window.showTextDocument document #js {:preview false})
+            _ (wait-for+ #(when (= file-path (active-editor-path))
+                            true)
+                         :interval 10
+                         :timeout 5000
+                         :message "Target editor did not become active within 5s")]
+      nil)))
+
+(def ^:private active-file-name "structural_edit_active_target.clj")
+
+(defn- active-file-path []
+  (path/join (.-fsPath mcp/workspace-uri) active-file-name))
+
+(defn- delete-active-file! []
+  (when (fs/existsSync (active-file-path))
+    (fs/unlinkSync (active-file-path))))
+
+(defn- active-document-dirty? []
+  (boolean (some-> vscode/window .-activeTextEditor .-document .-isDirty)))
+
+(defn- disk-equals-active-buffer?
+  "True when disk content equals the active editor buffer for file-path."
+  [file-path]
+  (when-let [doc (some-> vscode/window .-activeTextEditor .-document)]
+    (when (= file-path (.-fsPath (.-uri doc)))
+      (= (fs/readFileSync file-path "utf8") (.-getText doc)))))
+
+(defn- read-file-content+
+  "Read file-path. When previous-content is given, wait briefly for a change; on timeout return current disk content."
+  [file-path previous-content]
+  (if (some? previous-content)
+    (-> (wait-for+ #(let [content (fs/readFileSync file-path "utf8")]
+                      (when (and (seq content)
+                                 (not= content previous-content))
+                        content))
+                   :interval 10
+                   :timeout 2000
+                   :message "File content did not change within 2s")
+        (p/catch (fn [_]
+                   (fs/readFileSync file-path "utf8"))))
+    (p/resolved (fs/readFileSync file-path "utf8"))))
+
+(defn- edit-with-active-target-and-verify+
+  "Activate the target file, run tool-call-fn, return edit context including dirty/disk/buffer."
+  [file-path tool-call-fn prev-content]
+  (p/let [_ (activate-target-editor+ file-path)
+          dirty-before (active-document-dirty?)
+          result (tool-call-fn)
+          content (read-file-content+ file-path prev-content)
+          dirty-after (active-document-dirty?)
+          buffer-text (some-> vscode/window .-activeTextEditor .-document .-getText)
+          disk-matches? (disk-equals-active-buffer? file-path)]
+    {:result result
+     :content content
+     :buffer-text buffer-text
+     :dirty-before dirty-before
+     :dirty-after dirty-after
+     :disk-matches? disk-matches?
+     :active-path (active-editor-path)}))
+
+(defn- assert-active-editor-saved
+  "#72 contract: active-editor edit succeeds, buffer not dirty, disk equals buffer, edit on disk."
+  [{:keys [result dirty-before dirty-after disk-matches? active-path buffer-text content]} file-path expected-fragment]
+  (is (false? dirty-before)
+      "Active editor buffer should be clean before the edit")
+  (is (= file-path active-path)
+      "Target file should remain the active editor")
+  (is (batch-success? result) "Edit should succeed")
+  (is (string/includes? (str buffer-text) expected-fragment)
+      "Edit should land in the active editor buffer")
+  (is (false? dirty-after)
+      "Active editor buffer should not stay dirty after structural edit (#72)")
+  (is (true? disk-matches?)
+      "Disk content should equal the active editor buffer after structural edit")
+  (is (string/includes? (str content) expected-fragment)
+      "Edit should appear on disk"))
+
+(defn- discard-active-file-editor+
+  "Close the active-target editor without saving so setup can recreate the file."
+  [file-path]
+  (p/let [_ (when (= file-path (active-editor-path))
+              (p/do (when (active-document-dirty?)
+                      (vscode/commands.executeCommand "workbench.action.files.revert"))
+                    (vscode/commands.executeCommand "workbench.action.closeActiveEditor")))]
+    nil))
+
+(defn- setup-active-target-file+ [socket create-id]
+  (let [file-path (active-file-path)]
+    (p/let [_ (discard-active-file-editor+ file-path)
+            _ (delete-active-file!)
+            _ (mcp/call-tool socket create-id "clojure_edit_files"
+                             {:edits [{:type "create"
+                                       :filePath file-path
+                                       :content (initial-file-content)}]})]
+      file-path)))
+
+(defn- test-active-editor-replace-saves+ [socket]
+  (p/let [file-path (setup-active-target-file+ socket 130)
+          ctx (edit-with-active-target-and-verify+
+               file-path
+               #(mcp/call-tool socket 131 "clojure_edit_files"
+                               {:edits [{:type "replace"
+                                         :filePath file-path
+                                         :line 3
+                                         :targetLineText "(defn add-numbers"
+                                         :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b 0))"}]})
+               nil)]
+    (testing "active editor replace leaves buffer saved (#72)"
+      (assert-active-editor-saved ctx file-path "(+ a b 0)"))))
+
+(defn- test-active-editor-insert-saves+ [socket]
+  (p/let [file-path (setup-active-target-file+ socket 132)
+          content-before (fs/readFileSync file-path "utf8")
+          ctx (edit-with-active-target-and-verify+
+               file-path
+               #(mcp/call-tool socket 133 "clojure_edit_files"
+                               {:edits [{:type "insert"
+                                         :filePath file-path
+                                         :line 3
+                                         :targetLineText "(defn add-numbers"
+                                         :newForm "(defn multiply-active\n  [a b]\n  (* a b))\n"}]})
+               content-before)]
+    (testing "active editor insert leaves buffer saved (#72)"
+      (assert-active-editor-saved ctx file-path "(defn multiply-active"))))
+
+(defn- test-active-editor-append-saves+ [socket]
+  (p/let [file-path (setup-active-target-file+ socket 134)
+          content-before (fs/readFileSync file-path "utf8")
+          ctx (edit-with-active-target-and-verify+
+               file-path
+               #(mcp/call-tool socket 135 "clojure_edit_files"
+                               {:edits [{:type "append"
+                                         :filePath file-path
+                                         :code "(defn append-active\n  []\n  :ok)\n"}]})
+               content-before)]
+    (testing "active editor append leaves buffer saved (#72)"
+      (assert-active-editor-saved ctx file-path "(defn append-active"))))
+
 (deftest-async structural-editing-tests
   (-> (p/let [{:keys [socket]} (mcp/start-mcp-session!)
               file-path (test-file-path)]
@@ -382,6 +525,9 @@
               (test-tiny-file+ socket)
               (test-continue-on-runtime-failure+ socket)
               (test-continue-on-edit-validation-failure+ socket)
+              (test-active-editor-replace-saves+ socket)
+              (test-active-editor-insert-saves+ socket)
+              (test-active-editor-append-saves+ socket)
               (mcp/stop-mcp-session! socket)))
       (p/catch (fn [e]
                  (js/console.error "[structural-edit] Error:" (.-message e) e)
@@ -390,4 +536,5 @@
       (p/finally (fn []
                    (delete-test-file!)
                    (delete-tiny-file!)
-                   (delete-continue-file!)))))
+                   (delete-continue-file!)
+                   (delete-active-file!)))))
