@@ -244,9 +244,11 @@
                                      (conj acc (-> result
                                                    (assoc :index (:index edit))
                                                    (dissoc :diagnostics-before-edit :diagnostics-after-edit))))))))
-            diagnostics-after-edit (editor/poll-diagnostics+ file-path diagnostics-before-edit)]
+            diagnostics-after-edit (editor/poll-diagnostics+ file-path diagnostics-before-edit)
+            disk-matches-buffer? (editor/disk-matches-document? file-path)]
       {:file-path file-path
        :edits results
+       :disk-matches-buffer? disk-matches-buffer?
        :diagnostics-before-edit diagnostics-before-edit
        :diagnostics-after-edit diagnostics-after-edit})))
 

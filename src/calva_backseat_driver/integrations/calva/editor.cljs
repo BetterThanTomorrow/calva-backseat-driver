@@ -23,9 +23,65 @@
                       [(vscode/Range. vscode-position vscode-position), ""]
                       ((get-in calva/calva-api [:ranges ranges-fn-key]) vscode-document vscode-position))}))
 
-(defn- edit-replace-range [file-path vscode-range new-text]
-  (p/let [^js vscode-document (get-document-from-path file-path)]
-    ((get-in calva/calva-api [:editor :replace]) vscode-document vscode-range new-text)))
+(defn- edit-replace-range
+  "Apply Calva editor.replace on the given document (same object that will be saved)."
+  [^js vscode-document vscode-range new-text]
+  ((get-in calva/calva-api [:editor :replace]) vscode-document vscode-range new-text))
+
+(def ^:private pre-dirty-note
+  "The file had unsaved changes in the editor; the edit is in the editor buffer, not on disk. Read the open document, not the disk.")
+
+(def ^:private save-failed-note
+  "The edit is in the editor buffer, but the file on disk was not saved. Read the open document, not the disk.")
+
+(defn- wait-until+
+  "Poll pred until truthy or timeout-ms elapses. Returns true if pred became truthy."
+  [pred timeout-ms]
+  (letfn [(step [remaining]
+            (cond
+              (pred) (p/resolved true)
+              (<= remaining 0) (p/resolved false)
+              :else (p/do (p/delay 10) (step (- remaining 10)))))]
+    (step timeout-ms)))
+
+(defn- await-edit-visible-on-document+
+  "After applyEdit/replace resolves, wait briefly until the document is dirty or
+  its text differs from text-before. Avoids saving while the buffer is still
+  clean (VS Code then returns true from .save as a no-op)."
+  [^js vscode-document text-before]
+  (wait-until+ (fn []
+                 (or (.-isDirty vscode-document)
+                     (not= text-before (.getText vscode-document))))
+               500))
+
+(defn- persist-after-edit+
+  "Shape :success/:saved after an edit that already landed (or failed).
+   was-dirty? is isDirty before the edit. Only the save is error-wrapped.
+   Caller must await-edit-visible-on-document+ before this when was-dirty? is false."
+  [^js vscode-document was-dirty? edit-applied?]
+  (cond
+    (not edit-applied?)
+    (p/resolved {:success false :error "Failed to apply edit" :saved false})
+
+    was-dirty?
+    (p/resolved {:success true :saved false :note pre-dirty-note})
+
+    :else
+    (-> (p/let [save-result (.save vscode-document)
+                ;; .save can resolve true a tick before isDirty flips false.
+                _ (when save-result
+                    (wait-until+ #(not (.-isDirty vscode-document)) 500))
+                still-dirty? (.-isDirty vscode-document)]
+          (if (and save-result (not still-dirty?))
+            {:success true :saved true}
+            {:success true
+             :saved false
+             :note save-failed-note}))
+        (p/catch (fn [e]
+                   {:success true
+                    :saved false
+                    :note save-failed-note
+                    :error (.-message e)})))))
 
 (def ^:private severity-map
   "Map VS Code diagnostic severity levels to keywords"
@@ -190,21 +246,22 @@
   [{:editor/keys [file-path line-number original-line-number new-form ranges-fn-key]}]
   (let [validation-result (parinfer/validate-brackets new-form)]
     (if-not (:valid? validation-result)
-      (p/resolved (assoc validation-result :success false))
+      (p/resolved (assoc validation-result :success false :saved false))
       (p/let [form-data (get-ranges-form-data-by-line file-path line-number ranges-fn-key)
-              ^js vscode-document (get-document-from-path file-path)
+              ^js vscode-document (:vscode-document form-data)
+              was-dirty? (.-isDirty vscode-document)
+              text-before (.getText vscode-document)
               trimmed-form (string/trim new-form)
               text (if (= :insertionPoint ranges-fn-key) (str trimmed-form "\n\n") trimmed-form)
               form-range (first (:ranges-object form-data))
               effective-range (compute-effective-range vscode-document form-range ranges-fn-key trimmed-form)
-              edit-result (edit-replace-range file-path effective-range text)
-              _ (.save vscode-document)]
-        (if edit-result
-          (cond-> {:success true}
-            (not= line-number original-line-number)
-            (assoc :actual-line-used line-number))
-          {:success false
-           :error "Failed to apply edit"})))))
+              edit-result (edit-replace-range vscode-document effective-range text)
+              _ (when (and edit-result (not was-dirty?))
+                  (await-edit-visible-on-document+ vscode-document text-before))
+              persist (persist-after-edit+ vscode-document was-dirty? edit-result)]
+        (cond-> persist
+          (and (:success persist) (not= line-number original-line-number))
+          (assoc :actual-line-used line-number))))))
 
 (defn- apply-edit-and-report+
   "Apply a form edit and report diagnostics. Assumes targeting is already validated."
@@ -225,7 +282,7 @@
   [opts]
   (let [validation (validate-edit-inputs (:editor/target-line opts) (:editor/new-form opts))]
     (if-not (:valid? validation)
-      {:success false :error (:error validation)}
+      {:success false :saved false :error (:error validation)}
       (-> (p/let [targeting (resolve-edit-target+ opts)]
             (if-not (:resolved? targeting)
               (:result targeting)
@@ -233,7 +290,7 @@
                (assoc opts
                       :editor/line-number (:line-number targeting)
                       :editor/original-line-number (:editor/line-number opts)))))
-          (p/catch (fn [e] {:success false :error (.-message e)}))))))
+          (p/catch (fn [e] {:success false :saved false :error (.-message e)}))))))
 
 #_{:clojure-lsp/ignore [:clojure-lsp/unused-public-var]}
 (comment
@@ -304,9 +361,11 @@
                         (vscode/workspace.fs.writeFile uri content-bytes)))
               (p/then (fn [_]
                         {:success true
+                         :saved true
                          :file-path file-path}))
               (p/catch (fn [error]
                          {:success false
+                          :saved false
                           :error (.-message error)
                           :file-path file-path})))))))
 
@@ -315,9 +374,11 @@
   [file-path code]
   (let [validation-result (parinfer/validate-brackets code)]
     (if-not (:valid? validation-result)
-      (p/resolved validation-result)
+      (p/resolved (assoc validation-result :saved false))
       (-> (p/let [uri (vscode/Uri.file file-path)
                   ^js vscode-document (vscode/workspace.openTextDocument uri)
+                  was-dirty? (.-isDirty vscode-document)
+                  text-before (.getText vscode-document)
                   last-line-number (.-lineCount vscode-document)
                   end-position (vscode/Position. last-line-number 0)
                   last-line-text (if (pos? last-line-number)
@@ -331,12 +392,20 @@
                   workspace-edit (vscode/WorkspaceEdit.)
                   _ (.set workspace-edit uri #js [edit])
                   edit-result (vscode/workspace.applyEdit workspace-edit)
-                  _ (.save vscode-document)]
-            (if edit-result
-              {:success true
-               :appended-at-end true}
-              {:success false
-               :error "Failed to apply workspace edit"}))
+                  _ (when (and edit-result (not was-dirty?))
+                      (await-edit-visible-on-document+ vscode-document text-before))
+                  persist (persist-after-edit+ vscode-document was-dirty? edit-result)]
+            (cond-> persist
+              (:success persist) (assoc :appended-at-end true)))
           (p/catch (fn [error]
                      {:success false
+                      :saved false
                       :error (.-message error)}))))))
+
+(defn disk-matches-document?
+  "True when on-disk file content equals the open document buffer for file-path."
+  [file-path]
+  (p/let [^js vscode-document (get-document-from-path file-path)
+          disk-bytes (vscode/workspace.fs.readFile (.-uri vscode-document))
+          disk (.decode (js/TextDecoder.) disk-bytes)]
+    (= disk (.getText vscode-document))))

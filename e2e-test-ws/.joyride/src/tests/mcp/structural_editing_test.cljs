@@ -396,7 +396,7 @@
   [file-path]
   (when-let [doc (some-> vscode/window .-activeTextEditor .-document)]
     (when (= file-path (.-fsPath (.-uri doc)))
-      (= (fs/readFileSync file-path "utf8") (.-getText doc)))))
+      (= (fs/readFileSync file-path "utf8") (.getText doc)))))
 
 (defn- read-file-content+
   "Read file-path. When previous-content is given, wait briefly for a change; on timeout return current disk content."
@@ -421,7 +421,7 @@
           result (tool-call-fn)
           content (read-file-content+ file-path prev-content)
           dirty-after (active-document-dirty?)
-          buffer-text (some-> vscode/window .-activeTextEditor .-document .-getText)
+          buffer-text (some-> vscode/window .-activeTextEditor .-document .getText)
           disk-matches? (disk-equals-active-buffer? file-path)]
     {:result result
      :content content
@@ -431,6 +431,11 @@
      :disk-matches? disk-matches?
      :active-path (active-editor-path)}))
 
+(defn- first-edit-saved?
+  "True when the first edit in a batch tool result reports :saved true."
+  [result]
+  (boolean (some-> result :files vals first :edits first :saved)))
+
 (defn- assert-active-editor-saved
   "#72 contract: active-editor edit succeeds, buffer not dirty, disk equals buffer, edit on disk."
   [{:keys [result dirty-before dirty-after disk-matches? active-path buffer-text content]} file-path expected-fragment]
@@ -439,6 +444,8 @@
   (is (= file-path active-path)
       "Target file should remain the active editor")
   (is (batch-success? result) "Edit should succeed")
+  (is (true? (first-edit-saved? result))
+      "Clean active-editor edit should report :saved true")
   (is (string/includes? (str buffer-text) expected-fragment)
       "Edit should land in the active editor buffer")
   (is (false? dirty-after)
@@ -509,6 +516,88 @@
     (testing "active editor append leaves buffer saved (#72)"
       (assert-active-editor-saved ctx file-path "(defn append-active"))))
 
+(defn- dirtify-active-buffer+
+  "Insert unsaved user text into the active document for file-path. Leaves isDirty true."
+  [file-path marker]
+  (p/let [_ (activate-target-editor+ file-path)
+          ^js doc (.-document vscode/window.activeTextEditor)
+          uri (.-uri doc)
+          we (doto (vscode/WorkspaceEdit.)
+               (.insert uri (vscode/Position. 0 0) (str ";; " marker "\n")))
+          ;; applyEdit returns a Thenable; wait on isDirty rather than coercing its value.
+          _ (vscode/workspace.applyEdit we)
+          _ (wait-for+ #(when (.-isDirty doc) true)
+                       :interval 10
+                       :timeout 2000
+                       :message "Buffer did not become dirty after user edit setup")]
+    (is (true? (.-isDirty doc))
+        "Setup: buffer should be dirty with unsaved user text")
+    (is (false? (string/includes? (fs/readFileSync file-path "utf8") marker))
+        "Setup: user marker must not be on disk yet")
+    marker))
+
+(defn- test-active-editor-pre-dirty-does-not-save+ [socket]
+  (p/let [file-path (setup-active-target-file+ socket 136)
+          marker "user-pre-dirty-72"
+          _ (dirtify-active-buffer+ file-path marker)
+          disk-before (fs/readFileSync file-path "utf8")
+          result (mcp/call-tool socket 137 "clojure_edit_files"
+                                {:edits [{:type "replace"
+                                          :filePath file-path
+                                          :line 4
+                                          :targetLineText "(defn add-numbers"
+                                          :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b 9))"}]})
+          ^js doc (.-document vscode/window.activeTextEditor)
+          buffer (.getText doc)
+          disk-after (fs/readFileSync file-path "utf8")
+          edit (some-> result :files vals first :edits first)]
+    (testing "active editor pre-dirty: edit buffer, do not save (#72)"
+      (is (batch-success? result) "Edit should succeed")
+      (is (false? (:saved edit)) "Pre-dirty edit should report :saved false")
+      (is (string/includes? (str (:note edit)) "unsaved")
+          "Pre-dirty result should note unsaved user changes")
+      (is (string/includes? buffer marker)
+          "User unsaved text should remain in the buffer")
+      (is (string/includes? buffer "(+ a b 9)")
+          "Tool edit should land in the buffer")
+      (is (false? (string/includes? disk-after marker))
+          "User unsaved text must not be written to disk")
+      (is (= disk-before disk-after)
+          "Disk should be unchanged when buffer was pre-dirty")
+      (is (true? (.-isDirty doc))
+          "Buffer should stay dirty when we skip save"))))
+
+(defn- test-active-editor-two-edit-batch+ [socket]
+  (p/let [file-path (setup-active-target-file+ socket 138)
+          _ (activate-target-editor+ file-path)
+          dirty-before (active-document-dirty?)
+          result (mcp/call-tool socket 139 "clojure_edit_files"
+                                {:edits [{:type "replace"
+                                          :filePath file-path
+                                          :line 3
+                                          :targetLineText "(defn add-numbers"
+                                          :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b 1))"}
+                                         {:type "append"
+                                          :filePath file-path
+                                          :code "(defn batch-active\n  []\n  :ok)\n"}]})
+          file-result (some-> result :files vals first)
+          edits (:edits file-result)
+          dirty-after (active-document-dirty?)
+          buffer (.getText (.-document vscode/window.activeTextEditor))
+          disk (fs/readFileSync file-path "utf8")]
+    (testing "active editor two-edit batch reports :saved and disk match (#72)"
+      (is (false? dirty-before) "Batch should start from a clean buffer")
+      (is (batch-success? result) "Both edits should succeed")
+      (is (= 2 (count edits)) "Batch should return two edit results")
+      (is (every? :saved edits) "Each edit on a clean file should report :saved true")
+      (is (true? (:disk-matches-buffer? file-result))
+          "File result should report disk matches buffer")
+      (is (false? dirty-after) "Active buffer should not stay dirty after batch")
+      (is (string/includes? buffer "(+ a b 1)"))
+      (is (string/includes? buffer "(defn batch-active"))
+      (is (string/includes? disk "(+ a b 1)"))
+      (is (string/includes? disk "(defn batch-active")))))
+
 (deftest-async structural-editing-tests
   (-> (p/let [{:keys [socket]} (mcp/start-mcp-session!)
               file-path (test-file-path)]
@@ -528,6 +617,8 @@
               (test-active-editor-replace-saves+ socket)
               (test-active-editor-insert-saves+ socket)
               (test-active-editor-append-saves+ socket)
+              (test-active-editor-pre-dirty-does-not-save+ socket)
+              (test-active-editor-two-edit-batch+ socket)
               (mcp/stop-mcp-session! socket)))
       (p/catch (fn [e]
                  (js/console.error "[structural-edit] Error:" (.-message e) e)

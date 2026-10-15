@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- Fix: [clojure_edit_files leaves active editor buffer unsaved](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/72)
+
 ## [v0.0.44] - 2026-09-19
 
 - Fix: [Generated ECA config has hardcoded absolute path to MCP port file](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/70) (depends on vscode-mcp #3)
