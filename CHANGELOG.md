@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.45] - 2026-10-18
+
 - Fix: [clojure_edit_files leaves active editor buffer unsaved](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/72)
 
 ## [v0.0.44] - 2026-09-19
