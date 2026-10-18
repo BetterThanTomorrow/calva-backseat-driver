@@ -332,6 +332,35 @@ Test the complete file editing lifecycle in batch calls:
 - Response contains `summary` field (e.g., `"1/1 edits applied across 1 files"`)
 - Response contains `files` map with per-file results
 
+### Active Editor Document
+
+Test `clojure_edit_files` against the document that is the active text editor, not a background file.
+
+**Setup**:
+1. Create a dedicated test file under `src/mini/` with a namespace and one function. Same cleanup rule as the rest of this section. Do not use a file the human is working in.
+2. Show that file as the active editor with preview false before the edits. Confirm the active editor path is that file and `isDirty` is false. Joyride (`joyride_evaluate_code`) can open the document and read `vscode/window.activeTextEditor`.
+
+**Clean buffer**: Run replace, insert, and append, and one two-edit batch of replace plus append.
+
+**Validation points**:
+- Edit succeeds
+- Each edit reports `saved: true`
+- The file result reports `disk-matches-buffer?` true
+- After the edit, the active editor is still that file and `isDirty` is false
+- The new text is in the editor buffer and on disk, and those two texts are equal
+
+**Already-dirty buffer**:
+1. With the file active, insert an unsaved marker into the buffer and do not save. Confirm `isDirty` is true and the marker is not on disk.
+2. Run one structural replace.
+
+**Validation points**:
+- Edit succeeds, `saved` is false, and the edit `note` mentions unsaved changes
+- The marker and the tool edit are both in the buffer
+- Disk is unchanged: the marker is not on disk, and the tool edit is not on disk
+- The buffer stays dirty
+
+Revert the dirty buffer (do not save) before cleanup, then delete the test file.
+
 ### Batch Operation Goals
 
 These tests validate the specific design goals of the batch tool:
@@ -600,7 +629,7 @@ When reporting results, cover only the sections that were tested.
 
 **Who-Tracking**: `other-whos-since-last` correctly tracks API-to-API interleaving. Parallel subagent contention produces non-empty tracking arrays.
 
-**Structural Editing**: Full create → append → insert → replace → delete → reload lifecycle completes. Post-edit diagnostics are accurate. REPL reload succeeds after definition order is correct.
+**Structural Editing**: Full create → append → insert → replace → delete → reload lifecycle completes. Post-edit diagnostics are accurate. REPL reload succeeds after definition order is correct. When the edited file is the active editor, a clean buffer reports `saved: true` and `disk-matches-buffer?` true, with `isDirty` false and buffer text equal to disk; an already-dirty buffer reports `saved` false, keeps the unsaved marker and the edit in the buffer, and leaves disk unchanged.
 
 **Output Log**: Datalog queries return correct results across all query styles (pull, aggregation, predicates, parameterized `:in` clauses). Image capping: default `maxImages: 0` replaces data URIs with `<<image-N-capped>>` markers; explicit `maxImages > 0` returns images with `<<image-N>>` markers; plain results pass through unmodified.
 
