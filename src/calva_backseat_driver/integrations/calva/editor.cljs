@@ -2,6 +2,7 @@
   (:require
    ["vscode" :as vscode]
    [calva-backseat-driver.integrations.calva.api :as calva]
+   [calva-backseat-driver.integrations.calva.editor-persist :as editor-persist]
    [calva-backseat-driver.integrations.parinfer :as parinfer]
    [calva-backseat-driver.integrations.calva.editor-util :as util]
    [clojure.string :as string]
@@ -23,9 +24,10 @@
                       [(vscode/Range. vscode-position vscode-position), ""]
                       ((get-in calva/calva-api [:ranges ranges-fn-key]) vscode-document vscode-position))}))
 
-(defn- edit-replace-range [file-path vscode-range new-text]
-  (p/let [^js vscode-document (get-document-from-path file-path)]
-    ((get-in calva/calva-api [:editor :replace]) vscode-document vscode-range new-text)))
+(defn- edit-replace-range
+  "Apply Calva editor.replace on the given document (same object that will be saved)."
+  [^js vscode-document vscode-range new-text]
+  ((get-in calva/calva-api [:editor :replace]) vscode-document vscode-range new-text))
 
 (def ^:private severity-map
   "Map VS Code diagnostic severity levels to keywords"
@@ -190,21 +192,24 @@
   [{:editor/keys [file-path line-number original-line-number new-form ranges-fn-key]}]
   (let [validation-result (parinfer/validate-brackets new-form)]
     (if-not (:valid? validation-result)
-      (p/resolved (assoc validation-result :success false))
+      (p/resolved (assoc validation-result :success false :saved false))
       (p/let [form-data (get-ranges-form-data-by-line file-path line-number ranges-fn-key)
-              ^js vscode-document (get-document-from-path file-path)
+              ^js vscode-document (:vscode-document form-data)
+              was-dirty? (.-isDirty vscode-document)
+              text-before (.getText vscode-document)
               trimmed-form (string/trim new-form)
               text (if (= :insertionPoint ranges-fn-key) (str trimmed-form "\n\n") trimmed-form)
               form-range (first (:ranges-object form-data))
               effective-range (compute-effective-range vscode-document form-range ranges-fn-key trimmed-form)
-              edit-result (edit-replace-range file-path effective-range text)
-              _ (.save vscode-document)]
-        (if edit-result
-          (cond-> {:success true}
-            (not= line-number original-line-number)
-            (assoc :actual-line-used line-number))
-          {:success false
-           :error "Failed to apply edit"})))))
+              range-text (.getText vscode-document effective-range)
+              edit-result (edit-replace-range vscode-document effective-range text)
+              persist (editor-persist/persist-edit-result+
+                       vscode-document was-dirty? edit-result
+                       {:text-before text-before
+                        :identical-replace? (= range-text text)})]
+        (cond-> persist
+          (and (:success persist) (not= line-number original-line-number))
+          (assoc :actual-line-used line-number))))))
 
 (defn- apply-edit-and-report+
   "Apply a form edit and report diagnostics. Assumes targeting is already validated."
@@ -225,7 +230,7 @@
   [opts]
   (let [validation (validate-edit-inputs (:editor/target-line opts) (:editor/new-form opts))]
     (if-not (:valid? validation)
-      {:success false :error (:error validation)}
+      {:success false :saved false :error (:error validation)}
       (-> (p/let [targeting (resolve-edit-target+ opts)]
             (if-not (:resolved? targeting)
               (:result targeting)
@@ -233,7 +238,7 @@
                (assoc opts
                       :editor/line-number (:line-number targeting)
                       :editor/original-line-number (:editor/line-number opts)))))
-          (p/catch (fn [e] {:success false :error (.-message e)}))))))
+          (p/catch (fn [e] {:success false :saved false :error (.-message e)}))))))
 
 #_{:clojure-lsp/ignore [:clojure-lsp/unused-public-var]}
 (comment
@@ -304,9 +309,11 @@
                         (vscode/workspace.fs.writeFile uri content-bytes)))
               (p/then (fn [_]
                         {:success true
+                         :saved true
                          :file-path file-path}))
               (p/catch (fn [error]
                          {:success false
+                          :saved false
                           :error (.-message error)
                           :file-path file-path})))))))
 
@@ -315,9 +322,11 @@
   [file-path code]
   (let [validation-result (parinfer/validate-brackets code)]
     (if-not (:valid? validation-result)
-      (p/resolved validation-result)
+      (p/resolved (assoc validation-result :saved false))
       (-> (p/let [uri (vscode/Uri.file file-path)
                   ^js vscode-document (vscode/workspace.openTextDocument uri)
+                  was-dirty? (.-isDirty vscode-document)
+                  text-before (.getText vscode-document)
                   last-line-number (.-lineCount vscode-document)
                   end-position (vscode/Position. last-line-number 0)
                   last-line-text (if (pos? last-line-number)
@@ -331,12 +340,22 @@
                   workspace-edit (vscode/WorkspaceEdit.)
                   _ (.set workspace-edit uri #js [edit])
                   edit-result (vscode/workspace.applyEdit workspace-edit)
-                  _ (.save vscode-document)]
-            (if edit-result
-              {:success true
-               :appended-at-end true}
-              {:success false
-               :error "Failed to apply workspace edit"}))
+                  persist (editor-persist/persist-edit-result+
+                           vscode-document was-dirty? edit-result
+                           {:text-before text-before})]
+            (cond-> persist
+              (:success persist) (assoc :appended-at-end true)))
           (p/catch (fn [error]
                      {:success false
+                      :saved false
                       :error (.-message error)}))))))
+
+(defn disk-matches-document?
+  "True when on-disk file content equals the open document buffer for file-path.
+   Returns nil when the document or disk cannot be read."
+  [file-path]
+  (-> (p/let [^js vscode-document (get-document-from-path file-path)
+              disk-bytes (vscode/workspace.fs.readFile (.-uri vscode-document))
+              disk (.decode (js/TextDecoder.) disk-bytes)]
+        (= disk (.getText vscode-document)))
+      (p/catch (fn [_] nil))))
