@@ -25,36 +25,36 @@
 (deftest persist-after-edit-timeout-does-not-save
   (testing "timed-out visibility wait on a real change returns :saved false without calling save"
     (async done
-      (let [save-calls (atom 0)
-            doc (stub-document {:dirty? false
-                                :save-result true
-                                :on-save #(swap! save-calls inc)})]
-        (-> (p/let [result (editor-persist/persist-after-edit+
-                            doc false true {:edit-visible? false})]
-              (is (true? (:success result)))
-              (is (false? (:saved result)))
-              (is (string? (:note result)))
-              (is (zero? @save-calls)
-                  "save must not run when visibility wait timed out")
-              (done))
-            (p/catch (fn [e]
-                       (is false (str e))
-                       (done))))))))
+           (let [save-calls (atom 0)
+                 doc (stub-document {:dirty? false
+                                     :save-result true
+                                     :on-save #(swap! save-calls inc)})]
+             (-> (p/let [result (editor-persist/persist-after-edit+
+                                 doc false true {:edit-visible? false})]
+                   (is (true? (:success result)))
+                   (is (false? (:saved result)))
+                   (is (string? (:note result)))
+                   (is (zero? @save-calls)
+                       "save must not run when visibility wait timed out")
+                   (done))
+                 (p/catch (fn [e]
+                            (is false (str e))
+                            (done))))))))
 
 (deftest persist-after-edit-identical-replace-skips-visibility-gate
   (testing "identical replace saves even when edit-visible? is false"
     (async done
-      (let [save-calls (atom 0)
-            doc (stub-document {:dirty? true
-                                :save-result true
-                                :on-save #(swap! save-calls inc)})]
-        (-> (p/let [result (editor-persist/persist-after-edit+
-                            doc false true {:identical-replace? true
-                                            :edit-visible? false})]
-              (is (true? (:success result)))
-              (is (true? (:saved result)))
-              (is (= 1 @save-calls))
-              (done))
-            (p/catch (fn [e]
-                       (is false (str e))
-                       (done))))))))
+           (let [save-calls (atom 0)
+                 doc (stub-document {:dirty? true
+                                     :save-result true
+                                     :on-save #(swap! save-calls inc)})]
+             (-> (p/let [result (editor-persist/persist-after-edit+
+                                 doc false true {:identical-replace? true
+                                                 :edit-visible? false})]
+                   (is (true? (:success result)))
+                   (is (true? (:saved result)))
+                   (is (= 1 @save-calls))
+                   (done))
+                 (p/catch (fn [e]
+                            (is false (str e))
+                            (done))))))))
