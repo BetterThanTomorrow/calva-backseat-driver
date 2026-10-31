@@ -6,9 +6,9 @@ If you are using Backseat Driver with harnesses _other than_ Copilot or [Cursor]
 
 Backseat Driver runs a socket server inside the VS Code Extension Host. Your MCP client starts a small Node **stdio wrapper** that connects to that socket (port number, or the path from **Copy command** / `bb list`).
 
-There is one Backseat Driver MCP server per workspace. Change the preferred port with `calva-backseat-driver.mcpSocketServerPort`. Use `0` (default) to always pick a random available port.
+There is one Backseat Driver MCP server per VS Code window. Change the preferred port with `calva-backseat-driver.mcpSocketServerPort`. Use `0` (default) to always pick a random available port.
 
-While the socket is running, Backseat Driver also writes a live JSON entry to `~/.config/vscode-mcp/registry/windows/backseat-driver-<window-id>.json` (when `calva-backseat-driver.enableMcpRegistry` is `true`, the default). External agents (bots, phone clients, other machines that can see that home directory) can scan the folder, treat an entry as live when its `pid` is still running and `updatedAt` is less than 60 seconds old, then attach with:
+While the socket is running, Backseat Driver also writes a live JSON entry to `~/.config/vscode-mcp/registry/windows/calva-backseat-driver-<window-id>.json` (when `calva-backseat-driver.enableMcpRegistry` is `true`, the default). External agents (bots, phone clients, other machines that can see that home directory) can scan the folder, treat an entry as live when its `pid` is still running and `updatedAt` is less than 60 seconds old, then attach with:
 
 ```
 node <mcp.wrapperPath> <mcp.portFilePath> <mcp.host>
@@ -32,6 +32,8 @@ With your project opened in VS Code (or fork):
 Backseat Driver is per-project, so configure it at the project/workspace level when your client allows that.
 
 * **Project-level config:** use **Copy command + port-file** from the start dialog, or `bb list` under `~/.config/vscode-mcp/registry`. (Or hand Claude that registry folder and ask it to set the MCP server up.)
+
+  NB: The port-file path ends in a window id. The id comes from the editor (VS Code, Insiders, Cursor, …) plus the `.code-workspace` file you opened, or the folder when you opened a folder. Open the same project in another editor, or through another workspace file, and you get a different port file. If the client stops connecting, copy the path again from the window you're in.
 * **No project-level config:** assign different socket ports per project via `mcpSocketServerPort`, then point your client's stdio command at that port for the session you are in.
 
 ### Cursor
@@ -40,7 +42,7 @@ No config needed for Cursor. Backseat Driver handles this for you, Zero Conf, th
 
 ### ECA
 
-No config needed when the ECA extension is installed and a workspace is open. Backseat Driver upserts project-local `.eca/config.json` (server key `backseat-driver`). Opt out with `calva-backseat-driver.autoRegisterEcaMcp` set to `false`. Stop does not remove the ECA entry. No Register-with-ECA command.
+No config needed when the ECA extension is installed and a workspace is open. Backseat Driver upserts project-local `.eca/config.json` (server key `calva-backseat-driver`) in the first workspace folder each time the server starts, so it points at the window that started last. Opt out with `calva-backseat-driver.autoRegisterEcaMcp` set to `false`. Stop does not remove the ECA entry. No Register-with-ECA command.
 
 ### Windsurf configuration
 

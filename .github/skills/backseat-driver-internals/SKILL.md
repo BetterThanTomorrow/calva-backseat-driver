@@ -134,13 +134,16 @@ Subsystem contracts, state architecture, and temporal sequences for the Backseat
   socket_server: TCP | net.createServer | localhost_only
   | port: configured(default 1664) | 0 ≡ random | EADDRINUSE → fallback_to_0
   | port_file: ~/.config/vscode-mcp/port-files/<serverName>-<windowId>.port
+  | windowId: vscode-mcp instance-slug | computed_once_at_start
+  |   ws-<hash([uriScheme (or workspace-file first-folder)])> | win-<hash([uriScheme ext-host-pid])> when(¬folder)
+  |   same_folder → different_id per(editor ∧ workspace_file) | written_down_paths(.eca ∧ .mcp.json) go_stale
   | protocol: newline_delimited_JSON | buffered_partial_reads
   | active_sockets: atom | tracks_connected_clients
   | notifications: broadcast_to_all_active_sockets
 
   stdio_wrapper: dist/calva-mcp-server.js
   | reads_port_from_port_file → TCP_connect → relay(stdio ↔ socket)
-  | one_server_per_workspace_folder
+  | one_server_per_window
 
 λ calva_api_contract.
   calva-api ≡ {
