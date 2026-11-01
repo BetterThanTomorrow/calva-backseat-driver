@@ -71,8 +71,9 @@
       (is (= 2 (:runtimeCount result)))
       (is (= sample-runtime-projected (:mostRecentRuntime result)))))
   (testing "does not include :runtimes"
-    (is (nil? (:runtimes (session-runtimes/project-build-compact
-                          (assoc sample-build-base :runtimes [sample-runtime-raw])))))))
+    (is (not (contains? (session-runtimes/project-build-compact
+                         (assoc sample-build-base :runtimes [sample-runtime-raw]))
+                        :runtimes)))))
 
 (deftest project-build-full-test
   (testing "includes projected runtimes in input order"
