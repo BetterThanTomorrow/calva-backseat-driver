@@ -59,10 +59,12 @@ When `clojure_list_sessions` shows `supportsRuntimes: true` on a session:
 - User-defined builds use keyword names (e.g. `:app`); infrastructure builds use bare names (e.g. `node-repl`, `browser-repl`). Both are listed.
 - Optional `includeAllRuntimes: true` on `clojure_list_sessions` adds full `runtimes[]` per build when you need every connected tab/process description.
 - Optional `targetRuntimeId` on `clojure_evaluate_code` evaluates on a specific runtime without changing the editor's connected runtime. Get IDs from `clojure_list_sessions`.
-- NB: Unknown or stale `targetRuntimeId` evaluates on the editor-connected runtime (no error).
+- With Calva 2.0.608 or later, an unknown or stale `targetRuntimeId` fails with `No shadow-cljs runtime with id N on this connection`. Older Calva versions evaluated on the editor-connected runtime without an error.
+- The evaluation result reports `shadow-runtime-id`. Check it against the runtime you meant.
 - `lastActivity: null` means no Calva evaluation on that runtime this session yet.
-- When the user must choose among similar runtimes, present each runtime's `description`.
-- Choose default runtime (which is the user's currently selected runtime) or explicit targeting based on context.
+- Without `targetRuntimeId`, evaluation goes to Calva's active runtime, the one the user evaluates in. That runtime is chosen in Calva, not by which tab or window is in front, and runtime descriptions are often identical (every tab of one browser has the same description). When a build has several runtimes, evaluate something that identifies each one, such as `(.-href js/location)` for a browser tab, with `targetRuntimeId` set to each id, then target the one the task is about.
+- Each runtime has its own JS state, while the compiler state is shared by the build. A var defined on one runtime compiles on another and evaluates to `nil` there.
+- When the user must choose among similar runtimes, present what identifies each one.
 
 ### The `who` parameter
 
