@@ -79,16 +79,22 @@
     (println "Status: NO TESTS RAN")
     (throw (ex-info "E2E tests did not run" {:babashka/exit 1}))))
 
+(def ^:private e2e-launchers
+  "How `run-e2e-tests-ws` starts launch.js: in a container on a virtual display, or on
+   this machine with `--local`."
+  {:container ["./e2e-test-ws/run-containerized.sh"]
+   :local ["node" "./e2e-test-ws/launch.js"]})
+
 (defn- run-e2e-launch!
-  "Run e2e tests via launch.js with output redirected to log file.
-   Shows spinner during execution, prints brief summary when done."
-  [& args]
+  "Run e2e tests via `launcher`, a command that runs launch.js, with output redirected
+   to log file. Shows spinner during execution, prints brief summary when done."
+  [launcher & args]
   (fs/create-dirs (fs/parent e2e-output-log))
   (println "Output:" e2e-output-log)
   (let [start-ms (System/currentTimeMillis)
         exit-code (with-open [writer (io/writer (io/file e2e-output-log))]
                     (with-spinner "Running e2e tests..."
-                      #(:exit @(p/process (into ["node" "./e2e-test-ws/launch.js"] args)
+                      #(:exit @(p/process (into launcher args)
                                           {:out writer :err writer}))))
         elapsed-s (/ (- (System/currentTimeMillis) start-ms) 1000.0)
         {:keys [passed failed errored total warning] :as counts} (test-counts (slurp e2e-output-log))
@@ -140,13 +146,14 @@
         (fs/copy src (fs/path e2e-tmp-dir item)))))
   e2e-tmp-dir)
 
-(defn ^:export run-e2e-tests-from-working-dir! [{:keys [is-ci calva-vsix]}]
+(defn ^:export run-e2e-tests-from-working-dir! [{:keys [is-ci local calva-vsix]}]
   (println "Running end-to-end tests using working directory")
   (if is-ci
     (util/shell false "node" "./e2e-test-ws/launch.js")
     (let [tmp-ws (prepare-tmp-test-workspace!)]
       (println "Using temporary test workspace:" tmp-ws)
-      (apply run-e2e-launch! (str "--test-workspace=" tmp-ws)
+      (apply run-e2e-launch! (e2e-launchers (if local :local :container))
+             (str "--test-workspace=" tmp-ws)
              (when calva-vsix [(str "--calva-vsix=" calva-vsix)])))))
 
 (defn package-pre-release! [{:keys [slug dry]}]

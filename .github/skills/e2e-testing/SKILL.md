@@ -12,9 +12,12 @@ When verifying a change that affects MCP behavior, use the `bd-tester` agent in 
 ## Running Tests
 
 ```bash
-bb run-e2e-tests-ws
+bb run-e2e-tests-ws          # in a Linux container on a virtual display
+bb run-e2e-tests-ws --local  # in a VS Code on this machine
 ```
 
+- The default runs in Docker (`e2e-test-ws/run-containerized.sh`), against the `out/` the build keeps current. No test window opens on the screen, and the editor-focus-dependent structural editing tests don't flake there.
+- `--local` needs `ELECTRON_RUN_AS_NODE` unset when started from a VS Code terminal.
 - Output summary prints to stdout
 - Detailed output: `.tmp/e2e-output.log` — read this file for diagnostics
 - Do not pipe or redirect the command

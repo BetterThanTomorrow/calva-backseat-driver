@@ -79,7 +79,8 @@ Day-to-day co-development: run the default **Watch** task (`watch:local`), not `
 
 ### Testing Commands
 ```bash
-bb run-e2e-tests-ws     # Full E2E (exercises MCP server for many tests)
+bb run-e2e-tests-ws     # Full E2E (exercises MCP server for many tests), in Docker
+bb run-e2e-tests-ws --local  # The same, in a VS Code on this machine
 bb package-pre-release  # Package pre-release VSIX
 ```
 
@@ -89,7 +90,7 @@ bb package-pre-release  # Package pre-release VSIX
 - Full MCP coverage comes from the e2e tests + the `bd-tester` agent in the example/test project used inside the dev Extension Host.
 - For any change affecting the MCP server, tools, port file, or Cursor/ECA auto-registration: after the change, launch the dev Extension Host (F5), use `bd-tester` to specifically test the modified behavior, and frequently run its full protocol as a regression check.
 
-**Note**: When running `bb run-e2e-tests-ws`: Detailed output goes to .tmp/e2e-output.log — read that file for details, if needed. The command outputs a very brief summary. Don't pipe or redirect.
+**Note**: `bb run-e2e-tests-ws` runs the tests in a Linux container on a virtual display (`e2e-test-ws/run-containerized.sh`), against the `out/` your build keeps current, so no test window opens on your screen. It needs Docker. With `--local` they run in a VS Code on this machine; from a VS Code terminal, unset `ELECTRON_RUN_AS_NODE` first. Detailed output goes to .tmp/e2e-output.log — read that file for details, if needed. The command outputs a very brief summary. Don't pipe or redirect.
 
 ### E2E Testing
 Load the `e2e-testing` skill (`.github/skills/e2e-testing/SKILL.md`) when writing, modifying, or debugging e2e tests. It covers test runner mechanics, shared helpers, session lifecycle patterns, and data shape through MCP. The e2e suite (plus the `bd-tester` agent in the dev extension host's test project) provides full coverage of the MCP server/tools protocol.

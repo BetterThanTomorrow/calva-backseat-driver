@@ -1,0 +1,18 @@
+name: backseat-driver-e2e-test
+
+# Started by run-containerized.sh, which sets BD_REPO to the checkout's host path.
+# The checkout is mounted at that same path, so paths given on the command line work in the container.
+services:
+  e2e-test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: ${BD_REPO:?Start through run-containerized.sh}
+    volumes:
+      - ${BD_REPO}:${BD_REPO}
+      # Linux VS Code, its user data and extensions, apart from the host's
+      - vscode-test:${BD_REPO}/.vscode-test
+    init: true
+
+volumes:
+  vscode-test:

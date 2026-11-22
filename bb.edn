@@ -41,9 +41,9 @@
                                                :args->opts [:bump-branch :email :user-name]}))}
 
   run-e2e-tests-ws
-  {:doc "Run e2e tests using working directory [--is-ci] [--calva-vsix <path>]. Output goes to .tmp/e2e-output.log — read that file for details, don't pipe or redirect."
+  {:doc "Run e2e tests using working directory, in a container on a virtual display [--local] [--is-ci] [--calva-vsix <path>]. --local runs them on this machine. Output goes to .tmp/e2e-output.log — read that file for details, don't pipe or redirect."
    :task (t/run-e2e-tests-from-working-dir!
-          (cli/parse-opts *command-line-args* {:restrict [:is-ci :calva-vsix]}))}
+          (cli/parse-opts *command-line-args* {:restrict [:is-ci :local :calva-vsix]}))}
 
   run-e2e-tests-vsix
   {:doc "Run e2e tests using <vsix> [--calva-vsix <path>]"
