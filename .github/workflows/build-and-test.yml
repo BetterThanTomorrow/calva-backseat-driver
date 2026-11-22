@@ -12,11 +12,7 @@ on:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
 
       - name: Setup Node.js
@@ -88,13 +84,13 @@ jobs:
       - name: Upload VSIX Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ runner.os }}-${{ env.VSIX_NAME }}
+          name: ${{ env.VSIX_NAME }}
           path: ${{ env.VSIX_NAME }}
 
       - name: Upload Test Artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ runner.os }}-extension-tests
+          name: extension-tests
           path: out/extension-tests.js
 
   test:
@@ -116,7 +112,7 @@ jobs:
       - name: Download Test Artifact
         uses: actions/download-artifact@v8
         with:
-          name: ${{ runner.os }}-extension-tests
+          name: extension-tests
           pattern: out/extension-tests.js
           merge-multiple: true
           path: out/
@@ -140,7 +136,7 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           path: .
-          pattern: '${{ runner.os }}-*.vsix'
+          pattern: '*.vsix'
           merge-multiple: true
 
       - name: Get VSIX File Name
