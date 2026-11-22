@@ -61,16 +61,23 @@
         (print (str "\r" (apply str (repeat (+ 3 (count message)) " ")) "\r"))
         (flush)))))
 
-(defn- parse-test-counts
-  "Parse structured test results from the Runner summary line."
-  [log-file]
-  (let [content (slurp log-file)]
-    (if-let [[_ pass fail error] (re-find #"Runner: tests run, results: \{:pass (\d+),?\s*:fail (\d+),?\s*:error (\d+)\}" content)]
-      (let [passed (parse-long pass)
-            failed (parse-long fail)
-            errored (parse-long error)]
-        {:passed passed :failed failed :errored errored :total (+ passed failed errored)})
-      {:passed 0 :failed 0 :errored 0 :total 0 :warning "Could not find Runner summary in log"})))
+(defn- test-counts
+  "Structured test results from the Runner summary line in `content`."
+  [content]
+  (if-let [[_ pass fail error] (re-find #"Runner: tests run, results: \{:pass (\d+),?\s*:fail (\d+),?\s*:error (\d+)\}" content)]
+    (let [passed (parse-long pass)
+          failed (parse-long fail)
+          errored (parse-long error)]
+      {:passed passed :failed failed :errored errored :total (+ passed failed errored)})
+    {:passed 0 :failed 0 :errored 0 :total 0 :warning "Could not find Runner summary in log"}))
+
+(defn- throw-unless-tests-ran!
+  "A run that exits 0 without the Runner summary ran no tests, as when the test
+   instance's extension host exits before the runner starts."
+  [{:keys [total]}]
+  (when (zero? total)
+    (println "Status: NO TESTS RAN")
+    (throw (ex-info "E2E tests did not run" {:babashka/exit 1}))))
 
 (defn- run-e2e-launch!
   "Run e2e tests via launch.js with output redirected to log file.
@@ -84,21 +91,42 @@
                       #(:exit @(p/process (into ["node" "./e2e-test-ws/launch.js"] args)
                                           {:out writer :err writer}))))
         elapsed-s (/ (- (System/currentTimeMillis) start-ms) 1000.0)
-        {:keys [passed failed errored total warning]} (parse-test-counts e2e-output-log)
+        {:keys [passed failed errored total warning] :as counts} (test-counts (slurp e2e-output-log))
         problems (+ failed errored)]
     (println)
     (when warning (println (str "WARNING: " warning)))
     (println (format "Tests: %d passed, %d failed, %d errored, %d total" passed failed errored total))
     (if (zero? exit-code)
-      (println (format "Status: ALL TESTS PASSED (%.1fs)" elapsed-s))
+      (do
+        (throw-unless-tests-ran! counts)
+        (println (format "Status: ALL TESTS PASSED (%.1fs)" elapsed-s)))
       (do
         (println (format "Status: TESTS FAILED (%d problems, exit code %d, %.1fs)" problems exit-code elapsed-s))
         (throw (ex-info "E2E tests failed" {:babashka/exit exit-code}))))))
 
+(defn- run-echoing!
+  "Runs `cmd` with its output, stderr included, echoed as it comes. Returns
+   `{:exit … :out …}` with the output collected."
+  [cmd]
+  (println (string/join " " cmd))
+  (flush)
+  (let [proc (p/process cmd {:err :out})
+        out (StringBuilder.)]
+    (doseq [line (line-seq (io/reader (:out proc)))]
+      (println line)
+      (flush)
+      (.append out line)
+      (.append out "\n"))
+    {:exit (:exit @proc)
+     :out (str out)}))
+
 (defn ^:export run-e2e-tests-with-vsix! [{:keys [vsix calva-vsix]}]
   (println "Running end-to-end tests using vsix:" vsix)
-  (apply util/shell false "node" "./e2e-test-ws/launch.js" (str "--vsix=" vsix)
-         (when calva-vsix [(str "--calva-vsix=" calva-vsix)])))
+  (let [{:keys [exit out]} (run-echoing! (cond-> ["node" "./e2e-test-ws/launch.js" (str "--vsix=" vsix)]
+                                           calva-vsix (conj (str "--calva-vsix=" calva-vsix))))]
+    (when-not (zero? exit)
+      (throw (ex-info "E2E tests failed" {:babashka/exit exit})))
+    (throw-unless-tests-ran! (test-counts out))))
 
 (defn- prepare-tmp-test-workspace! []
   (println "Preparing temporary test workspace...")
