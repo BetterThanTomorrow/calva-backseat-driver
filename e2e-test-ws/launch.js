@@ -136,12 +136,14 @@ async function main(vsixPathOrLabel, testWorkspace, calvaVsix) {
     });
     console.log('Spawn result:', result);
 
+    // E2E_TRACE=1 makes the test instance log at trace level, to find out why a run stops
+    const traceArgs = process.env.E2E_TRACE ? ['--verbose', '--log', 'trace'] : [];
     const runOptions = {
       // When debugging tests, it can be good to use the development version Joyride
       // extensionDevelopmentPath: '/Users/pez/Projects/joyride',
       vscodeExecutablePath,
       extensionTestsPath,
-      launchArgs: [testWorkspace],
+      launchArgs: [testWorkspace, ...traceArgs],
     };
     if (vsixPathOrLabel === 'extension-development') {
       runOptions.extensionDevelopmentPath = path.resolve(__dirname, '..');

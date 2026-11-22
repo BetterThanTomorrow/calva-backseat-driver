@@ -171,7 +171,17 @@ jobs:
 
       - name: Run E2E Tests macOS/Windows
         if: runner.os != 'Linux'
+        env:
+          # The Windows test instance stops before the tests start, see the logs below
+          E2E_TRACE: ${{ runner.os == 'Windows' && '1' || '' }}
         run: bb run-e2e-tests-vsix ${{ env.VSIX_NAME }}
+
+      - name: Upload the test instance's VS Code logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: vscode-logs-${{ runner.os }}
+          path: .vscode-test/user-data/logs
 
   lint:
     runs-on: ubuntu-latest
