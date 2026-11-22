@@ -521,7 +521,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
-    "@vscode/test-electron": "^3.0.0",
+    "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^3.9.2",
     "ovsx": "~1.0.1",
     "rimraf": "~6.1.3",
