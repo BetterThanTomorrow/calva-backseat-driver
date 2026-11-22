@@ -47,6 +47,28 @@ function resolveDarwinVSCodeExecutable(vscodeExecutablePath) {
   return vscodeExecutablePath;
 }
 
+// Auto-update replaces the pinned Calva with the latest as the test instance starts.
+// On Windows CI the extension host then exited, and the test run was canceled with
+// exit code 0. The setting applies to the whole application, so it goes in the test
+// instance's user settings rather than the workspace's.
+function disableExtensionAutoUpdate(cliArgs) {
+  const userDataArg = cliArgs.find((a) => a.startsWith('--user-data-dir='));
+  if (!userDataArg) {
+    return;
+  }
+  const settingsPath = path.join(userDataArg.slice('--user-data-dir='.length), 'User', 'settings.json');
+  let settings = {};
+  try {
+    settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+  } catch (_) {
+    // No settings yet, or settings this script doesn't read: start from none
+  }
+  settings['extensions.autoUpdate'] = false;
+  settings['extensions.autoCheckUpdates'] = false;
+  fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+}
+
 function init() {
   return new Promise((resolve, reject) => {
     try {
@@ -74,6 +96,7 @@ async function main(vsixPathOrLabel, testWorkspace, calvaVsix) {
       await downloadAndUnzipVSCode('insiders')
     );
     const [cliPath, ...args] = resolveCliArgsFromVSCodeExecutablePath(vscodeExecutablePath);
+    disableExtensionAutoUpdate(args);
 
     const calvaExtension = calvaVsix
       ? calvaVsix
