@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.46] - 2026-11-22
+
 - Support starting the MCP server without specififying port file for harnesses running inside VS Code
 
 ## [v0.0.45] - 2026-10-18
