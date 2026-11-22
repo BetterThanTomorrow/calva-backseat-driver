@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- Support starting the MCP server without specififying port file for harnesses running inside VS Code
+
 ## [v0.0.45] - 2026-10-18
 
 - Fix: [clojure_edit_files leaves active editor buffer unsaved](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/72)
