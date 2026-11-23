@@ -1,6 +1,6 @@
 ---
 name: backseat-driver
-description: 'Effective use of the Backseat Driver extension and its tools for Clojure interactive programming. Use when: working in Clojure (including all dialects and runtimes) project, be it reading, planning, developing, or evaluating code in the REPL, looking up function documentation or ClojureDocs examples, choosing REPL sessions, editing Clojure files structurally, checking REPL output, planning implementations, reviewing code, or developing solutions incrementally. Whenever you consider any of these tools: clojure_evaluate_code, clojure_load_file, clojuredocs_info, clojure_list_sessions, clojure_symbol_info, clojure_repl_output_log, clojure_edit_files, clojure_balance_brackets. Also use this skill when PLANNING or DISCUSSING Clojure development approaches — not only at the moment of REPL evaluation.'
+description: 'Effective use of the Backseat Driver extension and its tools for Clojure interactive programming. Use when: working in Clojure (including all dialects and runtimes) project, be it reading, planning, developing, or evaluating code in the REPL, looking up function documentation or ClojureDocs examples, choosing REPL sessions, editing Clojure files structurally, checking REPL output, planning implementations, reviewing code, or developing solutions incrementally. Whenever you consider any of these tools: clojure_evaluate_code, clojure_load_file, clojuredocs_info, clojure_list_sessions, clojure_symbol_info, clojure_repl_output_log, clojure_edit_files, clojure_balance_brackets. Also use this skill when PLANNING or DISCUSSING Clojure development approaches — not only at the moment of REPL evaluation, and when setting up an MCP connection from an agent to Backseat Driver.'
 ---
 
 # Backseat Driver — Effective Tool Usage
@@ -209,9 +209,11 @@ Use Backseat Driver's structural editing tools for all Clojure file modification
 In a Joyride context, if the `joyride_evaluate_code` tool is available, "Use the REPL" means `joyride_evaluate_code`. In lieu of the `joyride_evaluate_code` tool, use the `clojure_evaluate_tool`. Joyride's REPL runs in the VS Code Extension Host and is promise-aware in ways that Backseat Driver's REPL is not — using Backseat Driver's eval for Joyride code leads to async problems. Other tools of Backseat Driver (ClojureDocs, symbol info, structural editing, output log) remain useful.
 
 
-## External harness attach
+## Connecting an agent over MCP
 
-When the user asks how to connect an external harness, bot, or other editor to this workstation's Backseat Driver MCP: registry home is `~/.config/vscode-mcp/registry`. Point the agent at that directory. After a normal install the listing tree includes `README.md`, `AGENTS.md`, `bb-mcp.md`, `bb.edn`, `scripts/list_registry.clj`, `scripts/mcp.clj`, and `scripts/mcp_briefing.clj`. `AGENTS.md` owns session attach. `bb-mcp.md` owns `bb mcp`; the first `bb mcp` command is `--readme`. First-fail stubs still omit `bb mcp` / `bb.edn` and point at `windows/`.
+When the user asks to set up Backseat Driver's MCP server for an agent, a harness, a bot or another editor: the registry home is `~/.config/vscode-mcp/registry`. Point the agent at that directory, or read its `AGENTS.md` and follow it. An agent inside a VS Code window, or in one of its terminals, writes the config with only the stdio wrapper, `node <wrapperPath>`, in its user-level config, and that one config reaches whichever window the agent runs in. An agent outside VS Code names the window, with the port file `bb list --all` shows. The server must be running in the window: **Calva Backseat Driver: Start the MCP socket server**, or the setting `calva-backseat-driver.autoStartMCPServer`.
+
+After a normal install the listing tree includes `README.md`, `AGENTS.md`, `bb-mcp.md`, `bb.edn`, `scripts/list_registry.clj`, `scripts/mcp.clj`, and `scripts/mcp_briefing.clj`. `AGENTS.md` owns session attach. `bb-mcp.md` owns `bb mcp`; the first `bb mcp` command is `--readme`. First-fail stubs still omit `bb mcp` / `bb.edn` and point at `windows/`.
 
 ## Invariants
 
