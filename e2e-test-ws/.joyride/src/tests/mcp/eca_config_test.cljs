@@ -1,8 +1,11 @@
 (ns tests.mcp.eca-config-test
   "Consumer Extension Host proof that ECA upsert pretty-prints owned mcpServers
-  entries and uses portable `${env:HOME}` port-file args (Backseat Driver #67 / #70)."
+  entries, and that the entry is the same on every machine: `node -e` requires the
+  wrapper under `os.homedir()`, with no port file while the window registry is on
+  (Backseat Driver #67 / #70 / #74)."
   (:require
    ["fs" :as fs]
+   ["os" :as os]
    ["path" :as path]
    ["vscode" :as vscode]
    [cljs.test :refer [is testing]]
@@ -47,10 +50,25 @@
 (defn- compact-owned-entry? [text]
   (str/includes? text (str "\"" server-key "\":{")))
 
+(defn- owned-entry
+  "Parses the config, minus its whole-line `//` comments, and returns the owned entry."
+  [text]
+  (-> (->> (str/split-lines text)
+           (remove #(re-find #"^\s*//" %))
+           (str/join "\n"))
+      js/JSON.parse
+      js->clj
+      (get-in ["mcpServers" server-key])))
+
+(def ^:private expected-script
+  "require(require('path').join(require('os').homedir(),'.config','calva','backseat-driver','calva-mcp-server.js'))")
+
 (deftest-async eca-upsert-pretty-prints-owned-entry
-  (testing "startMcpServer upserts calva-backseat-driver into .eca/config.json with pretty indent and portable port path"
+  (testing "startMcpServer upserts calva-backseat-driver into .eca/config.json with pretty indent and a machine-independent entry"
     (is (boolean (vscode/extensions.getExtension eca-extension-id))
         "ECA extension must be installed for this e2e (launch.js installs editor-code-assistant.eca)")
+    (is (true? (.get (vscode/workspace.getConfiguration "calva-backseat-driver") "enableMcpRegistry"))
+        "window registry is on, so the entry names no port file")
     (-> (p/let [_ (write-seed!+)
                 _ (wait-for+ #(.-isActive (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver"))
                              :timeout 15000
@@ -72,10 +90,21 @@
               "owned entry command is pretty-printed under 4-space indent")
           (is (not (compact-owned-entry? text))
               "owned entry is not a compact one-line object")
-          (is (str/includes? text "${env:HOME}/.config/vscode-mcp/port-files/")
-              "port arg is portable under ${env:HOME} (vscode-mcp #3 / BD #70)")
-          (is (not (re-find #"/Users/[^\"]+/.config/vscode-mcp/port-files/" text))
-              "port arg is not a hardcoded absolute home path"))
+          (let [{command "command" args "args" :as entry} (owned-entry text)
+                entry-strings (cons command args)
+                home (os/homedir)]
+            (is (= "node" command)
+                "command is node")
+            (is (= ["-e" expected-script "calva-mcp-server.js"] args)
+                "args are -e, the script requiring the wrapper under os.homedir(), and the wrapper's file name (BD #74)")
+            (is (not-any? #(str/ends-with? % ".port") args)
+                "no port file arg while the window registry is on")
+            (is (not-any? #(str/includes? % "${env:") entry-strings)
+                "no ${env:...} variable, which ECA can't expand where HOME is unset (BD #74)")
+            (is (not-any? #(or (str/includes? % home)
+                               (str/includes? % "/Users/"))
+                          entry-strings)
+                (str "no home directory path in the entry: " (pr-str entry)))))
         (p/catch (fn [e]
                    (js/console.error "[eca-config]" (.-message e) e)
                    (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
