@@ -46,15 +46,15 @@
               :ex/on-error [[:mcp/ax.cursor-mcp-registration-failed :ex/action-args]]}]]})
 
 (defn- handle-cursor-mcp-registered [state result]
-  {:ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]
-            [:app/fx.log
+  {:ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]]
+   :ex/fxs [[:app/fx.log
              (select-keys state [:app/min-log-level :app/log-file-uri :app/log-dir-initialized+])
              :info
              ["Cursor MCP server registered:" result]]]})
 
 (defn- handle-cursor-mcp-registration-failed [state failure]
-  {:ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]
-            [:app/fx.log
+  {:ex/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]]
+   :ex/fxs [[:app/fx.log
              (select-keys state [:app/min-log-level :app/log-file-uri :app/log-dir-initialized+])
              :warn
              ["Cursor MCP auto-registration failed:" failure]]]})
