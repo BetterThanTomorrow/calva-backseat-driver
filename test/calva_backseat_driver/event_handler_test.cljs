@@ -2,6 +2,10 @@
   (:require [cljs.test :refer [deftest is]]
             [calva-backseat-driver.event-handler :as event-handler]))
 
+;; The tests run the loop as a development build runs it, also when they are compiled
+;; for release. The test of a release build sets this to false while it runs.
+(set! event-handler/*development-build?* true)
+
 (defn- test-system
   "A system on its own atom, with `performed` collecting the effects that ran."
   [action-table initial-state]
@@ -236,7 +240,7 @@
   (let [{:keys [dispatch! !state !performed]} (test-system test-actions {})
         console-error js/console.error
         !logged (atom [])]
-    (set! js/goog.DEBUG false)
+    (set! event-handler/*development-build?* false)
     (set! js/console.error (fn [& args]
                              (swap! !logged conj (first args))))
     (try
@@ -245,7 +249,7 @@
                                                      [:test/ax.unknown-effect]
                                                      [:test/ax.effect-among-actions]
                                                      [:test/ax.note :ran]]))]
-        (set! js/goog.DEBUG true)
+        (set! event-handler/*development-build?* true)
         (set! js/console.error console-error)
         (is (= [:resolved nil] outcome)
             "The dispatch resolves")
@@ -259,5 +263,5 @@
                @!logged)
             "Each unknown name is logged"))
       (finally
-        (set! js/goog.DEBUG true)
+        (set! event-handler/*development-build?* true)
         (set! js/console.error console-error)))))

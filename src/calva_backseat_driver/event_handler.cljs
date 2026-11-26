@@ -20,10 +20,15 @@
           {}
           tables))
 
+(def ^:dynamic *development-build?*
+  "True in a development build, where a failed check of the loop's throws. In a release
+   build it is logged. A test sets it to test both."
+  js/goog.DEBUG)
+
 (defn- fail!
   "Throws in a development build. Logs the error in a release build, and returns nil."
   [message data]
-  (when js/goog.DEBUG
+  (when *development-build?*
     (throw (ex-info message data)))
   (js/console.error message (pr-str data))
   nil)
@@ -62,7 +67,7 @@
    `[the-name & args]` names, doesn't take the loop's `own` arguments followed by `args`."
   [kind handler own [the-name & args]]
   (let [arglists (:arglists (meta handler))]
-    (when (and js/goog.DEBUG
+    (when (and *development-build?*
                (not (takes? arglists (+ own (count args)))))
       (fail! (str "The " kind " " the-name " doesn't take " (count args) " arguments: " (pr-str arglists))
              {:uf/name the-name}))))
