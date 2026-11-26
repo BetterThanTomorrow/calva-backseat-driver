@@ -4,13 +4,15 @@
   (let [[opts body]
         (if (map? opts)
           [opts body]
-          [nil (cons opts body)])]
+          [nil (cons opts body)])
+        async-fn (with-meta 'fn {:async true})]
     `(cljs.test/deftest ~name
        ~@(when-let [pre (:before opts)]
            [pre])
        (cljs.test/async
         ~'done
-        (-> (do ~@body)
+        (-> (js/Promise.resolve nil)
+            (.then (fn [_#] ((~async-fn [] ~@body))))
             (.catch (fn [err#]
                       (cljs.test/is (= 1 0) (str err# (.-stack err#)))))
             (.finally
