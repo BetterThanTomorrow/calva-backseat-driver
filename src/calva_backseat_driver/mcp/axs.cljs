@@ -91,8 +91,9 @@
    :uf/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]]})
 
 (defn- open-server-log
+  "Opens the log file in an editor. The dispatch resolves when it is shown."
   [state _uf-data]
-  {:uf/fxs [[:vscode/fx.show-text-document-at (:app/log-file-uri state)]]})
+  {:uf/fxs [[:uf/await :vscode/fx.show-text-document-at (:app/log-file-uri state)]]})
 
 (defn- server-error
   "Tells the person that the MCP server failed, with `message`."

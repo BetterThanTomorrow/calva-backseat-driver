@@ -120,8 +120,9 @@
       "The person is shown the error, and it goes to the console"))
 
 (deftest open-server-log
-  (is (= [[:vscode/fx.show-text-document-at :the-log-file]]
-         (:uf/fxs (handle state [:mcp/ax.open-server-log])))))
+  (is (= [[:uf/await :vscode/fx.show-text-document-at :the-log-file]]
+         (:uf/fxs (handle state [:mcp/ax.open-server-log])))
+      "The command resolves when the log file is shown"))
 
 (deftest handle-request
   (let [request {:jsonrpc "2.0" :id 1 :method "tools/list"}]

@@ -23,9 +23,10 @@
 (defn- fail!
   "Throws in a development build. Logs the error in a release build, and returns nil."
   [message data]
-  (if js/goog.DEBUG
-    (throw (ex-info message data))
-    (js/console.error message (pr-str data))))
+  (when js/goog.DEBUG
+    (throw (ex-info message data)))
+  (js/console.error message (pr-str data))
+  nil)
 
 (defn- await-fx? [fx]
   (= :uf/await (first fx)))
@@ -44,12 +45,50 @@
                         {:uf/name (name-of v)})))
            vectors))
 
+(defn- takes?
+  "True when a function with `arglists` takes `n` arguments. A function without
+   argument lists, such as an anonymous one, is taken to."
+  [arglists n]
+  (or (empty? arglists)
+      (some (fn [arglist]
+              (let [[fixed more] (split-with #(not= '& %) arglist)]
+                (if (seq more)
+                  (<= (count fixed) n)
+                  (= (count fixed) n))))
+            arglists)))
+
+(defn- check-arguments!
+  "In a development build, fails when `handler`, the var for the `kind` named
+   `the-name`, doesn't take the loop's `own` arguments followed by `args`."
+  [kind the-name handler own args]
+  (let [arglists (:arglists (meta handler))]
+    (when (and js/goog.DEBUG
+               (not (takes? arglists (+ own (count args)))))
+      (fail! (str "The " kind " " the-name " doesn't take " (count args) " arguments: " (pr-str arglists))
+             {:uf/name the-name}))))
+
+(defn- known-effects
+  "Returns the `fxs` whose effect is in `effect-table`. Fails on the others, and on an
+   effect that doesn't take its vector's arguments."
+  [effect-table fxs]
+  (let [fxs (known effect-table "effect" effect-name fxs)]
+    (doseq [fx fxs]
+      (check-arguments! "effect"
+                        (effect-name fx)
+                        (get effect-table (effect-name fx))
+                        1
+                        (if (await-fx? fx)
+                          (drop 2 fx)
+                          (rest fx))))
+    fxs))
+
 (def ^:private result-keys #{:uf/db :uf/fxs :uf/dxs})
 
 (defn- handle-action
   [action-table state uf-data [action-name & args]]
   (if-let [handler (get action-table action-name)]
-    (let [result (apply handler state uf-data args)]
+    (let [_ (check-arguments! "action" action-name handler 2 args)
+          result (apply handler state uf-data args)]
       (when-let [unknown-keys (seq (remove result-keys (keys result)))]
         (fail! (str "The handler of " action-name " returned unknown keys: " (pr-str unknown-keys))
                {:uf/name action-name}))
@@ -143,7 +182,7 @@
         uf-data {:system/now (js/Date.now)}
         {:uf/keys [db fxs dxs awaiting]} (handle-actions action-table old-state uf-data actions)
         _ (check-awaiting! awaiting)
-        fxs (known effect-table "effect" effect-name fxs)
+        fxs (known-effects effect-table fxs)
         dxs (known action-table "action" first dxs)]
     (when-not (identical? old-state db)
       (reset! !state db))
@@ -155,7 +194,7 @@
              :uf/state-after db
              :system/now (:system/now uf-data)}))
     (when state-effects
-      (doseq [fx (known effect-table "effect" effect-name (state-effects old-state db))]
+      (doseq [fx (known-effects effect-table (state-effects old-state db))]
         (perform-and-forget! effect-table dispatch! fx)))
     (then (execute-effects effect-table dispatch! fxs prev)
           (fn [prev]

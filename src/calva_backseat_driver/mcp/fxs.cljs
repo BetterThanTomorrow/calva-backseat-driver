@@ -37,7 +37,7 @@
        (vscode-mcp/register-with-cursor!+ (lifecycle-config dispatch! options) lifecycle-state))
       (.catch (fn [e]
                 {:ok false
-                 :error (ex-message e)}))))
+                 :error (or (ex-message e) (str e))}))))
 
 (defn- handle-request
   "Answers the MCP `request`. Returns the response, or a promise of it."
