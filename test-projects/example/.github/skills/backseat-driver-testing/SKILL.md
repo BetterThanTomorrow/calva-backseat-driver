@@ -469,7 +469,7 @@ Use `pull` to select only the attributes you need — this protects the context 
    **Setup** — evaluate in at least two distinct combinations:
    - Evaluate `(+ 1 1)` in `user` namespace via `clj` session
    - Evaluate `(+ 2 2)` in `user` namespace via `bb` session
-   - Evaluate `(ns mini.playground) :ok` in `mini.playground` namespace via `mini-clj` session
+   - Evaluate `(ns mini.playground)` in `user` namespace via `mini-clj` session, then `:ok` in `mini.playground` namespace via `mini-clj` session. The `ns` form is evaluated in `user`, since an evaluation in a namespace that doesn't exist yet gives `""`
 
    **Query** — pull `:output/ns` and `:output/repl-session-key` from `evaluatedCode` entries:
    ```edn
