@@ -119,9 +119,7 @@
   {"enableMcpReplEvaluation" true
    "autoStartMCPServer" false
    "mcpSocketServerPort" 1664
-   "mcpHost" "127.0.0.1"
-   "provideBdSkill" true
-   "provideEditSkill" true})
+   "mcpHost" "127.0.0.1"})
 
 (defn- read-settings-backup [backup-path]
   (js->clj (.parse js/JSON (fs/readFileSync backup-path "utf8"))))
@@ -158,8 +156,6 @@
     (await (.update config "autoStartMCPServer" (restored-js-value (get restored-settings "autoStartMCPServer")) vscode/ConfigurationTarget.Workspace))
     (await (.update config "mcpSocketServerPort" (restored-js-value (get restored-settings "mcpSocketServerPort")) vscode/ConfigurationTarget.Workspace))
     (await (.update config "mcpHost" (restored-js-value (get restored-settings "mcpHost")) vscode/ConfigurationTarget.Workspace))
-    (await (.update config "provideBdSkill" (restored-js-value (get restored-settings "provideBdSkill")) vscode/ConfigurationTarget.Workspace))
-    (await (.update config "provideEditSkill" (restored-js-value (get restored-settings "provideEditSkill")) vscode/ConfigurationTarget.Workspace))
     (await (wait-for+ #(let [current-config (vscode/workspace.getConfiguration "calva-backseat-driver")]
                          (every? (fn [[setting-key default-value]]
                                    (= (restored-effective-value (get restored-settings setting-key) default-value)

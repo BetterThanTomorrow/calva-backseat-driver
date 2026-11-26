@@ -17,7 +17,7 @@ The state, `@db/!app-db`, is plain data and prints. The output log (`:calva/outp
 
 ## Bundled AI Context (chatSkills / chatInstructions)
 
-Skills are registered in `package.json` as `chatSkills` (Copilot skill loader + MCP resources). Short pointer instructions in `chatInstructions` are always injected. Skills are conditional on user settings (`provideBdSkill`, `provideEditSkill`).
+Skills are registered in `package.json` as `chatSkills` (Copilot skill loader + MCP resources). Short pointer instructions in `chatInstructions` are always injected. Backseat Driver always provides both of its skills, `backseat-driver` and `editing-clojure-files`.
 
 ## Key Development Commands
 

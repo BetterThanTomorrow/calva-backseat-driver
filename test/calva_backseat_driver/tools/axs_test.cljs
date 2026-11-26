@@ -18,8 +18,6 @@
    :vscode/config.editor.fuzzyLineTargetingPadding 2
    :vscode/config.editor.lineContextResponsePadding 10
    :vscode/config.enableMcpReplEvaluation true
-   :vscode/config.provideBdSkill true
-   :vscode/config.provideEditSkill false
    :app/min-log-level :debug
    :app/log-file-uri "file:///logs/mcp-server.log"
    :calva/output-line-counter 7

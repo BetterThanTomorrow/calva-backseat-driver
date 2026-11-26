@@ -43,7 +43,6 @@ Match the user's request to the relevant section(s). When asked to "run a full t
 - **Symbol Info and ClojureDocs** — requires session listing first
 - **Bracket Balancer** — no prerequisites, no REPL needed
 - **Bundled Skills** — no prerequisites; client-agnostic discovery/load check
-- **Skills Opt-Out** — requires toggling VS Code settings (manual)
 
 ### Delegation via `bd-tester`
 
@@ -613,21 +612,6 @@ Backseat Driver ships `backseat-driver` and `editing-clojure-files` as bundled s
 
 **Validation**: Discovery and load should be straightforward — no hunting for undocumented entry points or workarounds. Note which surface you used (for diagnosis); the pass criterion is discoverability and successful load, not a specific API.
 
-## Skills Opt-Out
-
-Backseat Driver provides skills conditionally. The `backseat-driver` and `editing-clojure-files` skills referenced in AGENTS.md are injected by BD into the agent's skills list only when enabled. They can be opted out, in which case they will not appear in the agent's `<skills>` section at all.
-
-**VS Code settings**:
-- `calva-backseat-driver.provideBdSkill` — controls the `backseat-driver` skill
-- `calva-backseat-driver.provideEditSkill` — controls the `editing-clojure-files` skill
-
-**Test protocol**:
-1. Ask the agent to list all skills it sees in its context
-2. When a setting is disabled, the corresponding skill should be absent from the agent's `<skills>` section
-3. When a setting is enabled, the corresponding skill should appear as a loadable skill with a file path
-
-This verifies that BD's conditional skill injection works correctly.
-
 ## Success Criteria
 
 When reporting results, cover only the sections that were tested.
@@ -653,5 +637,3 @@ When reporting results, cover only the sections that were tested.
 **Legacy Calva**: Graceful degradation — informative feedback, no crashes.
 
 **Bundled Skills**: Skills discoverable and loadable via the client's normal skill/resource path; entry content (and at least one sibling, when applicable) intact.
-
-**Skills Opt-Out**: Skills appear/disappear based on settings.

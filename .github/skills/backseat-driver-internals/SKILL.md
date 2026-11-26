@@ -254,7 +254,5 @@ The stdio wrapper and the skill resources are in vscode-mcp (`vscode-mcp.stdio.w
 | `enableMcpReplEvaluation` | boolean | true | Expose REPL eval via MCP (set `false` to disable) |
 | `mcpSocketServerPort` | number | 0 | Socket server port (0 = random) |
 | `autoStartMCPServer` | boolean | false | Start MCP server on activation |
-| `provideBdSkill` | boolean | true | Provide Backseat Driver skill via MCP |
-| `provideEditSkill` | boolean | true | Provide structural editing skill via MCP |
 
 Settings are in the state under `:vscode/config.settingName`; a handler reads one with a plain lookup.

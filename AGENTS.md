@@ -215,8 +215,6 @@ The settings are in the state under `:vscode/config.<name>` keys. A handler read
 :vscode/config.autoRegisterCursorMcp    ; boolean (default true)
 :vscode/config.autoRegisterEcaMcp       ; boolean (default true)
 :vscode/config.enableMcpRegistry        ; boolean (default true) — write window registry entries
-:vscode/config.provideBdSkill           ; boolean (default true) — enable/disable Backseat Driver skill
-:vscode/config.provideEditSkill         ; boolean (default true) — enable/disable structural editing skill
 ```
 
 ## Adding New Features

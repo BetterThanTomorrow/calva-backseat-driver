@@ -12,7 +12,6 @@
   {:mcp/wrapper-config-path "/tmp/w"
    :vscode/config.mcpHost "127.0.0.1"
    :vscode/config.mcpSocketServerPort 1664
-   :vscode/config.provideBdSkill true
    :app/min-log-level :debug
    :app/log-file-uri "file:///logs/mcp-server.log"
    :calva/sessions [{:replSessionKey "clj"
@@ -187,9 +186,7 @@
     (is (= [[:uf/await :mcp/fx.handle-request
              {:mcp/manifest {:manifest/name "calva-backseat-driver"}
               :mcp/repl-enabled? false
-              :mcp/when-clause-settings {"config.calva-backseat-driver.provideBdSkill" true
-                                         "config.calva-backseat-driver.provideEditSkill" nil
-                                         "config.calva-backseat-driver.enableMcpReplEvaluation" false
+              :mcp/when-clause-settings {"config.calva-backseat-driver.enableMcpReplEvaluation" false
                                          ":calva-mcp-extension/activated?" true}}
              request]]
            (:uf/fxs (handle (assoc state

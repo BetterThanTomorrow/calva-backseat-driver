@@ -11,8 +11,6 @@
                         #js {:extension #js {:packageJSON (js/JSON.parse (fs/readFileSync (path/resolve "package.json") "utf8"))}})
    :app/min-log-level :error
    :vscode/config.enableMcpReplEvaluation false
-   :vscode/config.provideBdSkill true
-   :vscode/config.provideEditSkill true
    :calva/output-log (sorted-map 3 {:output/line 3 :output/category "evaluatedCode" :output/text "(+ 1 2)"})})
 
 (use-fixtures :each

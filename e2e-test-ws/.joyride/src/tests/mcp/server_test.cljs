@@ -300,66 +300,6 @@
         (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
         (throw e)))))
 
-(deftest-async conditional-skills-filtering
-  (testing "Disabled skills are filtered from MCP responses"
-    (let [backup-path (mcp/backup-settings! "conditional-skills-test-backup.json")]
-      (try
-        (let [config (vscode/workspace.getConfiguration "calva-backseat-driver")
-
-              ;; Disable the backseat-driver skill
-              _ (await (.update config "provideBdSkill" false vscode/ConfigurationTarget.Workspace))
-
-              ;; Wait for config to propagate
-              _ (await (wait-for+
-                        #(= false (.get (vscode/workspace.getConfiguration "calva-backseat-driver")
-                                        "provideBdSkill"))
-                        :message "provideBdSkill did not become false"))
-
-              _ (js/console.log "[conditional-skills] Starting MCP server with BD skill disabled...")
-              {:keys [socket]} (await (mcp/start-mcp-session!))
-
-              ;; Test resources/list — BD skill should be absent
-              resources-response (await (mcp/send-request socket
-                                                          {:jsonrpc "2.0"
-                                                           :id 2
-                                                           :method "resources/list"}))
-              resources (-> resources-response
-                            (js->clj :keywordize-keys true)
-                            (get-in [:result :resources]))
-              resource-names (set (map :name resources))
-              _ (js/console.log "[conditional-skills] Resource names:" (pr-str resource-names))
-
-              _ (let [read-response (await (mcp/send-request socket
-                                                             {:jsonrpc "2.0"
-                                                              :id 3
-                                                              :method "resources/read"
-                                                              :params {:uri "skill://backseat-driver"}}))
-                      read-result (js->clj read-response :keywordize-keys true)
-                      _ (js/console.log "[conditional-skills] Read disabled skill response:" (pr-str read-result))]
-                  (is (some? (:error read-result))
-                      "Reading disabled skill should return error")
-                  (is (= -32602 (get-in read-result [:error :code]))
-                      "Error code should be -32602 for disabled skill")
-
-                  (let [init-response (await (mcp/send-request socket
-                                                               {:jsonrpc "2.0"
-                                                                :id 4
-                                                                :method "initialize"}))
-                        instructions (-> init-response
-                                         (js->clj :keywordize-keys true)
-                                         (get-in [:result :instructions]))
-                        _ (js/console.log "[conditional-skills] Instructions length:" (count instructions))]
-                    (is (re-find #"tools/list" instructions)
-                        "Instructions mention tools/list")
-                    (is (re-find #"resources/list" instructions)
-                        "Instructions mention resources/list")
-                    (is (not (re-find #"Effective use of the Backseat Driver|Structural editing of Clojure files" instructions))
-                        "Instructions do not include skill descriptions")))
-              _ (await (mcp/stop-mcp-session! socket))]
-          nil)
-        (finally
-          (await (mcp/restore-settings! backup-path)))))))
-
 (defn- ^:async get-eval-session-key+
   "Discover a REPL session key via MCP tools/call on clojure_list_sessions."
   [socket]

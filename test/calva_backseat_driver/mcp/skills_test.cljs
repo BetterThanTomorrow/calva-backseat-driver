@@ -1,7 +1,8 @@
 (ns calva-backseat-driver.mcp.skills-test
-  (:require [cljs.test :refer [deftest testing is]]
+  (:require [cljs.test :refer [deftest is]]
             ["fs" :as fs]
             ["path" :as path]
+            [calva-backseat-driver.integrations.vscode.settings :as settings]
             [vscode-mcp.manifest :as manifest]))
 
 (def package-json
@@ -13,36 +14,10 @@
    #js {:extensionPath (js/process.cwd)
         :extension #js {:packageJSON package-json}}))
 
-(defn settings-map [{:mcp/keys [provide-bd-skill? provide-edit-skill?]}]
-  {"config.calva-backseat-driver.provideBdSkill" provide-bd-skill?
-   "config.calva-backseat-driver.provideEditSkill" provide-edit-skill?
-   ":calva-mcp-extension/activated?" true})
-
-(defn get-skills [options]
-  (manifest/get-resources mock-context {:settings (settings-map options)}))
-
 (deftest skills-provision-test
-  (testing "when both skills are enabled"
-    (let [skills (get-skills {:mcp/provide-bd-skill? true
-                              :mcp/provide-edit-skill? true})]
-      (is (= 2 (count skills)))
-      (is (some #(= "backseat-driver" (:name %)) skills))
-      (is (some #(= "editing-clojure-files" (:name %)) skills))
-      (is (every? #(.endsWith (:uri %) "/SKILL.md") skills))))
-
-  (testing "when only backseat-driver is enabled"
-    (let [skills (get-skills {:mcp/provide-bd-skill? true
-                              :mcp/provide-edit-skill? false})]
-      (is (= 1 (count skills)))
-      (is (= "backseat-driver" (:name (first skills))))))
-
-  (testing "when only editing-clojure-files is enabled"
-    (let [skills (get-skills {:mcp/provide-bd-skill? false
-                              :mcp/provide-edit-skill? true})]
-      (is (= 1 (count skills)))
-      (is (= "editing-clojure-files" (:name (first skills))))))
-
-  (testing "when both skills are disabled"
-    (let [skills (get-skills {:mcp/provide-bd-skill? false
-                              :mcp/provide-edit-skill? false})]
-      (is (empty? skills)))))
+  (let [skills (manifest/get-resources mock-context {:settings (settings/when-clause-settings {})})]
+    (is (= #{"backseat-driver" "editing-clojure-files"} (set (map :name skills)))
+        "Both skills are provided, whatever the settings")
+    (is (every? #(.endsWith (:uri %) "/SKILL.md") skills)))
+  (is (not-any? #(contains? % "when") (:manifest/skills mock-context))
+      "No skill has a when clause"))

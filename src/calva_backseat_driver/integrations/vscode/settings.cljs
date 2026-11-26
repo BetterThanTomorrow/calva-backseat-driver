@@ -26,7 +26,5 @@
   "Returns what the when clauses of the manifest's tools and skills evaluate to, by
    clause, from the settings in `state`."
   [state]
-  {"config.calva-backseat-driver.provideBdSkill" (:vscode/config.provideBdSkill state)
-   "config.calva-backseat-driver.provideEditSkill" (:vscode/config.provideEditSkill state)
-   "config.calva-backseat-driver.enableMcpReplEvaluation" (true? (:vscode/config.enableMcpReplEvaluation state))
+  {"config.calva-backseat-driver.enableMcpReplEvaluation" (true? (:vscode/config.enableMcpReplEvaluation state))
    ":calva-mcp-extension/activated?" true})

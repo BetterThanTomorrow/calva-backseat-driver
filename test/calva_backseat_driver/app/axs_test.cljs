@@ -76,12 +76,12 @@
 
 (deftest settings-changed
   (is (= {:vscode/config.mcpHost "0.0.0.0"
-          :vscode/config.provideBdSkill false
+          :vscode/config.enableMcpRegistry false
           :calva/output-line-counter 7}
          (:uf/db (handle {:vscode/config.mcpHost "127.0.0.1"
                           :calva/output-line-counter 7}
                          [:app/ax.settings-changed {:vscode/config.mcpHost "0.0.0.0"
-                                                    :vscode/config.provideBdSkill false}])))
+                                                    :vscode/config.enableMcpRegistry false}])))
       "The state takes the new settings and keeps the rest"))
 
 (deftest hot-reloaded
