@@ -8,71 +8,71 @@
    [clojure.string :as string]
    [e2e.macros :refer [deftest-async]]
    [e2e.mcp-helpers :as mcp]
-   [e2e.utils :refer [wait-for+]]
-   [promesa.core :as p]))
+   [e2e.utils :refer [wait-for+]]))
 
 (def ^:private who "e2e-tool-results")
 
 (def ^:private !request-id (atom 5000))
 
-(defn- mcp-call+
+(defn- ^:async mcp-call+
   "Calls `tool` through MCP. Resolves to `{:data … :is-error? … :rpc-error …}`."
   [socket tool arguments]
-  (p/let [response (mcp/send-request socket {:jsonrpc "2.0"
-                                             :id (swap! !request-id inc)
-                                             :method "tools/call"
-                                             :params {:name tool
-                                                      :arguments arguments}})
-          {:keys [result error]} (js->clj response :keywordize-keys true)
-          text (get-in result [:content 0 :text])]
+  (let [response (await (mcp/send-request socket {:jsonrpc "2.0"
+                                                  :id (swap! !request-id inc)
+                                                  :method "tools/call"
+                                                  :params {:name tool
+                                                           :arguments arguments}}))
+        {:keys [result error]} (js->clj response :keywordize-keys true)
+        text (get-in result [:content 0 :text])]
     {:data (when text
              (js->clj (js/JSON.parse text) :keywordize-keys true))
      :is-error? (:isError result)
      :rpc-error error}))
 
-(defn- lm-call+
+(defn- ^:async lm-call+
   "Calls `tool` through the Language Model API. Resolves to `{:data …}`, or to
    `{:rejected message}` when the call rejects."
   [tool arguments]
-  (-> (p/let [^js result (vscode/lm.invokeTool tool #js {:input (clj->js arguments)
-                                                          :toolInvocationToken js/undefined})
-              text (some-> result .-content (aget 0) .-value)]
-        {:data (when text
-                 (js->clj (js/JSON.parse text) :keywordize-keys true))})
-      (p/catch (fn [e]
-                 {:rejected (.-message e)}))))
+  (try
+    (let [^js result (await (vscode/lm.invokeTool tool #js {:input (clj->js arguments)
+                                                             :toolInvocationToken js/undefined}))
+          text (some-> result .-content (aget 0) .-value)]
+      {:data (when text
+               (js->clj (js/JSON.parse text) :keywordize-keys true))})
+    (catch :default e
+      {:rejected (.-message e)})))
 
-(defn- mcp-content+
+(defn- ^:async mcp-content+
   "Calls `tool` through MCP. Resolves to the result's content parts, as they came."
   [socket tool arguments]
-  (p/let [response (mcp/send-request socket {:jsonrpc "2.0"
-                                             :id (swap! !request-id inc)
-                                             :method "tools/call"
-                                             :params {:name tool
-                                                      :arguments arguments}})]
+  (let [response (await (mcp/send-request socket {:jsonrpc "2.0"
+                                                  :id (swap! !request-id inc)
+                                                  :method "tools/call"
+                                                  :params {:name tool
+                                                           :arguments arguments}}))]
     (-> response (js->clj :keywordize-keys true) :result :content)))
 
-(defn- lm-parts+
+(defn- ^:async lm-parts+
   "Calls `tool` through the Language Model API. Resolves to a map per result part:
    `:value` for a text part, `:mime-type` and `:data?` for a data part."
   [tool arguments]
-  (p/let [^js result (vscode/lm.invokeTool tool #js {:input (clj->js arguments)
-                                                      :toolInvocationToken js/undefined})]
+  (let [^js result (await (vscode/lm.invokeTool tool #js {:input (clj->js arguments)
+                                                           :toolInvocationToken js/undefined}))]
     (mapv (fn [^js part]
             {:value (.-value part)
              :mime-type (.-mimeType part)
              :data? (some? (.-data part))})
           (.-content result))))
 
-(defn- both+
+(defn- ^:async both+
   "Calls `tool` through MCP and then through the Language Model API."
   [socket tool arguments]
-  (p/let [through-mcp (mcp-call+ socket tool arguments)
-          through-lm (lm-call+ tool arguments)]
+  (let [through-mcp (await (mcp-call+ socket tool arguments))
+        through-lm (await (lm-call+ tool arguments))]
     {:mcp through-mcp :lm through-lm}))
 
-(defn- session-key+ [socket]
-  (p/let [{:keys [data]} (mcp-call+ socket "clojure_list_sessions" {})]
+(defn- ^:async session-key+ [socket]
+  (let [{:keys [data]} (await (mcp-call+ socket "clojure_list_sessions" {}))]
     (or (some (fn [session]
                 (when (:currentRoutedTarget session)
                   (:replSessionKey session)))
@@ -102,9 +102,9 @@
       (is (contains? tool-names "clojure_balance_brackets")
           (str "clojure_balance_brackets is registered: " (pr-str (filter #(string/starts-with? % "cloj") tool-names)))))))
 
-(defn- test-balance-brackets+ [socket]
-  (p/let [unbalanced (both+ socket "clojure_balance_brackets" {:text "(def foo [a b"})
-          balanced (both+ socket "clojure_balance_brackets" {:text "(def foo [a b])"})]
+(defn- ^:async test-balance-brackets+ [socket]
+  (let [unbalanced (await (both+ socket "clojure_balance_brackets" {:text "(def foo [a b"}))
+        balanced (await (both+ socket "clojure_balance_brackets" {:text "(def foo [a b])"}))]
     (testing "clojure_balance_brackets"
       (is-same-data {:balanced-text "(def foo [a b])"
                      :note "This is the complete, bracket-balanced version of the code. REPLACE THE ENTIRE previous text (the input to the tool) with this output. The changes/fixes require NO analysis or comments from you, WHATSOEVER."}
@@ -112,15 +112,15 @@
       (is-same-data {:note "The text was already properly balanced."}
                     balanced "balanced text"))))
 
-(defn- test-evaluation-input-errors+ [socket session-key]
-  (p/let [blank-who (both+ socket "clojure_evaluate_code"
-                           {:code "(+ 1 2)" :namespace "user" :replSessionKey session-key :who ""})
-          reserved-who (both+ socket "clojure_evaluate_code"
-                              {:code "(+ 1 2)" :namespace "user" :replSessionKey session-key :who "ui"})
-          unbalanced (both+ socket "clojure_evaluate_code"
-                            {:code "(+ 1 2" :namespace "user" :replSessionKey session-key :who who})
-          unknown-session (both+ socket "clojure_evaluate_code"
-                                 {:code "(+ 1 2)" :namespace "user" :replSessionKey "no-such-session" :who who})]
+(defn- ^:async test-evaluation-input-errors+ [socket session-key]
+  (let [blank-who (await (both+ socket "clojure_evaluate_code"
+                                {:code "(+ 1 2)" :namespace "user" :replSessionKey session-key :who ""}))
+        reserved-who (await (both+ socket "clojure_evaluate_code"
+                                   {:code "(+ 1 2)" :namespace "user" :replSessionKey session-key :who "ui"}))
+        unbalanced (await (both+ socket "clojure_evaluate_code"
+                                 {:code "(+ 1 2" :namespace "user" :replSessionKey session-key :who who}))
+        unknown-session (await (both+ socket "clojure_evaluate_code"
+                                      {:code "(+ 1 2)" :namespace "user" :replSessionKey "no-such-session" :who who}))]
     (testing "clojure_evaluate_code, input errors"
       (is-same-data {:error "The `who` parameter is required. Provide a slug identifying your agent (e.g. \"copilot\")."}
                     blank-who "blank who")
@@ -140,16 +140,16 @@
              (get-in unknown-session [:lm :data]))
           "unknown session, the same through the Language Model API"))))
 
-(defn- test-evaluation-results+ [socket session-key]
-  (p/let [arguments {:code "(+ 1 2)" :namespace "user" :replSessionKey session-key :who who}
-          _warm-up (mcp-call+ socket "clojure_evaluate_code" arguments)
-          success (both+ socket "clojure_evaluate_code" arguments)
-          printing (both+ socket "clojure_evaluate_code"
-                          (assoc arguments :code "(do (println \"e2e-tool-results out\") (+ 1 2))"))
-          no-namespace (mcp-call+ socket "clojure_evaluate_code" (dissoc arguments :namespace))
-          thrown (both+ socket "clojure_evaluate_code"
-                        (assoc arguments :code "(throw (js/Error. \"e2e-tool-results boom\"))"))
-          result {:result "3" :ns "user" :stdout nil :stderr nil :session-key session-key :notes [] :who who}]
+(defn- ^:async test-evaluation-results+ [socket session-key]
+  (let [arguments {:code "(+ 1 2)" :namespace "user" :replSessionKey session-key :who who}
+        _warm-up (await (mcp-call+ socket "clojure_evaluate_code" arguments))
+        success (await (both+ socket "clojure_evaluate_code" arguments))
+        printing (await (both+ socket "clojure_evaluate_code"
+                               (assoc arguments :code "(do (println \"e2e-tool-results out\") (+ 1 2))")))
+        no-namespace (await (mcp-call+ socket "clojure_evaluate_code" (dissoc arguments :namespace)))
+        thrown (await (both+ socket "clojure_evaluate_code"
+                             (assoc arguments :code "(throw (js/Error. \"e2e-tool-results boom\"))")))
+        result {:result "3" :ns "user" :stdout nil :stderr nil :session-key session-key :notes [] :who who}]
     (testing "clojure_evaluate_code, results"
       (is-same-data result success "a success")
       (is-same-data (assoc result :stdout "e2e-tool-results out\n")
@@ -173,16 +173,16 @@
                                "#error {:message \"e2e-tool-results boom\"")
           "and through the Language Model API"))))
 
-(defn- test-list-sessions+ [socket]
-  (p/let [{through-mcp :mcp through-lm :lm} (both+ socket "clojure_list_sessions" {})
-          joyride-session (fn [{:keys [data]}]
-                            (some (fn [session]
-                                    (when (= "joyride" (:replSessionKey session))
-                                      session))
-                                  (:sessions data)))
-          changing-keys [:lastActivity :currentRoutedTarget :globs]
-          stable (fn [answer]
-                   (apply dissoc (joyride-session answer) changing-keys))]
+(defn- ^:async test-list-sessions+ [socket]
+  (let [{through-mcp :mcp through-lm :lm} (await (both+ socket "clojure_list_sessions" {}))
+        joyride-session (fn [{:keys [data]}]
+                          (some (fn [session]
+                                  (when (= "joyride" (:replSessionKey session))
+                                    session))
+                                (:sessions data)))
+        changing-keys [:lastActivity :currentRoutedTarget :globs]
+        stable (fn [answer]
+                 (apply dissoc (joyride-session answer) changing-keys))]
     (testing "clojure_list_sessions"
       (is (= {:replSessionKey "joyride"
               :replType "clj"
@@ -202,25 +202,25 @@
              (dissoc (joyride-session through-lm) :lastActivity))
           "the same session through the Language Model API"))))
 
-(defn- test-symbol-info+ [socket session-key]
-  (p/let [answers (both+ socket "clojure_symbol_info"
-                         {:clojureSymbol "map"
-                          :namespace "user"
-                          :replSessionKey session-key})]
+(defn- ^:async test-symbol-info+ [socket session-key]
+  (let [answers (await (both+ socket "clojure_symbol_info"
+                              {:clojureSymbol "map"
+                               :namespace "user"
+                               :replSessionKey session-key}))]
     (testing "clojure_symbol_info"
       (is-same-data {:error "Can't retrieve REPL session for session key. Is the REPL connected?"}
                     answers "the Joyride session, which Calva has no symbol info for")
       (is (nil? (get-in answers [:mcp :is-error?]))
           "and it is not marked as an error through MCP"))))
 
-(defn- test-output-log+ [socket]
-  (p/let [query "[:find [?text ...] :in $ ?who :where [?e :output/who ?who] [?e :output/category \"evaluatedCode\"] [?e :output/text ?text]]"
-          found (both+ socket "clojure_repl_output_log" {:query query :inputs [who]})
-          map-input (both+ socket "clojure_repl_output_log"
-                           {:query "[:find ?v . :in $ ?m :where [(get ?m :k) ?v]]"
-                            :inputs [{:k "from-a-keyword-key"}]})
-          failing (both+ socket "clojure_repl_output_log"
-                         {:query "[:find ?e :where [?e :output/text ?text] [(clojure.string/includes? ?nope \"x\")]]"})]
+(defn- ^:async test-output-log+ [socket]
+  (let [query "[:find [?text ...] :in $ ?who :where [?e :output/who ?who] [?e :output/category \"evaluatedCode\"] [?e :output/text ?text]]"
+        found (await (both+ socket "clojure_repl_output_log" {:query query :inputs [who]}))
+        map-input (await (both+ socket "clojure_repl_output_log"
+                                {:query "[:find ?v . :in $ ?m :where [(get ?m :k) ?v]]"
+                                 :inputs [{:k "from-a-keyword-key"}]}))
+        failing (await (both+ socket "clojure_repl_output_log"
+                              {:query "[:find ?e :where [?e :output/text ?text] [(clojure.string/includes? ?nope \"x\")]]"}))]
     (testing "clojure_repl_output_log"
       (is (some #{"(+ 1 2)"} (get-in found [:mcp :data]))
           "finds this test's evaluated code through MCP")
@@ -236,13 +236,13 @@
       (is (re-find #"Insufficient bindings" (str (get-in failing [:lm :rejected])))
           (str "and a rejection with the same message through the Language Model API: " (pr-str (:lm failing)))))))
 
-(defn- test-load-file+ [socket session-key]
-  (p/let [missing-file (both+ socket "clojure_load_file"
-                              {:filePath "/nonexistent/path/foo.clj" :replSessionKey session-key :who who})
-          blank-who (both+ socket "clojure_load_file"
-                           {:filePath "/nonexistent/path/foo.clj" :replSessionKey session-key :who ""})
-          blank-session (both+ socket "clojure_load_file"
-                               {:filePath "/nonexistent/path/foo.clj" :replSessionKey "" :who who})]
+(defn- ^:async test-load-file+ [socket session-key]
+  (let [missing-file (await (both+ socket "clojure_load_file"
+                                   {:filePath "/nonexistent/path/foo.clj" :replSessionKey session-key :who who}))
+        blank-who (await (both+ socket "clojure_load_file"
+                                {:filePath "/nonexistent/path/foo.clj" :replSessionKey session-key :who ""}))
+        blank-session (await (both+ socket "clojure_load_file"
+                                    {:filePath "/nonexistent/path/foo.clj" :replSessionKey "" :who who}))]
     (testing "clojure_load_file"
       (is (true? (get-in missing-file [:mcp :is-error?]))
           "a failed load has isError through MCP")
@@ -259,77 +259,79 @@
       (is-same-data {:error "The `replSessionKey` parameter is required. Use `clojure_list_sessions` to discover available sessions."}
                     blank-session "a blank session key"))))
 
-(defn- test-edit-files+ [socket]
+(defn- ^:async test-edit-files+ [socket]
   (let [file-path (path/join (.-fsPath mcp/workspace-uri) "tool_results_edit_target.clj")
         file-key (keyword file-path)
         content "(ns tool-results-edit-target)\n\n(defn add-numbers\n  [a b]\n  (+ a b))\n"
         without-diagnostics (fn [data]
                               (update-in data [:files file-key]
                                          dissoc :diagnostics-before-edit :diagnostics-after-edit))]
-    (-> (p/let [_ (fs/writeFileSync file-path content)
-                not-found (both+ socket "clojure_edit_files"
-                                 {:edits [{:type "replace"
-                                           :filePath file-path
-                                           :line 3
-                                           :targetLineText "(defn no-such-function"
-                                           :newForm "(defn no-such-function [])"}]})
-                relative-path (both+ socket "clojure_edit_files"
-                                     {:edits [{:type "append"
-                                               :filePath "relative/path.clj"
-                                               :code "(def x 1)"}]})
-                edit-result (get-in not-found [:mcp :data :files file-key :edits 0])]
-          (testing "clojure_edit_files"
-            (is (= "0/1 edits applied across 1 file" (get-in not-found [:mcp :data :summary]))
-                "a target that isn't found applies nothing")
-            (is (= {:success false
-                    :error "Target line text not found. Expected: '(defn no-such-function' near line 3"
-                    :remedy "The target text was not found in the context shown below. Read the file to understand the actual structure, then target the correct line with the first line of the existing top level form starting at that line."
-                    :file-context " 1 | (ns tool-results-edit-target)\n 2 | \n→3 | (defn add-numbers\n 4 |   [a b]\n 5 |   (+ a b))\n 6 | "
-                    :index 0}
-                   edit-result)
-                "with the error, the remedy and the file context")
-            (is (= #{:file-path :edits :disk-matches-buffer? :diagnostics-before-edit :diagnostics-after-edit}
-                   (set (keys (get-in not-found [:mcp :data :files file-key]))))
-                "the file's result has its keys")
-            (is (= (without-diagnostics (get-in not-found [:mcp :data]))
-                   (without-diagnostics (get-in not-found [:lm :data])))
-                "the same through the Language Model API")
-            (is (= content (fs/readFileSync file-path "utf8"))
-                "and the file is untouched")
-            (is-same-data {:error "Schema validation failed — no edits were applied"
-                           :validation-errors [{:index 0
-                                                :error "filePath must be an absolute path (starting with /)"}]}
-                          relative-path "a relative path")))
-        (p/finally (fn []
-                     (when (fs/existsSync file-path)
-                       (fs/unlinkSync file-path)))))))
+    (try
+      (let [_ (fs/writeFileSync file-path content)
+            not-found (await (both+ socket "clojure_edit_files"
+                                    {:edits [{:type "replace"
+                                              :filePath file-path
+                                              :line 3
+                                              :targetLineText "(defn no-such-function"
+                                              :newForm "(defn no-such-function [])"}]}))
+            relative-path (await (both+ socket "clojure_edit_files"
+                                        {:edits [{:type "append"
+                                                  :filePath "relative/path.clj"
+                                                  :code "(def x 1)"}]}))
+            edit-result (get-in not-found [:mcp :data :files file-key :edits 0])]
+        (testing "clojure_edit_files"
+          (is (= "0/1 edits applied across 1 file" (get-in not-found [:mcp :data :summary]))
+              "a target that isn't found applies nothing")
+          (is (= {:success false
+                  :error "Target line text not found. Expected: '(defn no-such-function' near line 3"
+                  :remedy "The target text was not found in the context shown below. Read the file to understand the actual structure, then target the correct line with the first line of the existing top level form starting at that line."
+                  :file-context " 1 | (ns tool-results-edit-target)\n 2 | \n→3 | (defn add-numbers\n 4 |   [a b]\n 5 |   (+ a b))\n 6 | "
+                  :index 0}
+                 edit-result)
+              "with the error, the remedy and the file context")
+          (is (= #{:file-path :edits :disk-matches-buffer? :diagnostics-before-edit :diagnostics-after-edit}
+                 (set (keys (get-in not-found [:mcp :data :files file-key]))))
+              "the file's result has its keys")
+          (is (= (without-diagnostics (get-in not-found [:mcp :data]))
+                 (without-diagnostics (get-in not-found [:lm :data])))
+              "the same through the Language Model API")
+          (is (= content (fs/readFileSync file-path "utf8"))
+              "and the file is untouched")
+          (is-same-data {:error "Schema validation failed — no edits were applied"
+                         :validation-errors [{:index 0
+                                              :error "filePath must be an absolute path (starting with /)"}]}
+                        relative-path "a relative path")))
+      (finally
+        (when (fs/existsSync file-path)
+          (fs/unlinkSync file-path))))))
 
-(defn- set-context-padding+
+(defn- ^:async set-context-padding+
   "Sets `editor.lineContextResponsePadding` in the workspace to `value`, and waits
    until the setting reads `expected`."
   [value expected]
   (let [setting "editor.lineContextResponsePadding"
         config #(vscode/workspace.getConfiguration "calva-backseat-driver")]
-    (p/do (.update (config) setting value vscode/ConfigurationTarget.Workspace)
-          (wait-for+ #(= expected (.get (config) setting))
-                     :timeout 15000
-                     :message (str "[tool-results] " setting " did not become " expected " within 15s")))))
+    (await (.update (config) setting value vscode/ConfigurationTarget.Workspace))
+    (await (wait-for+ #(= expected (.get (config) setting))
+                      :timeout 15000
+                      :message (str "[tool-results] " setting " did not become " expected " within 15s")))))
 
-(defn- test-context-padding+ [socket]
+(defn- ^:async test-context-padding+ [socket]
   (let [file-path (path/join (.-fsPath mcp/workspace-uri) "tool_results_padding_target.clj")
         default-padding (.get (vscode/workspace.getConfiguration "calva-backseat-driver")
                               "editor.lineContextResponsePadding")]
-    (p/let [outcome (-> (p/let [_ (fs/writeFileSync file-path "(ns tool-results-padding-target)\n\n(defn add-numbers\n  [a b]\n  (+ a b))\n")
-                                _ (set-context-padding+ 1 1)]
-                          (mcp-call+ socket "clojure_edit_files"
-                                     {:edits [{:type "replace"
-                                               :filePath file-path
-                                               :line 3
-                                               :targetLineText "(defn no-such-function"
-                                               :newForm "(defn no-such-function [])"}]}))
-                        (p/catch (fn [e]
-                                   {:failed e})))
-            _ (set-context-padding+ js/undefined default-padding)]
+    (let [outcome (try
+                    (let [_ (fs/writeFileSync file-path "(ns tool-results-padding-target)\n\n(defn add-numbers\n  [a b]\n  (+ a b))\n")
+                          _ (await (set-context-padding+ 1 1))]
+                      (await (mcp-call+ socket "clojure_edit_files"
+                                        {:edits [{:type "replace"
+                                                  :filePath file-path
+                                                  :line 3
+                                                  :targetLineText "(defn no-such-function"
+                                                  :newForm "(defn no-such-function [])"}]})))
+                    (catch :default e
+                      {:failed e}))
+          _ (await (set-context-padding+ js/undefined default-padding))]
       (when (fs/existsSync file-path)
         (fs/unlinkSync file-path))
       (when-let [e (:failed outcome)]
@@ -339,24 +341,24 @@
                (get-in outcome [:data :files (keyword file-path) :edits 0 :file-context]))
             "the file context is one line each side of the target")))))
 
-(defn- test-clojuredocs-without-symbol+ [socket]
-  (p/let [through-mcp (mcp-content+ socket "clojuredocs_info" {})
-          through-lm (lm-parts+ "clojuredocs_info" {})]
+(defn- ^:async test-clojuredocs-without-symbol+ [socket]
+  (let [through-mcp (await (mcp-content+ socket "clojuredocs_info" {}))
+        through-lm (await (lm-parts+ "clojuredocs_info" {}))]
     (testing "clojuredocs_info without a symbol, where Calva answers undefined"
       (is (= [{:type "text"}] through-mcp)
           "is a text part without text through MCP")
       (is (= ["null"] (mapv :value through-lm))
           "and the text null through the Language Model API"))))
 
-(defn- test-image-parts+ [session-key]
-  (p/let [arguments {:code "\"data:image/png;base64,iVBORw0KGgo=\""
-                     :namespace "user"
-                     :replSessionKey session-key
-                     :who who}
-          with-image (lm-parts+ "clojure_evaluate_code" arguments)
-          capped (lm-parts+ "clojure_evaluate_code" (assoc arguments :maxImages 0))
-          result-of (fn [parts]
-                      (-> parts first :value js/JSON.parse (js->clj :keywordize-keys true) :result))]
+(defn- ^:async test-image-parts+ [session-key]
+  (let [arguments {:code "\"data:image/png;base64,iVBORw0KGgo=\""
+                   :namespace "user"
+                   :replSessionKey session-key
+                   :who who}
+        with-image (await (lm-parts+ "clojure_evaluate_code" arguments))
+        capped (await (lm-parts+ "clojure_evaluate_code" (assoc arguments :maxImages 0)))
+        result-of (fn [parts]
+                    (-> parts first :value js/JSON.parse (js->clj :keywordize-keys true) :result))]
     (testing "an image in a result, through the Language Model API"
       (is (= "\"<<image-1>>\"" (result-of with-image))
           "the text part has a marker where the image was")
@@ -369,17 +371,17 @@
       (is (= 1 (count capped))
           "and the text part is the only part"))))
 
-(defn- test-resource-templates+ [socket session-key]
-  (p/let [templates-response (mcp/send-request socket {:jsonrpc "2.0"
+(defn- ^:async test-resource-templates+ [socket session-key]
+  (let [templates-response (await (mcp/send-request socket {:jsonrpc "2.0"
+                                                            :id (swap! !request-id inc)
+                                                            :method "resources/templates/list"}))
+        templates (-> templates-response (js->clj :keywordize-keys true) :result :resourceTemplates)
+        uri (str "/symbol-info/map@" session-key "@user")
+        read-response (await (mcp/send-request socket {:jsonrpc "2.0"
                                                        :id (swap! !request-id inc)
-                                                       :method "resources/templates/list"})
-          templates (-> templates-response (js->clj :keywordize-keys true) :result :resourceTemplates)
-          uri (str "/symbol-info/map@" session-key "@user")
-          read-response (mcp/send-request socket {:jsonrpc "2.0"
-                                                  :id (swap! !request-id inc)
-                                                  :method "resources/read"
-                                                  :params {:uri uri}})
-          contents (-> read-response (js->clj :keywordize-keys true) :result :contents)]
+                                                       :method "resources/read"
+                                                       :params {:uri uri}}))
+        contents (-> read-response (js->clj :keywordize-keys true) :result :contents)]
     (testing "resources/templates/list"
       (is (= [{:uriTemplate "/symbol-info/{symbol}@{session-key}@{namespace}"
                :name "symbol-info"
@@ -401,55 +403,57 @@
 
 (deftest-async tool-results
   (let [backup-path (mcp/backup-settings! "tool-results-test-backup.json")]
-    (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
-                {:keys [socket]} (mcp/start-mcp-session!)
-                _ (mcp/wait-for-tool! socket "clojure_evaluate_code")
-                session-key (session-key+ socket)]
-          (test-language-model-tools-registered)
-          (p/do (test-balance-brackets+ socket)
-                (test-evaluation-input-errors+ socket session-key)
-                (test-evaluation-results+ socket session-key)
-                (test-image-parts+ session-key)
-                (test-list-sessions+ socket)
-                (test-symbol-info+ socket session-key)
-                (test-clojuredocs-without-symbol+ socket)
-                (test-output-log+ socket)
-                (test-load-file+ socket session-key)
-                (test-edit-files+ socket)
-                (test-context-padding+ socket)
-                (test-resource-templates+ socket session-key)
-                (mcp/stop-mcp-session! socket)))
-        (p/catch (fn [e]
-                   (js/console.error "[tool-results] Error:" (.-message e) e)
-                   (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
-                   (throw e)))
-        (p/finally (fn []
-                     (mcp/restore-settings! backup-path))))))
+    (try
+      (let [_ (await (mcp/ensure-repl-and-eval-enabled!))
+            {:keys [socket]} (await (mcp/start-mcp-session!))
+            _ (await (mcp/wait-for-tool! socket "clojure_evaluate_code"))
+            session-key (await (session-key+ socket))]
+        (test-language-model-tools-registered)
+        (await (test-balance-brackets+ socket))
+        (await (test-evaluation-input-errors+ socket session-key))
+        (await (test-evaluation-results+ socket session-key))
+        (await (test-image-parts+ session-key))
+        (await (test-list-sessions+ socket))
+        (await (test-symbol-info+ socket session-key))
+        (await (test-clojuredocs-without-symbol+ socket))
+        (await (test-output-log+ socket))
+        (await (test-load-file+ socket session-key))
+        (await (test-edit-files+ socket))
+        (await (test-context-padding+ socket))
+        (await (test-resource-templates+ socket session-key))
+        (await (mcp/stop-mcp-session! socket)))
+      (catch :default e
+        (js/console.error "[tool-results] Error:" (.-message e) e)
+        (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+        (throw e))
+      (finally
+        (await (mcp/restore-settings! backup-path))))))
 
 (deftest-async a-tool-whose-setting-is-off
   (let [backup-path (mcp/backup-settings! "tool-results-setting-off-backup.json")]
-    (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
-                {:keys [socket]} (mcp/start-mcp-session!)
-                session-key (session-key+ socket)
-                config (vscode/workspace.getConfiguration "calva-backseat-driver")
-                _ (.update config "enableMcpReplEvaluation" false vscode/ConfigurationTarget.Workspace)
-                _ (wait-for+ #(false? (.get (vscode/workspace.getConfiguration "calva-backseat-driver")
-                                            "enableMcpReplEvaluation"))
-                             :timeout 15000
-                             :message "[tool-results] enableMcpReplEvaluation false not propagated within 15s")
-                arguments {:code "(+ 1 2)" :namespace "user" :replSessionKey session-key :who who}
-                through-mcp (mcp-call+ socket "clojure_evaluate_code" arguments)
-                through-lm (lm-call+ "clojure_evaluate_code" arguments)
-                _ (mcp/stop-mcp-session! socket)]
-          (testing "clojure_evaluate_code with enableMcpReplEvaluation off"
-            (is (= {:code -32601 :message "Unknown tool"}
-                   (:rpc-error through-mcp))
-                "is an unknown tool through MCP")
-            (is (= "Unknown tool" (:rejected through-lm))
-                (str "and through the Language Model API: " (pr-str through-lm)))))
-        (p/catch (fn [e]
-                   (js/console.error "[tool-results] Error:" (.-message e) e)
-                   (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
-                   (throw e)))
-        (p/finally (fn []
-                     (mcp/restore-settings! backup-path))))))
+    (try
+      (let [_ (await (mcp/ensure-repl-and-eval-enabled!))
+            {:keys [socket]} (await (mcp/start-mcp-session!))
+            session-key (await (session-key+ socket))
+            config (vscode/workspace.getConfiguration "calva-backseat-driver")
+            _ (await (.update config "enableMcpReplEvaluation" false vscode/ConfigurationTarget.Workspace))
+            _ (await (wait-for+ #(false? (.get (vscode/workspace.getConfiguration "calva-backseat-driver")
+                                               "enableMcpReplEvaluation"))
+                                :timeout 15000
+                                :message "[tool-results] enableMcpReplEvaluation false not propagated within 15s"))
+            arguments {:code "(+ 1 2)" :namespace "user" :replSessionKey session-key :who who}
+            through-mcp (await (mcp-call+ socket "clojure_evaluate_code" arguments))
+            through-lm (await (lm-call+ "clojure_evaluate_code" arguments))
+            _ (await (mcp/stop-mcp-session! socket))]
+        (testing "clojure_evaluate_code with enableMcpReplEvaluation off"
+          (is (= {:code -32601 :message "Unknown tool"}
+                 (:rpc-error through-mcp))
+              "is an unknown tool through MCP")
+          (is (= "Unknown tool" (:rejected through-lm))
+              (str "and through the Language Model API: " (pr-str through-lm)))))
+      (catch :default e
+        (js/console.error "[tool-results] Error:" (.-message e) e)
+        (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+        (throw e))
+      (finally
+        (await (mcp/restore-settings! backup-path))))))

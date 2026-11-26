@@ -1,7 +1,6 @@
 (ns workspace-activate
   (:require ["vscode" :as vscode]
-            [e2e.db :as db]
-            [promesa.core :as p]))
+            [e2e.db :as db]))
 
 (println "e2e-test-ws workspace activating...")
 
@@ -23,7 +22,6 @@
 
 ;; E.g. when running the tests locally, you may have created files
 ;; that you don't want to litter the git repo with.
-(defn clean-up!+ []
-  (p/do
-    (println "Cleaning up e2e-tests workspace")
-    :nothing-to-clean-up))
+(defn ^:async clean-up!+ []
+  (println "Cleaning up e2e-tests workspace")
+  :nothing-to-clean-up)

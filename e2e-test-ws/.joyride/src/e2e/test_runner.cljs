@@ -2,7 +2,6 @@
   (:require [clojure.string :as string]
             [cljs.test]
             [e2e.baldr]
-            [promesa.core :as p]
             [e2e.db :as db]
             ["vscode" :as vscode]
             workspace-activate))
@@ -45,8 +44,8 @@
                         :else nil)]
       (writeln (str "Runner: tests run, results: {:pass " pass ", :fail " fail ", :error " error "}"))
       (if fail-reason
-        (p/reject! running fail-reason)
-        (p/resolve! running true)))))
+        ((:reject running) fail-reason)
+        ((:resolve running) true)))))
 
 (defn- file->ns [src-path file]
   (-> file
@@ -55,37 +54,46 @@
       (string/replace #"/" ".")
       (string/replace #"_" "-")))
 
-(defn- find-test-nss+ [src-path]
-  (p/let [file-uris (vscode/workspace.findFiles (str src-path "/**/*_test.cljs"))
-          files (.map file-uris (fn [uri]
-                                  (vscode/workspace.asRelativePath uri false)))
-          nss-strings (-> files
-                          (.map (partial file->ns src-path))
-                          sort)]
+(defn- ^:async find-test-nss+ [src-path]
+  (let [file-uris (await (vscode/workspace.findFiles (str src-path "/**/*_test.cljs")))
+        files (.map file-uris (fn [uri]
+                                (vscode/workspace.asRelativePath uri false)))
+        nss-strings (-> files
+                        (.map (partial file->ns src-path))
+                        sort)]
     (mapv symbol nss-strings)))
 
-(defn- run-when-ws-activated [nss-syms tries]
+(defn- ^:async run-when-ws-activated [nss-syms tries]
   (if (:ws-activated? @db/!state)
-    (-> (p/do
-          (println "Running tests in" nss-syms)
-          (apply require nss-syms)
-          (apply cljs.test/run-tests nss-syms)
-          (:running @db/!state))
-        (p/catch (fn [e]
-                   (workspace-activate/clean-up!+)
-                   (p/reject! (:running @db/!state) e))))
+    (try
+      (println "Running tests in" nss-syms)
+      (apply require nss-syms)
+      (apply cljs.test/run-tests nss-syms)
+      (await (:promise (:running @db/!state)))
+      (catch :default e
+        (workspace-activate/clean-up!+)
+        ((:reject (:running @db/!state)) e)))
     (do
       (println "Runner: Workspace not activated yet, tries: " tries "- trying again in a jiffy")
       (js/setTimeout #(run-when-ws-activated nss-syms (inc tries)) 10)
-      (:running @db/!state))))
+      (:promise (:running @db/!state)))))
+
+(defn- running-promise
+  "A promise for the test run, with the functions that resolve and reject it."
+  []
+  (let [!settle (atom nil)
+        promise (js/Promise. (fn [resolve reject]
+                               (reset! !settle {:resolve resolve :reject reject})))]
+    (assoc @!settle :promise promise)))
 
 (defn ^:export run-all-tests [src-path]
-  (let [running (p/deferred)]
+  (let [running (running-promise)]
     (swap! db/!state assoc :running running)
-    (p/let [nss-syms (find-test-nss+ src-path)
-            p (run-when-ws-activated nss-syms 1)]
-      (workspace-activate/clean-up!+)
-      (swap! db/!state merge db/default-db)
-      p)
-    running))
+    ((^:async fn []
+       (let [nss-syms (await (find-test-nss+ src-path))
+             p (await (run-when-ws-activated nss-syms 1))]
+         (workspace-activate/clean-up!+)
+         (swap! db/!state merge db/default-db)
+         p)))
+    (:promise running)))
 

@@ -3,12 +3,11 @@
    ["vscode" :as vscode]
    [cljs.test :refer [is testing]]
    [e2e.macros :refer [deftest-async]]
-   [e2e.mcp-helpers :as mcp]
-   [promesa.core :as p]))
+   [e2e.mcp-helpers :as mcp]))
 
-(defn- test-well-known-symbol+ [socket]
-  (p/let [result (mcp/call-tool socket 10 "clojuredocs_info"
-                                {:clojureSymbol "map"})]
+(defn- ^:async test-well-known-symbol+ [socket]
+  (let [result (await (mcp/call-tool socket 10 "clojuredocs_info"
+                                     {:clojureSymbol "map"}))]
     (js/console.log "[clojuredocs-info] map result:" (pr-str result))
     (testing "well-known symbol returns structured response"
       (is (or (some? result) true)
@@ -17,9 +16,9 @@
         (is (some #(get result %) [:name :doc :examples])
             "data response should contain name, doc, or examples")))))
 
-(defn- test-nonexistent-symbol+ [socket]
-  (p/let [result (mcp/call-tool socket 11 "clojuredocs_info"
-                                {:clojureSymbol "definitely-not-a-real-fn-xyz"})]
+(defn- ^:async test-nonexistent-symbol+ [socket]
+  (let [result (await (mcp/call-tool socket 11 "clojuredocs_info"
+                                     {:clojureSymbol "definitely-not-a-real-fn-xyz"}))]
     (js/console.log "[clojuredocs-info] unknown result:" (pr-str result))
     (testing "nonexistent symbol returns gracefully"
       (is (or (nil? result)
@@ -27,14 +26,14 @@
               (map? result))
           "nonexistent symbol should not crash"))))
 
-(defn- test-missing-symbol-param+ [socket]
-  (p/let [resp (mcp/send-request socket
-                                 {:jsonrpc "2.0"
-                                  :id 12
-                                  :method "tools/call"
-                                  :params {:name "clojuredocs_info"
-                                           :arguments {}}})
-          result (-> resp (js->clj :keywordize-keys true) :result)]
+(defn- ^:async test-missing-symbol-param+ [socket]
+  (let [resp (await (mcp/send-request socket
+                                      {:jsonrpc "2.0"
+                                       :id 12
+                                       :method "tools/call"
+                                       :params {:name "clojuredocs_info"
+                                                :arguments {}}}))
+        result (-> resp (js->clj :keywordize-keys true) :result)]
     (js/console.log "[clojuredocs-info] missing param result:" (pr-str result))
     (testing "missing clojureSymbol parameter returns error"
       (is (some? result))
@@ -48,14 +47,16 @@
 
 (deftest-async clojuredocs-info-tests
   (let [backup-path (mcp/backup-settings! "clojuredocs-info-test-backup.json")]
-    (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
-                {:keys [socket]} (mcp/start-mcp-session!)]
-          (p/do (test-well-known-symbol+ socket)
-                (test-nonexistent-symbol+ socket)
-                (test-missing-symbol-param+ socket)
-                (mcp/stop-mcp-session! socket)))
-        (p/catch (fn [e]
-                   (js/console.error "[clojuredocs-info] Test error:" (.-message e) e)
-                   (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
-                   (throw e)))
-        (p/finally (fn [] (mcp/restore-settings! backup-path))))))
+    (try
+      (let [_ (await (mcp/ensure-repl-and-eval-enabled!))
+            {:keys [socket]} (await (mcp/start-mcp-session!))]
+        (await (test-well-known-symbol+ socket))
+        (await (test-nonexistent-symbol+ socket))
+        (await (test-missing-symbol-param+ socket))
+        (await (mcp/stop-mcp-session! socket)))
+      (catch :default e
+        (js/console.error "[clojuredocs-info] Test error:" (.-message e) e)
+        (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+        (throw e))
+      (finally
+        (await (mcp/restore-settings! backup-path))))))

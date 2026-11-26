@@ -5,8 +5,7 @@
    ["net" :as net]
    ["path" :as path]
    ["vscode" :as vscode]
-   [e2e.utils :refer [wait-for+]]
-   [promesa.core :as p]))
+   [e2e.utils :refer [delay+ wait-for+]]))
 
 (def workspace-uri
   (.-uri (first vscode/workspace.workspaceFolders)))
@@ -19,7 +18,7 @@
 (defn connect-to-mcp-server
   ([port] (connect-to-mcp-server port default-mcp-host))
   ([port host]
-   (p/create
+   (js/Promise.
     (fn [resolve reject]
       (let [socket (.connect net #js {:port port :host host})]
        (.on socket "error" (fn [err]
@@ -33,7 +32,7 @@
   (try (.parse js/JSON s) (catch :default _ nil)))
 
 (defn send-request [socket request-obj]
-  (p/create
+  (js/Promise.
    (fn [resolve _reject]
      (let [buffer (atom "")
            request-id (.-id (clj->js request-obj))
@@ -55,63 +54,65 @@
   "Send a JSON-RPC request and reject if no matching response within timeout-ms."
   [socket request-obj timeout-ms]
   (let [request-id (.-id (clj->js request-obj))]
-    (p/race
-     [(send-request socket request-obj)
-      (p/let [_ (p/delay timeout-ms)]
-        (p/rejected
-         (js/Error.
-          (str "Request " request-id " timed out after " timeout-ms "ms"))))])))
+    (js/Promise.race
+     #js [(send-request socket request-obj)
+          (.then (delay+ timeout-ms)
+                 (fn [_]
+                   (throw
+                    (js/Error.
+                     (str "Request " request-id " timed out after " timeout-ms "ms")))))])))
 
-(defn call-tool
+(defn ^:async call-tool
   "Send a tools/call request and return the parsed text content."
   [socket id tool-name arguments]
-  (p/let [resp (send-request socket {:jsonrpc "2.0"
-                                     :id id
-                                     :method "tools/call"
-                                     :params {:name tool-name
-                                              :arguments arguments}})
-          outer (js->clj resp :keywordize-keys true)
-          text (get-in outer [:result :content 0 :text])]
+  (let [resp (await (send-request socket {:jsonrpc "2.0"
+                                          :id id
+                                          :method "tools/call"
+                                          :params {:name tool-name
+                                                   :arguments arguments}}))
+        outer (js->clj resp :keywordize-keys true)
+        text (get-in outer [:result :content 0 :text])]
     (when text
       (js->clj (.parse js/JSON text) :keywordize-keys true))))
 
-(defn start-mcp-session!
+(defn ^:async start-mcp-session!
   "Start MCP server, connect, initialize. Returns {:socket :port}."
   []
-  (p/let [_ (wait-for+ #(.-isActive (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver"))
-                       :timeout 15000
-                       :message "[MCP helpers] Extension not active within 15s")
-          ;; Commands register via an async effect chain after activation, so
-          ;; isActive can be true before the command exists. Wait for it.
-          _ (wait-for+ #(p/let [cmds (vscode/commands.getCommands true)]
-                          (.includes cmds "calva-backseat-driver.startMcpServer"))
-                       :timeout 15000
-                       :message "[MCP helpers] startMcpServer command not registered within 15s")
-          server-info+ (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer")
-          server-info (js->clj server-info+ :keywordize-keys true)
-          port (or (:server/assigned-port server-info) (:assigned-port server-info))
-          host (or (:server/host server-info) (:host server-info) default-mcp-host)
-          _ (when (or (nil? port) (js/isNaN port) (<= port 0))
-              (throw (js/Error. (str "[MCP helpers] Invalid MCP port after start: " port
-                                     " server-info: " (pr-str server-info)))))
-          socket (connect-to-mcp-server port host)
-          _ (send-request socket {:jsonrpc "2.0" :id 0 :method "initialize"})]
+  (let [_ (await (wait-for+ #(.-isActive (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver"))
+                            :timeout 15000
+                            :message "[MCP helpers] Extension not active within 15s"))
+        ;; Commands register via an async effect chain after activation, so
+        ;; isActive can be true before the command exists. Wait for it.
+        _ (await (wait-for+ (^:async fn []
+                              (let [cmds (await (vscode/commands.getCommands true))]
+                                (.includes cmds "calva-backseat-driver.startMcpServer")))
+                            :timeout 15000
+                            :message "[MCP helpers] startMcpServer command not registered within 15s"))
+        server-info+ (await (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer"))
+        server-info (js->clj server-info+ :keywordize-keys true)
+        port (or (:server/assigned-port server-info) (:assigned-port server-info))
+        host (or (:server/host server-info) (:host server-info) default-mcp-host)
+        _ (when (or (nil? port) (js/isNaN port) (<= port 0))
+            (throw (js/Error. (str "[MCP helpers] Invalid MCP port after start: " port
+                                   " server-info: " (pr-str server-info)))))
+        socket (await (connect-to-mcp-server port host))
+        _ (await (send-request socket {:jsonrpc "2.0" :id 0 :method "initialize"}))]
     {:socket socket :port port}))
 
 (defn wait-for-tool!
   "Poll tools/list until a tool with the given name is registered."
   [socket tool-name & {:keys [timeout] :or {timeout 15000}}]
-  (wait-for+ (fn []
-               (p/let [resp (send-request socket {:jsonrpc "2.0" :id 999 :method "tools/list"})
-                       outer (js->clj resp :keywordize-keys true)
-                       tools (get-in outer [:result :tools])]
+  (wait-for+ (^:async fn []
+               (let [resp (await (send-request socket {:jsonrpc "2.0" :id 999 :method "tools/list"}))
+                     outer (js->clj resp :keywordize-keys true)
+                     tools (get-in outer [:result :tools])]
                  (some #(= tool-name (:name %)) tools)))
              :timeout timeout
              :message (str "[MCP helpers] Tool " tool-name " not registered within " timeout "ms")))
 
-(defn stop-mcp-session! [socket]
-  (p/do (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
-        (.end socket)))
+(defn ^:async stop-mcp-session! [socket]
+  (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
+  (.end socket))
 
 (def ^:private backseat-driver-setting-defaults
   {"enableMcpReplEvaluation" true
@@ -145,29 +146,29 @@
     (fs/copyFileSync settings-path backup-path)
     backup-path))
 
-(defn restore-settings! [backup-path]
+(defn ^:async restore-settings! [backup-path]
   (let [settings (read-settings-backup backup-path)
         restored-settings (into {}
                                 (map (fn [[setting-key _default-value]]
                                        [setting-key (backed-up-setting settings setting-key)]))
                                 backseat-driver-setting-defaults)
         config (vscode/workspace.getConfiguration "calva-backseat-driver")]
-    (p/let [_ (.update config "enableMcpReplEvaluation" (restored-js-value (get restored-settings "enableMcpReplEvaluation")) vscode/ConfigurationTarget.Workspace)
-            _ (.update config "autoStartMCPServer" (restored-js-value (get restored-settings "autoStartMCPServer")) vscode/ConfigurationTarget.Workspace)
-            _ (.update config "mcpSocketServerPort" (restored-js-value (get restored-settings "mcpSocketServerPort")) vscode/ConfigurationTarget.Workspace)
-            _ (.update config "mcpHost" (restored-js-value (get restored-settings "mcpHost")) vscode/ConfigurationTarget.Workspace)
-            _ (.update config "provideBdSkill" (restored-js-value (get restored-settings "provideBdSkill")) vscode/ConfigurationTarget.Workspace)
-            _ (.update config "provideEditSkill" (restored-js-value (get restored-settings "provideEditSkill")) vscode/ConfigurationTarget.Workspace)
-            _ (wait-for+ #(let [current-config (vscode/workspace.getConfiguration "calva-backseat-driver")]
-                            (every? (fn [[setting-key default-value]]
-                                      (= (restored-effective-value (get restored-settings setting-key) default-value)
-                                         (.get current-config setting-key)))
-                                    backseat-driver-setting-defaults))
-                         :timeout 15000
-                         :message "[MCP helpers] Settings restore not propagated within 15s")]
-      (when (fs/existsSync backup-path)
-        (fs/unlinkSync backup-path))
-      nil)))
+    (await (.update config "enableMcpReplEvaluation" (restored-js-value (get restored-settings "enableMcpReplEvaluation")) vscode/ConfigurationTarget.Workspace))
+    (await (.update config "autoStartMCPServer" (restored-js-value (get restored-settings "autoStartMCPServer")) vscode/ConfigurationTarget.Workspace))
+    (await (.update config "mcpSocketServerPort" (restored-js-value (get restored-settings "mcpSocketServerPort")) vscode/ConfigurationTarget.Workspace))
+    (await (.update config "mcpHost" (restored-js-value (get restored-settings "mcpHost")) vscode/ConfigurationTarget.Workspace))
+    (await (.update config "provideBdSkill" (restored-js-value (get restored-settings "provideBdSkill")) vscode/ConfigurationTarget.Workspace))
+    (await (.update config "provideEditSkill" (restored-js-value (get restored-settings "provideEditSkill")) vscode/ConfigurationTarget.Workspace))
+    (await (wait-for+ #(let [current-config (vscode/workspace.getConfiguration "calva-backseat-driver")]
+                         (every? (fn [[setting-key default-value]]
+                                   (= (restored-effective-value (get restored-settings setting-key) default-value)
+                                      (.get current-config setting-key)))
+                                 backseat-driver-setting-defaults))
+                      :timeout 15000
+                      :message "[MCP helpers] Settings restore not propagated within 15s"))
+    (when (fs/existsSync backup-path)
+      (fs/unlinkSync backup-path))
+    nil))
 
 (defn wrapper-script-path
   "Absolute path to the stdio MCP wrapper script bundled with the extension."
@@ -182,7 +183,7 @@
   "Spawn the stdio MCP wrapper relay connected to port. Returns a client map."
   ([port] (spawn-stdio-wrapper! port default-mcp-host))
   ([port host]
-   (p/create
+   (js/Promise.
     (fn [resolve reject]
       (try
         (let [script (wrapper-script-path)
@@ -206,25 +207,26 @@
   [{:keys [stdin stdout buffer] :as _client} request & {:keys [timeout] :or {timeout 10000}}]
   (let [request-id (.-id (clj->js request))
         request-str (str (.stringify js/JSON (clj->js request)) "\n")]
-    (p/race
-     [(p/create
-       (fn [resolve _reject]
-         (let [on-data (fn on-data [data]
-                         (swap! buffer str data)
-                         (let [lines (.split @buffer "\n")
-                               match (->> lines
-                                          (keep try-parse-json)
-                                          (filter #(= request-id (.-id %)))
-                                          first)]
-                           (when match
-                             (.removeListener stdout "data" on-data)
-                             (resolve match))))]
-           (.on stdout "data" on-data)
-           (.write stdin request-str))))
-      (p/let [_ (p/delay timeout)]
-        (p/rejected
-         (js/Error.
-          (str "Stdio request " request-id " timed out after " timeout "ms"))))])))
+    (js/Promise.race
+     #js [(js/Promise.
+           (fn [resolve _reject]
+             (let [on-data (fn on-data [data]
+                             (swap! buffer str data)
+                             (let [lines (.split @buffer "\n")
+                                   match (->> lines
+                                              (keep try-parse-json)
+                                              (filter #(= request-id (.-id %)))
+                                              first)]
+                               (when match
+                                 (.removeListener stdout "data" on-data)
+                                 (resolve match))))]
+               (.on stdout "data" on-data)
+               (.write stdin request-str))))
+          (.then (delay+ timeout)
+                 (fn [_]
+                   (throw
+                    (js/Error.
+                     (str "Stdio request " request-id " timed out after " timeout "ms")))))])))
 
 (defn stop-stdio-wrapper! [{:keys [proc]}]
   (when proc
@@ -234,7 +236,7 @@
   "Start a fake TCP server that replies to the first request by splitting
    response-json across two socket writes. Used to simulate TCP chunking."
   [response-obj & {:keys [chunk-size] :or {chunk-size 1024}}]
-  (p/create
+  (js/Promise.
    (fn [resolve _reject]
      (let [full-response (str (.stringify js/JSON (clj->js response-obj)) "\n")
            responded? (atom false)
@@ -262,16 +264,16 @@
   (when server
     (.close server)))
 
-(defn ensure-repl-and-eval-enabled!
+(defn ^:async ensure-repl-and-eval-enabled!
   []
-  (p/let [_ (vscode/commands.executeCommand "calva.startJoyrideReplAndConnect")
-          _ (wait-for+ #(some? (.currentSessionKey (.-repl (.-v1 (.-exports (vscode/extensions.getExtension "betterthantomorrow.calva"))))))
-                       :timeout 15000
-                       :message "[MCP helpers] REPL session not available within 15s")
-          config (vscode/workspace.getConfiguration "calva-backseat-driver")
-          _ (.update config "enableMcpReplEvaluation" true vscode/ConfigurationTarget.Workspace)
-          _ (wait-for+ #(true? (.get (vscode/workspace.getConfiguration "calva-backseat-driver")
-                                     "enableMcpReplEvaluation"))
-                       :timeout 15000
-                       :message "[MCP helpers] Config enableMcpReplEvaluation not propagated within 15s")]
+  (let [_ (await (vscode/commands.executeCommand "calva.startJoyrideReplAndConnect"))
+        _ (await (wait-for+ #(some? (.currentSessionKey (.-repl (.-v1 (.-exports (vscode/extensions.getExtension "betterthantomorrow.calva"))))))
+                            :timeout 15000
+                            :message "[MCP helpers] REPL session not available within 15s"))
+        config (vscode/workspace.getConfiguration "calva-backseat-driver")
+        _ (await (.update config "enableMcpReplEvaluation" true vscode/ConfigurationTarget.Workspace))
+        _ (await (wait-for+ #(true? (.get (vscode/workspace.getConfiguration "calva-backseat-driver")
+                                          "enableMcpReplEvaluation"))
+                            :timeout 15000
+                            :message "[MCP helpers] Config enableMcpReplEvaluation not propagated within 15s"))]
     nil))

@@ -1,7 +1,6 @@
 (ns tests.smoke-test
   (:require ["vscode" :as vscode]
             [cljs.test :refer [deftest testing is]]
-            [promesa.core :as p]
             [e2e.macros :refer [deftest-async]]))
 
 (deftest foo
@@ -14,8 +13,8 @@
         "There can only be one (workspaceFolder)")))
 
 (deftest-async extension-activation
-  (p/let [extension (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver")
-          api (.activate extension)]
+  (let [extension (vscode/extensions.getExtension "betterthantomorrow.calva-backseat-driver")
+        api (await (.activate extension))]
     (is (not= nil
               (.-v1 api))
         "The extension activates (which is an async operation)")))

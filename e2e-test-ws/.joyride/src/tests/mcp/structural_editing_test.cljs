@@ -7,27 +7,26 @@
    [clojure.string :as string]
    [e2e.macros :refer [deftest-async]]
    [e2e.mcp-helpers :as mcp]
-   [e2e.utils :refer [wait-for+]]
-   [promesa.core :as p]))
+   [e2e.utils :refer [wait-for+]]))
 
 (def ^:private test-file-name "structural_edit_target.clj")
 
 (defn- test-file-path []
   (path/join (.-fsPath mcp/workspace-uri) test-file-name))
 
-(defn- read-test-file+ [previous-content]
+(defn- ^:async read-test-file+ [previous-content]
   (if (some? previous-content)
     ;; Poll until content changes from previous
     ;; Ignore empty string — transient state from truncate-before-write on Linux
-    (wait-for+ #(let [content (fs/readFileSync (test-file-path) "utf8")]
-                  (when (and (seq content)
-                             (not= content previous-content))
-                    content))
-               :interval 10
-               :timeout 5000
-               :message "File content did not change within 5s")
+    (await (wait-for+ #(let [content (fs/readFileSync (test-file-path) "utf8")]
+                         (when (and (seq content)
+                                    (not= content previous-content))
+                           content))
+                      :interval 10
+                      :timeout 5000
+                      :message "File content did not change within 5s"))
     ;; No previous content — just read (file was just created)
-    (p/resolved (fs/readFileSync (test-file-path) "utf8"))))
+    (fs/readFileSync (test-file-path) "utf8")))
 
 (defn- delete-test-file! []
   (when (fs/existsSync (test-file-path))
@@ -93,35 +92,35 @@
   (some #(= (.-fsPath (.-uri (.-document ^js %))) file-path)
         vscode/window.visibleTextEditors))
 
-(defn- activate-decoy-editor+ []
+(defn- ^:async activate-decoy-editor+ []
   (let [uri (vscode/Uri.joinPath mcp/workspace-uri ".vscode" "settings.json")]
-    (p/let [document (vscode/workspace.openTextDocument uri)
-            _ (vscode/window.showTextDocument document #js {:preview false})
-            _ (wait-for+ #(when (= (.-fsPath uri) (active-editor-path))
-                            true)
-                         :interval 10
-                         :timeout 5000
-                         :message "Decoy editor did not become active within 5s")]
+    (let [document (await (vscode/workspace.openTextDocument uri))
+          _ (await (vscode/window.showTextDocument document #js {:preview false}))
+          _ (await (wait-for+ #(when (= (.-fsPath uri) (active-editor-path))
+                                 true)
+                              :interval 10
+                              :timeout 5000
+                              :message "Decoy editor did not become active within 5s"))]
       nil)))
 
 ;; --- Test scenario helpers ---
 
-(defn- test-create-file+ [socket file-path]
-  (p/let [result (mcp/call-tool socket 100 "clojure_edit_files"
-                                {:edits [{:type "create"
-                                          :filePath file-path
-                                          :content (initial-file-content)}]})]
+(defn- ^:async test-create-file+ [socket file-path]
+  (let [result (await (mcp/call-tool socket 100 "clojure_edit_files"
+                                     {:edits [{:type "create"
+                                               :filePath file-path
+                                               :content (initial-file-content)}]}))]
     (testing "create_file creates file successfully"
       (is (batch-success? result) "File creation should succeed"))))
 
-(defn- edit-with-decoy-and-verify+
+(defn- ^:async edit-with-decoy-and-verify+
   "Activate decoy editor, perform edit, verify active editor unchanged and file not visible."
   [_socket _file-path tool-call-fn prev-content]
-  (p/let [_ (activate-decoy-editor+)
-          active-before (active-editor-path)
-          result (tool-call-fn)
-          content (read-test-file+ prev-content)
-          active-after (active-editor-path)]
+  (let [_ (await (activate-decoy-editor+))
+        active-before (active-editor-path)
+        result (await (tool-call-fn))
+        content (await (read-test-file+ prev-content))
+        active-after (active-editor-path)]
     {:result result :content content
      :active-before active-before :active-after active-after}))
 
@@ -141,29 +140,29 @@
   (is (<= (count-consecutive-blank-lines content) 1)
       "Edit should not leave more than 1 consecutive blank line"))
 
-(defn- test-replace-trims-whitespace+ [socket file-path]
-  (p/let [ctx
-          (edit-with-decoy-and-verify+
-           socket file-path
-           #(mcp/call-tool socket 101 "clojure_edit_files"
-                           {:edits [{:type "replace"
-                                     :filePath file-path
-                                     :line 3
-                                     :targetLineText "(defn add-numbers"
-                                     :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b))\n\n\n"}]})
-           nil)]
-    (testing "replace trims trailing whitespace"
-      (assert-invisible-spacing-edit ctx file-path))))
-
-(defn- test-replace-idempotent+ [socket file-path]
-  (p/let [content-before (read-test-file+ nil)
-          result (mcp/call-tool socket 102 "clojure_edit_files"
+(defn- ^:async test-replace-trims-whitespace+ [socket file-path]
+  (let [ctx
+        (await (edit-with-decoy-and-verify+
+                socket file-path
+                #(mcp/call-tool socket 101 "clojure_edit_files"
                                 {:edits [{:type "replace"
                                           :filePath file-path
                                           :line 3
                                           :targetLineText "(defn add-numbers"
-                                          :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b))\n\n"}]})
-          content-after (read-test-file+ nil)]
+                                          :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b))\n\n\n"}]})
+                nil))]
+    (testing "replace trims trailing whitespace"
+      (assert-invisible-spacing-edit ctx file-path))))
+
+(defn- ^:async test-replace-idempotent+ [socket file-path]
+  (let [content-before (await (read-test-file+ nil))
+        result (await (mcp/call-tool socket 102 "clojure_edit_files"
+                                     {:edits [{:type "replace"
+                                               :filePath file-path
+                                               :line 3
+                                               :targetLineText "(defn add-numbers"
+                                               :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b))\n\n"}]}))
+        content-after (await (read-test-file+ nil))]
     (testing "replace is idempotent for whitespace"
       (is (batch-success? result) "Second replace should succeed")
       (is (<= (count-consecutive-blank-lines content-after) 1)
@@ -171,32 +170,32 @@
       (is (= content-before content-after)
           "Replacing with same content should be idempotent"))))
 
-(defn- test-insert-proper-spacing+ [socket file-path]
-  (p/let [content-before (read-test-file+ nil)
-          {:keys [_result content] :as ctx}
-          (edit-with-decoy-and-verify+
-           socket file-path
-           #(mcp/call-tool socket 103 "clojure_edit_files"
-                           {:edits [{:type "insert"
-                                     :filePath file-path
-                                     :line 3
-                                     :targetLineText "(defn add-numbers"
-                                     :newForm "(defn multiply-numbers\n  \"Multiplies a and b\"\n  [a b]\n  (* a b))\n\n"}]})
-           content-before)]
+(defn- ^:async test-insert-proper-spacing+ [socket file-path]
+  (let [content-before (await (read-test-file+ nil))
+        {:keys [_result content] :as ctx}
+        (await (edit-with-decoy-and-verify+
+                socket file-path
+                #(mcp/call-tool socket 103 "clojure_edit_files"
+                                {:edits [{:type "insert"
+                                          :filePath file-path
+                                          :line 3
+                                          :targetLineText "(defn add-numbers"
+                                          :newForm "(defn multiply-numbers\n  \"Multiplies a and b\"\n  [a b]\n  (* a b))\n\n"}]})
+                content-before))]
     (testing "insert produces proper spacing"
       (assert-invisible-spacing-edit ctx file-path)
       (is (string/includes? content "(defn multiply-numbers")
           "Inserted form should appear in file"))))
 
-(defn- test-append-trims-whitespace+ [socket file-path]
-  (p/let [content-before (read-test-file+ nil)
-          active-before (active-editor-path)
-          result (mcp/call-tool socket 104 "clojure_edit_files"
-                                {:edits [{:type "append"
-                                          :filePath file-path
-                                          :code "(defn divide-numbers\n  \"Divides a by b\"\n  [a b]\n  (/ a b))\n\n\n"}]})
-          content (read-test-file+ content-before)
-          active-after (active-editor-path)]
+(defn- ^:async test-append-trims-whitespace+ [socket file-path]
+  (let [content-before (await (read-test-file+ nil))
+        active-before (active-editor-path)
+        result (await (mcp/call-tool socket 104 "clojure_edit_files"
+                                     {:edits [{:type "append"
+                                               :filePath file-path
+                                               :code "(defn divide-numbers\n  \"Divides a by b\"\n  [a b]\n  (/ a b))\n\n\n"}]}))
+        content (await (read-test-file+ content-before))
+        active-after (active-editor-path)]
     (testing "append trims trailing whitespace"
       (is (batch-success? result) "Append should succeed")
       (is (<= (count-consecutive-blank-lines content) 1)
@@ -208,17 +207,17 @@
       (is (= active-after active-before)
           "Active editor should remain unchanged after append"))))
 
-(defn- test-delete-form+ [socket file-path]
-  (p/let [content-before (read-test-file+ nil)
-          active-before (active-editor-path)
-          result (mcp/call-tool socket 105 "clojure_edit_files"
-                                {:edits [{:type "replace"
-                                          :filePath file-path
-                                          :line 8
-                                          :targetLineText "(defn add-numbers"
-                                          :newForm ""}]})
-          content (read-test-file+ content-before)
-          active-after (active-editor-path)]
+(defn- ^:async test-delete-form+ [socket file-path]
+  (let [content-before (await (read-test-file+ nil))
+        active-before (active-editor-path)
+        result (await (mcp/call-tool socket 105 "clojure_edit_files"
+                                     {:edits [{:type "replace"
+                                               :filePath file-path
+                                               :line 8
+                                               :targetLineText "(defn add-numbers"
+                                               :newForm ""}]}))
+        content (await (read-test-file+ content-before))
+        active-after (active-editor-path)]
     (testing "replace with empty string deletes form"
       (is (batch-success? result) "Delete should succeed")
       (is (not (string/includes? content "(defn add-numbers"))
@@ -234,17 +233,17 @@
       (is (= active-after active-before)
           "Active editor should remain unchanged after delete"))))
 
-(defn- delete-and-verify-gone+
+(defn- ^:async delete-and-verify-gone+
   "Delete a form by replacing with empty string and verify it's gone from file."
   [socket file-path {:keys [id line target-text form-name test-label]}]
-  (p/let [content-before (read-test-file+ nil)
-          result (mcp/call-tool socket id "clojure_edit_files"
-                                {:edits [{:type "replace"
-                                          :filePath file-path
-                                          :line line
-                                          :targetLineText target-text
-                                          :newForm ""}]})
-          content (read-test-file+ content-before)]
+  (let [content-before (await (read-test-file+ nil))
+        result (await (mcp/call-tool socket id "clojure_edit_files"
+                                     {:edits [{:type "replace"
+                                               :filePath file-path
+                                               :line line
+                                               :targetLineText target-text
+                                               :newForm ""}]}))
+        content (await (read-test-file+ content-before))]
     (testing test-label
       (is (batch-success? result))
       (is (<= (count-consecutive-blank-lines content) 1))
@@ -262,42 +261,42 @@
                             :form-name "(defn divide-numbers"
                             :test-label "delete last form keeps spacing stable"}))
 
-(defn- test-wrong-target-text+ [socket file-path]
-  (p/let [result (mcp/call-tool socket 108 "clojure_edit_files"
-                                {:edits [{:type "insert"
-                                          :filePath file-path
-                                          :line 3
-                                          :targetLineText "(defn does-not-exist [x]"
-                                          :newForm "(defn nope [] :nope)"}]})]
+(defn- ^:async test-wrong-target-text+ [socket file-path]
+  (let [result (await (mcp/call-tool socket 108 "clojure_edit_files"
+                                     {:edits [{:type "insert"
+                                               :filePath file-path
+                                               :line 3
+                                               :targetLineText "(defn does-not-exist [x]"
+                                               :newForm "(defn nope [] :nope)"}]}))]
     (testing "wrong targetLineText returns clear error"
       (is (expect-tool-failure result "Target line text not found")))))
 
-(defn- test-fuzzy-window-miss+ [socket file-path]
-  (p/let [result (mcp/call-tool socket 109 "clojure_edit_files"
-                                {:edits [{:type "replace"
-                                          :filePath file-path
-                                          :line 999
-                                          :targetLineText "(defn subtract-numbers"
-                                          :newForm "(defn subtract-numbers [a b] (- a b))"}]})]
+(defn- ^:async test-fuzzy-window-miss+ [socket file-path]
+  (let [result (await (mcp/call-tool socket 109 "clojure_edit_files"
+                                     {:edits [{:type "replace"
+                                               :filePath file-path
+                                               :line 999
+                                               :targetLineText "(defn subtract-numbers"
+                                               :newForm "(defn subtract-numbers [a b] (- a b))"}]}))]
     (testing "line outside fuzzy window fails even with matching text"
       (is (expect-tool-failure result "Target line text not found")))))
 
-(defn- test-tiny-file+ [socket]
-  (p/let [create-result (mcp/call-tool socket 110 "clojure_edit_files"
-                                       {:edits [{:type "create"
-                                                 :filePath (tiny-file-path)
-                                                 :content "(ns structural-edit-tiny-target)\n(def x 1)\n"}]})
-          replace-result (mcp/call-tool socket 111 "clojure_edit_files"
-                                        {:edits [{:type "replace"
-                                                  :filePath (tiny-file-path)
-                                                  :line 2
-                                                  :targetLineText "(def x 1)"
-                                                  :newForm "(def x 2)"}]})
-          content (wait-for+ #(let [c (fs/readFileSync (tiny-file-path) "utf8")]
-                                (when (string/includes? c "(def x 2)") c))
-                             :interval 10
-                             :timeout 5000
-                             :message "Tiny file content did not update within 5s")]
+(defn- ^:async test-tiny-file+ [socket]
+  (let [create-result (await (mcp/call-tool socket 110 "clojure_edit_files"
+                                            {:edits [{:type "create"
+                                                      :filePath (tiny-file-path)
+                                                      :content "(ns structural-edit-tiny-target)\n(def x 1)\n"}]}))
+        replace-result (await (mcp/call-tool socket 111 "clojure_edit_files"
+                                             {:edits [{:type "replace"
+                                                       :filePath (tiny-file-path)
+                                                       :line 2
+                                                       :targetLineText "(def x 1)"
+                                                       :newForm "(def x 2)"}]}))
+        content (await (wait-for+ #(let [c (fs/readFileSync (tiny-file-path) "utf8")]
+                                     (when (string/includes? c "(def x 2)") c))
+                                  :interval 10
+                                  :timeout 5000
+                                  :message "Tiny file content did not update within 5s"))]
     (testing "tiny file replace works"
       (is (batch-success? create-result))
       (is (batch-success? replace-result))
@@ -318,19 +317,19 @@
     (when (fs/existsSync (continue-file-path test-key))
       (fs/unlinkSync (continue-file-path test-key)))))
 
-(defn- test-continue-on-failure+
+(defn- ^:async test-continue-on-failure+
   "Test that a batch with one valid and one invalid edit applies the valid one."
   [socket {:keys [test-label test-key id-create id-batch valid-edit invalid-edit
                   expected-content expected-error]}]
-  (p/let [file-path (continue-file-path test-key)
-          _ (do (delete-continue-files!)
-                (mcp/call-tool socket id-create "clojure_edit_files"
-                               {:edits [{:type "create"
-                                         :filePath file-path
-                                         :content (initial-file-content)}]}))
-          result (mcp/call-tool socket id-batch "clojure_edit_files"
-                                {:edits [valid-edit invalid-edit]})
-          content (fs/readFileSync file-path "utf8")]
+  (let [file-path (continue-file-path test-key)
+        _ (do (delete-continue-files!)
+              (await (mcp/call-tool socket id-create "clojure_edit_files"
+                                    {:edits [{:type "create"
+                                              :filePath file-path
+                                              :content (initial-file-content)}]})))
+        result (await (mcp/call-tool socket id-batch "clojure_edit_files"
+                                     {:edits [valid-edit invalid-edit]}))
+        content (fs/readFileSync file-path "utf8")]
     (testing test-label
       (is (not (batch-success? result))
           "Summary should show partial success (1/2)")
@@ -375,17 +374,17 @@
 
 ;; --- Test orchestrator ---
 
-(defn- activate-target-editor+
+(defn- ^:async activate-target-editor+
   "Show file-path as the active editor (preview false)."
   [file-path]
   (let [uri (vscode/Uri.file file-path)]
-    (p/let [document (vscode/workspace.openTextDocument uri)
-            _ (vscode/window.showTextDocument document #js {:preview false})
-            _ (wait-for+ #(when (= file-path (active-editor-path))
-                            true)
-                         :interval 10
-                         :timeout 5000
-                         :message "Target editor did not become active within 5s")]
+    (let [document (await (vscode/workspace.openTextDocument uri))
+          _ (await (vscode/window.showTextDocument document #js {:preview false}))
+          _ (await (wait-for+ #(when (= file-path (active-editor-path))
+                                 true)
+                              :interval 10
+                              :timeout 5000
+                              :message "Target editor did not become active within 5s"))]
       nil)))
 
 (def ^:private !active-file-paths
@@ -416,31 +415,32 @@
     (when (= file-path (.-fsPath (.-uri doc)))
       (= (fs/readFileSync file-path "utf8") (.getText doc)))))
 
-(defn- read-file-content+
+(defn- ^:async read-file-content+
   "Read file-path. When previous-content is given, wait briefly for a change; on timeout return current disk content."
   [file-path previous-content]
   (if (some? previous-content)
-    (-> (wait-for+ #(let [content (fs/readFileSync file-path "utf8")]
-                      (when (and (seq content)
-                                 (not= content previous-content))
-                        content))
-                   :interval 10
-                   :timeout 2000
-                   :message "File content did not change within 2s")
-        (p/catch (fn [_]
-                   (fs/readFileSync file-path "utf8"))))
-    (p/resolved (fs/readFileSync file-path "utf8"))))
+    (try
+      (await (wait-for+ #(let [content (fs/readFileSync file-path "utf8")]
+                           (when (and (seq content)
+                                      (not= content previous-content))
+                             content))
+                        :interval 10
+                        :timeout 2000
+                        :message "File content did not change within 2s"))
+      (catch :default _
+        (fs/readFileSync file-path "utf8")))
+    (fs/readFileSync file-path "utf8")))
 
-(defn- edit-with-active-target-and-verify+
+(defn- ^:async edit-with-active-target-and-verify+
   "Activate the target file, run tool-call-fn, return edit context including dirty/disk/buffer."
   [file-path tool-call-fn prev-content]
-  (p/let [_ (activate-target-editor+ file-path)
-          dirty-before (active-document-dirty?)
-          result (tool-call-fn)
-          content (read-file-content+ file-path prev-content)
-          dirty-after (active-document-dirty?)
-          buffer-text (some-> vscode/window .-activeTextEditor .-document .getText)
-          disk-matches? (disk-equals-active-buffer? file-path)]
+  (let [_ (await (activate-target-editor+ file-path))
+        dirty-before (active-document-dirty?)
+        result (await (tool-call-fn))
+        content (await (read-file-content+ file-path prev-content))
+        dirty-after (active-document-dirty?)
+        buffer-text (some-> vscode/window .-activeTextEditor .-document .getText)
+        disk-matches? (disk-equals-active-buffer? file-path)]
     {:result result
      :content content
      :buffer-text buffer-text
@@ -473,104 +473,104 @@
   (is (string/includes? (str content) expected-fragment)
       "Edit should appear on disk"))
 
-(defn- discard-active-file-editor+
+(defn- ^:async discard-active-file-editor+
   "Close the active-target editor without saving so setup can recreate the file."
   [file-path]
-  (p/let [_ (when (= file-path (active-editor-path))
-              (p/do (when (active-document-dirty?)
-                      (vscode/commands.executeCommand "workbench.action.files.revert"))
-                    (vscode/commands.executeCommand "workbench.action.closeActiveEditor")))]
+  (let [_ (when (= file-path (active-editor-path))
+            (await (when (active-document-dirty?)
+                     (vscode/commands.executeCommand "workbench.action.files.revert")))
+            (await (vscode/commands.executeCommand "workbench.action.closeActiveEditor")))]
     nil))
 
-(defn- setup-active-target-file+ [socket create-id]
+(defn- ^:async setup-active-target-file+ [socket create-id]
   (let [file-path (active-file-path create-id)
         previous-file-path (some #{(active-editor-path)} @!active-file-paths)]
     (swap! !active-file-paths conj file-path)
-    (p/let [_ (when previous-file-path
-                (discard-active-file-editor+ previous-file-path))
-            _ (mcp/call-tool socket create-id "clojure_edit_files"
-                             {:edits [{:type "create"
-                                       :filePath file-path
-                                       :content (initial-file-content)}]})]
+    (let [_ (when previous-file-path
+              (await (discard-active-file-editor+ previous-file-path)))
+          _ (await (mcp/call-tool socket create-id "clojure_edit_files"
+                                  {:edits [{:type "create"
+                                            :filePath file-path
+                                            :content (initial-file-content)}]}))]
       file-path)))
 
-(defn- test-active-editor-replace-saves+ [socket]
-  (p/let [file-path (setup-active-target-file+ socket 130)
-          ctx (edit-with-active-target-and-verify+
-               file-path
-               #(mcp/call-tool socket 131 "clojure_edit_files"
-                               {:edits [{:type "replace"
-                                         :filePath file-path
-                                         :line 3
-                                         :targetLineText "(defn add-numbers"
-                                         :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b 0))"}]})
-               nil)]
+(defn- ^:async test-active-editor-replace-saves+ [socket]
+  (let [file-path (await (setup-active-target-file+ socket 130))
+        ctx (await (edit-with-active-target-and-verify+
+                    file-path
+                    #(mcp/call-tool socket 131 "clojure_edit_files"
+                                    {:edits [{:type "replace"
+                                              :filePath file-path
+                                              :line 3
+                                              :targetLineText "(defn add-numbers"
+                                              :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b 0))"}]})
+                    nil))]
     (testing "active editor replace leaves buffer saved (#72)"
       (assert-active-editor-saved ctx file-path "(+ a b 0)"))))
 
-(defn- test-active-editor-insert-saves+ [socket]
-  (p/let [file-path (setup-active-target-file+ socket 132)
-          content-before (fs/readFileSync file-path "utf8")
-          ctx (edit-with-active-target-and-verify+
-               file-path
-               #(mcp/call-tool socket 133 "clojure_edit_files"
-                               {:edits [{:type "insert"
-                                         :filePath file-path
-                                         :line 3
-                                         :targetLineText "(defn add-numbers"
-                                         :newForm "(defn multiply-active\n  [a b]\n  (* a b))\n"}]})
-               content-before)]
+(defn- ^:async test-active-editor-insert-saves+ [socket]
+  (let [file-path (await (setup-active-target-file+ socket 132))
+        content-before (fs/readFileSync file-path "utf8")
+        ctx (await (edit-with-active-target-and-verify+
+                    file-path
+                    #(mcp/call-tool socket 133 "clojure_edit_files"
+                                    {:edits [{:type "insert"
+                                              :filePath file-path
+                                              :line 3
+                                              :targetLineText "(defn add-numbers"
+                                              :newForm "(defn multiply-active\n  [a b]\n  (* a b))\n"}]})
+                    content-before))]
     (testing "active editor insert leaves buffer saved (#72)"
       (assert-active-editor-saved ctx file-path "(defn multiply-active"))))
 
-(defn- test-active-editor-append-saves+ [socket]
-  (p/let [file-path (setup-active-target-file+ socket 134)
-          content-before (fs/readFileSync file-path "utf8")
-          ctx (edit-with-active-target-and-verify+
-               file-path
-               #(mcp/call-tool socket 135 "clojure_edit_files"
-                               {:edits [{:type "append"
-                                         :filePath file-path
-                                         :code "(defn append-active\n  []\n  :ok)\n"}]})
-               content-before)]
+(defn- ^:async test-active-editor-append-saves+ [socket]
+  (let [file-path (await (setup-active-target-file+ socket 134))
+        content-before (fs/readFileSync file-path "utf8")
+        ctx (await (edit-with-active-target-and-verify+
+                    file-path
+                    #(mcp/call-tool socket 135 "clojure_edit_files"
+                                    {:edits [{:type "append"
+                                              :filePath file-path
+                                              :code "(defn append-active\n  []\n  :ok)\n"}]})
+                    content-before))]
     (testing "active editor append leaves buffer saved (#72)"
       (assert-active-editor-saved ctx file-path "(defn append-active"))))
 
-(defn- dirtify-active-buffer+
+(defn- ^:async dirtify-active-buffer+
   "Insert unsaved user text into the active document for file-path. Leaves isDirty true."
   [file-path marker]
-  (p/let [_ (activate-target-editor+ file-path)
-          ^js doc (.-document vscode/window.activeTextEditor)
-          uri (.-uri doc)
-          we (doto (vscode/WorkspaceEdit.)
-               (.insert uri (vscode/Position. 0 0) (str ";; " marker "\n")))
-          ;; applyEdit returns a Thenable; wait on isDirty rather than coercing its value.
-          _ (vscode/workspace.applyEdit we)
-          _ (wait-for+ #(when (.-isDirty doc) true)
-                       :interval 10
-                       :timeout 2000
-                       :message "Buffer did not become dirty after user edit setup")]
+  (let [_ (await (activate-target-editor+ file-path))
+        ^js doc (.-document vscode/window.activeTextEditor)
+        uri (.-uri doc)
+        we (doto (vscode/WorkspaceEdit.)
+             (.insert uri (vscode/Position. 0 0) (str ";; " marker "\n")))
+        ;; applyEdit returns a Thenable; wait on isDirty rather than coercing its value.
+        _ (await (vscode/workspace.applyEdit we))
+        _ (await (wait-for+ #(when (.-isDirty doc) true)
+                            :interval 10
+                            :timeout 2000
+                            :message "Buffer did not become dirty after user edit setup"))]
     (is (true? (.-isDirty doc))
         "Setup: buffer should be dirty with unsaved user text")
     (is (false? (string/includes? (fs/readFileSync file-path "utf8") marker))
         "Setup: user marker must not be on disk yet")
     marker))
 
-(defn- test-active-editor-pre-dirty-does-not-save+ [socket]
-  (p/let [file-path (setup-active-target-file+ socket 136)
-          marker "user-pre-dirty-72"
-          _ (dirtify-active-buffer+ file-path marker)
-          disk-before (fs/readFileSync file-path "utf8")
-          result (mcp/call-tool socket 137 "clojure_edit_files"
-                                {:edits [{:type "replace"
-                                          :filePath file-path
-                                          :line 4
-                                          :targetLineText "(defn add-numbers"
-                                          :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b 9))"}]})
-          ^js doc (.-document vscode/window.activeTextEditor)
-          buffer (.getText doc)
-          disk-after (fs/readFileSync file-path "utf8")
-          edit (some-> result :files vals first :edits first)]
+(defn- ^:async test-active-editor-pre-dirty-does-not-save+ [socket]
+  (let [file-path (await (setup-active-target-file+ socket 136))
+        marker "user-pre-dirty-72"
+        _ (await (dirtify-active-buffer+ file-path marker))
+        disk-before (fs/readFileSync file-path "utf8")
+        result (await (mcp/call-tool socket 137 "clojure_edit_files"
+                                     {:edits [{:type "replace"
+                                               :filePath file-path
+                                               :line 4
+                                               :targetLineText "(defn add-numbers"
+                                               :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b 9))"}]}))
+        ^js doc (.-document vscode/window.activeTextEditor)
+        buffer (.getText doc)
+        disk-after (fs/readFileSync file-path "utf8")
+        edit (some-> result :files vals first :edits first)]
     (testing "active editor pre-dirty: edit buffer, do not save (#72)"
       (is (batch-success? result) "Edit should succeed")
       (is (false? (:saved edit)) "Pre-dirty edit should report :saved false")
@@ -587,24 +587,24 @@
       (is (true? (.-isDirty doc))
           "Buffer should stay dirty when we skip save"))))
 
-(defn- test-active-editor-two-edit-batch+ [socket]
-  (p/let [file-path (setup-active-target-file+ socket 138)
-          _ (activate-target-editor+ file-path)
-          dirty-before (active-document-dirty?)
-          result (mcp/call-tool socket 139 "clojure_edit_files"
-                                {:edits [{:type "replace"
-                                          :filePath file-path
-                                          :line 3
-                                          :targetLineText "(defn add-numbers"
-                                          :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b 1))"}
-                                         {:type "append"
-                                          :filePath file-path
-                                          :code "(defn batch-active\n  []\n  :ok)\n"}]})
-          file-result (some-> result :files vals first)
-          edits (:edits file-result)
-          dirty-after (active-document-dirty?)
-          buffer (.getText (.-document vscode/window.activeTextEditor))
-          disk (fs/readFileSync file-path "utf8")]
+(defn- ^:async test-active-editor-two-edit-batch+ [socket]
+  (let [file-path (await (setup-active-target-file+ socket 138))
+        _ (await (activate-target-editor+ file-path))
+        dirty-before (active-document-dirty?)
+        result (await (mcp/call-tool socket 139 "clojure_edit_files"
+                                     {:edits [{:type "replace"
+                                               :filePath file-path
+                                               :line 3
+                                               :targetLineText "(defn add-numbers"
+                                               :newForm "(defn add-numbers\n  \"Adds a and b\"\n  [a b]\n  (+ a b 1))"}
+                                              {:type "append"
+                                               :filePath file-path
+                                               :code "(defn batch-active\n  []\n  :ok)\n"}]}))
+        file-result (some-> result :files vals first)
+        edits (:edits file-result)
+        dirty-after (active-document-dirty?)
+        buffer (.getText (.-document vscode/window.activeTextEditor))
+        disk (fs/readFileSync file-path "utf8")]
     (testing "active editor two-edit batch reports :saved and disk match (#72)"
       (is (false? dirty-before) "Batch should start from a clean buffer")
       (is (batch-success? result) "Both edits should succeed")
@@ -619,33 +619,34 @@
       (is (string/includes? disk "(defn batch-active")))))
 
 (deftest-async structural-editing-tests
-  (-> (p/let [{:keys [socket]} (mcp/start-mcp-session!)
-              file-path (test-file-path)]
-        (p/do (test-create-file+ socket file-path)
-              (test-replace-trims-whitespace+ socket file-path)
-              (test-replace-idempotent+ socket file-path)
-              (test-insert-proper-spacing+ socket file-path)
-              (test-append-trims-whitespace+ socket file-path)
-              (test-delete-form+ socket file-path)
-              (test-delete-first-form+ socket file-path)
-              (test-delete-last-form+ socket file-path)
-              (test-wrong-target-text+ socket file-path)
-              (test-fuzzy-window-miss+ socket file-path)
-              (test-tiny-file+ socket)
-              (test-continue-on-runtime-failure+ socket)
-              (test-continue-on-edit-validation-failure+ socket)
-              (test-active-editor-replace-saves+ socket)
-              (test-active-editor-insert-saves+ socket)
-              (test-active-editor-append-saves+ socket)
-              (test-active-editor-pre-dirty-does-not-save+ socket)
-              (test-active-editor-two-edit-batch+ socket)
-              (mcp/stop-mcp-session! socket)))
-      (p/catch (fn [e]
-                 (js/console.error "[structural-edit] Error:" (.-message e) e)
-                 (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
-                 (throw e)))
-      (p/finally (fn []
-                   (delete-test-file!)
-                   (delete-tiny-file!)
-                   (delete-continue-files!)
-                   (delete-active-files!)))))
+  (try
+    (let [{:keys [socket]} (await (mcp/start-mcp-session!))
+          file-path (test-file-path)]
+      (await (test-create-file+ socket file-path))
+      (await (test-replace-trims-whitespace+ socket file-path))
+      (await (test-replace-idempotent+ socket file-path))
+      (await (test-insert-proper-spacing+ socket file-path))
+      (await (test-append-trims-whitespace+ socket file-path))
+      (await (test-delete-form+ socket file-path))
+      (await (test-delete-first-form+ socket file-path))
+      (await (test-delete-last-form+ socket file-path))
+      (await (test-wrong-target-text+ socket file-path))
+      (await (test-fuzzy-window-miss+ socket file-path))
+      (await (test-tiny-file+ socket))
+      (await (test-continue-on-runtime-failure+ socket))
+      (await (test-continue-on-edit-validation-failure+ socket))
+      (await (test-active-editor-replace-saves+ socket))
+      (await (test-active-editor-insert-saves+ socket))
+      (await (test-active-editor-append-saves+ socket))
+      (await (test-active-editor-pre-dirty-does-not-save+ socket))
+      (await (test-active-editor-two-edit-batch+ socket))
+      (await (mcp/stop-mcp-session! socket)))
+    (catch :default e
+      (js/console.error "[structural-edit] Error:" (.-message e) e)
+      (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+      (throw e))
+    (finally
+      (delete-test-file!)
+      (delete-tiny-file!)
+      (delete-continue-files!)
+      (delete-active-files!))))
