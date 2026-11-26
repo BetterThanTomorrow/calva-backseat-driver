@@ -21,6 +21,7 @@
                 server-info (js->clj server-info+ :keywordize-keys true)
                 instance (:instance server-info)
                 assigned-port (or (:server/assigned-port server-info) (:assigned-port server-info))
+                host (or (:server/host server-info) (:host server-info))
                 workspace-root (.-uri (first vscode/workspace.workspaceFolders))
                 legacy-port-uri (vscode/Uri.joinPath workspace-root ".calva" "mcp-server" "port")
                 legacy-port-exists? (-> (vscode/workspace.fs.stat legacy-port-uri)
@@ -34,13 +35,16 @@
               "Server instance is something")
           (is (number? assigned-port)
               "Server started on a port")
+          (is (= "127.0.0.1" host)
+              "Server started on the default host")
           (is (false? legacy-port-exists?)
               "Start does not create workspace .calva/mcp-server/port")
           (is (= true
                  success?+)
               "Server stopped successfully"))
         (p/catch (fn [e]
-                   (js/console.error (.-message e) e))))))
+                   (js/console.error (.-message e) e)
+                   (throw e))))))
 
 (deftest-async tools-validation
   (testing "MCP server tools have valid descriptions"
