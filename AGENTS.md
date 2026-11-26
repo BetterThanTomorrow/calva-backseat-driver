@@ -57,7 +57,7 @@ npm run watch:local     # shadow-cljs + nREPL via :local-dev (sibling ../vscode-
 # Launch Extension Host: F5
 ```
 
-In the `backseat-driver-dev` workspace, the window does all of this when it opens, and agents restart the watch and the dev Extension Host themselves: see the `dev-environment` skill in `../backseat-driver-dev/.github/skills/dev-environment/SKILL.md`.
+In the `backseat-driver-dev` workspace, the task **Start dev environment** does all of this, and agents start and restart the watch and the dev Extension Host themselves: see the `dev-environment` skill in `../backseat-driver-dev/.github/skills/dev-environment/SKILL.md`.
 
 Day-to-day co-development: run the default **Watch** task (`watch:local`), not `npm run watch`. When the library stint is done: commit vscode-mcp, then bump and commit the `:git/sha` pin in `deps.edn` here; the human pushes vscode-mcp first, then Backseat Driver. Use **Watch (pinned vscode-mcp)** or `npm run watch` to verify the pin. Full process: vscode-mcp `AGENTS.md` Co-development.
 
