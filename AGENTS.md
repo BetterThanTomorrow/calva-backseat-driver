@@ -48,7 +48,7 @@ Available at `calva-backseat-driver.integrations.calva.api/calva-api`:
 
 ### REPL Setup (ClojureScript)
 
-Co-dev tower (vscode-mcp sibling): (1) git pin in `deps.edn`, (2) `:local-dev` overlay, (3) npm scripts — `watch`/`compile` = pin, `watch:local` = local, (4) VS Code tasks — default **Watch** → `watch:local`, pinned → `watch`. Task `"script"` names must exist in `package.json`.
+Co-dev tower (vscode-mcp sibling): (1) git pin in `deps.edn`, (2) `:local-dev` overlay, (3) npm scripts — `watch`/`compile` = pin, `watch:local` = local, (4) VS Code tasks — **Watch** → `watch:local`, pinned → `watch`. Task `"script"` names must exist in `package.json`.
 
 ```bash
 npm run watch           # git SHA pin from deps.edn
@@ -59,7 +59,7 @@ npm run watch:local     # shadow-cljs + nREPL via :local-dev (sibling ../vscode-
 
 In the `backseat-driver-dev` workspace, the task **Start dev environment** does all of this, and agents start and restart the watch and the dev Extension Host themselves: see the `dev-environment` skill in `../backseat-driver-dev/.github/skills/dev-environment/SKILL.md`.
 
-Day-to-day co-development: run the default **Watch** task (`watch:local`), not `npm run watch`. When the library stint is done: commit vscode-mcp, then bump and commit the `:git/sha` pin in `deps.edn` here; the human pushes vscode-mcp first, then Backseat Driver. Use **Watch (pinned vscode-mcp)** or `npm run watch` to verify the pin. Full process: vscode-mcp `AGENTS.md` Co-development.
+Day-to-day co-development: run the **Watch** task (`watch:local`), not `npm run watch`. When the library stint is done: commit vscode-mcp, then bump and commit the `:git/sha` pin in `deps.edn` here; the human pushes vscode-mcp first, then Backseat Driver. Use **Watch (pinned vscode-mcp)** or `npm run watch` to verify the pin. Full process: vscode-mcp `AGENTS.md` Co-development.
 
 **Critical**: This is a ClojureScript project running in VS Code Extension Host (Node.js). Use `cljs` REPL session, not `clj`.
 

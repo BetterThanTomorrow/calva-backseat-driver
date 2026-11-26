@@ -8,10 +8,7 @@
       "script": "watch:local",
       "isBackground": true,
       "problemMatcher": [],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
+      "group": "build",
       "presentation": {
         "reveal": "always",
         "panel": "dedicated"
