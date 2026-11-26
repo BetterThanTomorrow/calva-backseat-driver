@@ -25,9 +25,12 @@
                       ((get-in calva/calva-api [:ranges ranges-fn-key]) vscode-document vscode-position))}))
 
 (defn- edit-replace-range
-  "Apply Calva editor.replace on the given document (same object that will be saved)."
+  "Applies Calva's `editor.replace` on `vscode-document`, the same object that is then
+   saved. Returns a native promise of whether the edit was applied: Calva returns
+   `applyEdit`'s thenable, which `p/let` doesn't await."
   [^js vscode-document vscode-range new-text]
-  ((get-in calva/calva-api [:editor :replace]) vscode-document vscode-range new-text))
+  (js/Promise.resolve
+   ((get-in calva/calva-api [:editor :replace]) vscode-document vscode-range new-text)))
 
 (def ^:private severity-map
   "Map VS Code diagnostic severity levels to keywords"
@@ -250,7 +253,8 @@
                   edit (vscode/TextEdit.insert (vscode/Position. end-line end-character) text)
                   workspace-edit (vscode/WorkspaceEdit.)
                   _ (.set workspace-edit uri #js [edit])
-                  edit-result (vscode/workspace.applyEdit workspace-edit)
+                  ;; `applyEdit` returns a thenable that isn't a native promise
+                  edit-result (js/Promise.resolve (vscode/workspace.applyEdit workspace-edit))
                   persist (editor-persist/persist-edit-result+
                            vscode-document was-dirty? edit-result
                            {:text-before text-before})]

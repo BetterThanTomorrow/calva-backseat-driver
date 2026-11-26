@@ -40,7 +40,8 @@
                                                :editor/edit-visible? edit-visible?})]
      (p/resolved unsaved)
      ;; Keystrokes typed during the visibility wait get saved with the edit.
-     (-> (p/let [save-result (.save vscode-document)
+     ;; `save` returns a thenable that isn't a native promise, which `p/let` doesn't await.
+     (-> (p/let [save-result (js/Promise.resolve (.save vscode-document))
                  _ (when save-result
                      (wait-until+ #(not (.-isDirty vscode-document)) 500))
                  still-dirty? (.-isDirty vscode-document)]

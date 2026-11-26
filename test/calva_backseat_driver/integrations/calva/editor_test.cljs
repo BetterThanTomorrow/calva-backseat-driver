@@ -58,3 +58,71 @@
                  (p/catch (fn [e]
                             (is false (str e))
                             (done))))))))
+
+(defn- lazy-thenable
+  "A thenable that isn't a native promise, as VS Code returns from a document's `save`.
+   Calls `settle` with the resolve and reject functions after `ms`."
+  [ms settle]
+  #js {:then (fn [resolve reject]
+               (js/setTimeout #(settle resolve reject) ms))})
+
+(defn- document-saving-later
+  "A TextDocument stand-in whose `save` returns a thenable that settles after 30 ms.
+   The document reads as without unsaved changes when `save` is called, as the extension
+   host does for a moment after an edit, and as unsaved from then until the save resolves."
+  [!events settle]
+  (let [!dirty (atom false)
+        doc #js {}]
+    (js/Object.defineProperty doc "isDirty" #js {:configurable true
+                                                 :get (fn [] @!dirty)})
+    (set! (.-save doc)
+          (fn []
+            (js/setTimeout #(reset! !dirty true) 2)
+            (lazy-thenable 30 (fn [resolve reject]
+                                (swap! !events conj :save-settled)
+                                (settle {:resolve (fn [v]
+                                                    (reset! !dirty false)
+                                                    (resolve v))
+                                         :reject reject})))))
+    doc))
+
+(deftest persist-after-edit-awaits-the-save
+  (testing "a save that VS Code resolves later, through a thenable that isn't a native promise"
+    (async done
+           (let [!events (atom [])
+                 doc (document-saving-later !events (fn [{:keys [resolve]}] (resolve true)))]
+             (-> (p/let [result (editor-persist/persist-after-edit+ doc false true {:edit-visible? true})]
+                   (is (= [:save-settled] @!events)
+                       "The save has resolved when the edit is reported")
+                   (is (= {:success true :saved true} (select-keys result [:success :saved]))
+                       "and the edit is reported as saved")
+                   (is (false? (.-isDirty doc)))
+                   (done))
+                 (p/catch (fn [e]
+                            (is false (str e))
+                            (done))))))))
+
+(deftest persist-after-edit-save-that-fails
+  (testing "a save that VS Code resolves to false"
+    (async done
+           (let [doc (document-saving-later (atom []) (fn [{:keys [resolve]}] (resolve false)))]
+             (-> (p/let [result (editor-persist/persist-after-edit+ doc false true {:edit-visible? true})]
+                   (is (= {:success true :saved false} (select-keys result [:success :saved]))
+                       "The edit is reported as in the buffer only")
+                   (done))
+                 (p/catch (fn [e]
+                            (is false (str e))
+                            (done))))))))
+
+(deftest persist-after-edit-save-that-rejects
+  (testing "a save that rejects"
+    (async done
+           (let [doc (document-saving-later (atom []) (fn [{:keys [reject]}] (reject (js/Error. "disk full"))))]
+             (-> (p/let [result (editor-persist/persist-after-edit+ doc false true {:edit-visible? true})]
+                   (is (= {:success true :saved false :error "disk full"}
+                          (select-keys result [:success :saved :error]))
+                       "The edit is reported as in the buffer only, with the error's message")
+                   (done))
+                 (p/catch (fn [e]
+                            (is false (str e))
+                            (done))))))))
