@@ -155,4 +155,10 @@
         "A save that VS Code declined, and one that left the document dirty")
     (is (= "EACCES"
            (:error (edit-plan/saved-result {:editor/save-error "EACCES"})))
-        "A save that threw gives its message too")))
+        "A save that threw gives its message too")
+    (is (= {:success true
+            :saved false
+            :note "The edit is in the editor buffer, but the file on disk was not saved. Read the open document, not the disk."
+            :error nil}
+           (edit-plan/saved-result {:editor/save-error nil}))
+        "also when what it threw had no message")))

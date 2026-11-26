@@ -7,10 +7,10 @@
 
 (defn- performer
   "Returns the function a tool performs an effect with. It takes an effect vector, and
-   returns a promise of what the effect gave. The effects a tool can perform are Calva's."
+   returns a promise of what the effect gave, for the effects a tool can perform."
   [dispatch!]
   (fn [[effect-name & args]]
-    (if-let [effect (get calva-fxs/effects effect-name)]
+    (if-let [effect (get calva-fxs/tool-effects effect-name)]
       (.then (js/Promise.resolve nil)
              (fn [_]
                (apply effect dispatch! args)))

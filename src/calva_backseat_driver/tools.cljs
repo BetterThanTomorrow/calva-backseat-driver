@@ -69,11 +69,18 @@
 (defn load-file-result
   "Returns the result of a file load for what Calva gave: the load's result, or the
    error it failed with. A load that fails is a failed tool call."
-  [{:load/keys [result error]}]
-  (if error
+  [{:load/keys [result error] :as load}]
+  (cond
+    error
     {:result/data {:error error}
      :result/error? true
      :result/log [[:debug "[Server] Load file failed:" error]]}
+
+    ;; A load that failed with an error that has no message
+    (contains? load :load/error)
+    {:result/data {:error nil}}
+
+    :else
     {:result/data {:result (or result "nil")}}))
 
 (defn- load-clojure-file+

@@ -107,10 +107,10 @@
   (-> (js/Promise.resolve nil)
       (.then (fn [_]
                ((get-in calva/calva-api [:repl :evaluate]) code (clj->js options))))
-      (.then evaluation
-             (fn [^js error]
-               {:evaluation/rejected-message (str (.-message error))
-                :evaluation/rejected-printed (pr-str error)}))))
+      (.then evaluation)
+      (.catch (fn [^js error]
+                {:evaluation/rejected-message (str (.-message error))
+                 :evaluation/rejected-printed (pr-str error)}))))
 
 (defn- symbol-info
   "Returns what Calva knows about `clojure-symbol` in `ns`, as Calva gives it."
@@ -144,16 +144,20 @@
   [_dispatch! edits paddings]
   (features/edit-files+ edits paddings))
 
-(def effects
-  {:calva/fx.calva-activated #'calva-activated
-   :calva/fx.subscribe-to-output #'subscribe-to-output
-   :calva/fx.subscribe-to-sessions-changed #'subscribe-to-sessions-changed
-   :calva/fx.read-history #'read-history
-   :calva/fx.save-history #'save-history
-   :calva/fx.list-sessions #'list-sessions
+(def tool-effects
+  "The effects a tool can perform."
+  {:calva/fx.list-sessions #'list-sessions
    :calva/fx.list-sessions-and-runtimes #'list-sessions-and-runtimes
    :calva/fx.evaluate #'evaluate
    :calva/fx.symbol-info #'symbol-info
    :calva/fx.clojuredocs #'clojuredocs
    :calva/fx.load-file #'load-clojure-file
    :calva/fx.edit-files #'edit-files})
+
+(def effects
+  (merge tool-effects
+         {:calva/fx.calva-activated #'calva-activated
+          :calva/fx.subscribe-to-output #'subscribe-to-output
+          :calva/fx.subscribe-to-sessions-changed #'subscribe-to-sessions-changed
+          :calva/fx.read-history #'read-history
+          :calva/fx.save-history #'save-history}))

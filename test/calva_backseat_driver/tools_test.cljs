@@ -139,7 +139,10 @@
           :result/error? true
           :result/log [[:debug "[Server] Load file failed:" "cannot open file:///nope.clj"]]}
          (tools/load-file-result {:load/error "cannot open file:///nope.clj"}))
-      "A load that fails is a failed tool call, with a log line"))
+      "A load that fails is a failed tool call, with a log line")
+  (is (= {:result/data {:error nil}}
+         (tools/load-file-result {:load/error nil}))
+      "A load that failed without a message answers as it did: an error that is nil"))
 
 (deftest calling-a-tool
   (async done

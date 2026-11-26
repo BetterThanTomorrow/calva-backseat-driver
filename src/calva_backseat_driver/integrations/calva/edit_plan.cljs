@@ -157,9 +157,10 @@
 (defn saved-result
   "Returns the result for an applied edit after the save: saved when the save
    succeeded and the document is clean, and otherwise in the editor buffer only."
-  [{:editor/keys [save-succeeded? still-dirty? save-error]}]
+  [{:editor/keys [save-succeeded? still-dirty? save-error] :as saved}]
   (cond
-    save-error
+    ;; A save that threw has the key, also when the error had no message
+    (contains? saved :editor/save-error)
     {:success true :saved false :note save-failed-note :error save-error}
 
     (and save-succeeded?
