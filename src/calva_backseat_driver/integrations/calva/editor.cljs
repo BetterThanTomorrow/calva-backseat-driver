@@ -2,9 +2,9 @@
   (:require
    ["vscode" :as vscode]
    [calva-backseat-driver.integrations.calva.api :as calva]
+   [calva-backseat-driver.integrations.calva.edit-plan :as edit-plan]
    [calva-backseat-driver.integrations.calva.editor-persist :as editor-persist]
    [calva-backseat-driver.integrations.parinfer :as parinfer]
-   [calva-backseat-driver.integrations.calva.editor-util :as util]
    [clojure.string :as string]
    [promesa.core :as p]))
 
@@ -79,117 +79,38 @@
         diags
         (p/recur (inc attempts))))))
 
-(defn- starts-with-comment?
-  "Check if text starts with a comment character after trimming whitespace"
-  [text]
-  (when text
-    (-> text str string/trim (string/starts-with? ";"))))
-
-(defn- validate-edit-inputs
-  "Validate that neither target-line nor new-form start with comments"
-  [target-line new-form]
-  (cond
-    (not target-line)
-    {:valid? false
-     :error "No target line text provided. Provide an empty string to target an empty line."}
-
-    (not new-form)
-    {:valid? false
-     :error "No insert/replace text provided."}
-
-    (starts-with-comment? target-line)
-    {:valid? false
-     :error "Target line text cannot start with a comment (;). You can only target forms/sexpressions. (To edit line comments, use your line based editing tools.)"}
-
-    (starts-with-comment? new-form)
-    {:valid? false
-     :error "Replacement form cannot start with a comment (;). You can only insert forms/sexpressions with this tool. (To edit line comments, use your line based editing tools.)"}
-
-    :else
-    {:valid? true}))
-
-(defn- find-target-line-by-text
-  "Find the actual line number by searching for target text within a window around the initial line.
-   Returns the line number (1-indexed) where the target text is found, or nil if not found."
-  [{:editor/keys [^js vscode-document line-number target-text search-padding]}]
-  (when-let [found-line (util/find-target-line-by-text (.getText vscode-document) target-text (dec line-number) search-padding)]
-    (inc found-line)))
-
-(defn- validate-top-level-form-targeting
-  "Validate that target text matches the start of the top-level form at the given position.
-   Returns validation result map."
-  [{:editor/keys [file-path line-number target-text]}]
-  (p/let [form-data (get-ranges-form-data-by-line file-path line-number :currentTopLevelForm)
-          top-level-form-text (second (:ranges-object form-data))]
-    (if (util/form-first-line-starts-target-text? target-text top-level-form-text)
-      {:valid? true}
-      {:valid? false
-       :validation-error "The target text does not match the first line of a top level form in the vicinity of the target line."})))
-
-(defn- targeting-error-result [{:keys [doc-text line-number context-padding target-line error-msg extra-keys]}]
-  (let [{:editor/keys [file-context matched-line-in-context]}
-        (util/get-context-lines doc-text line-number context-padding target-line)
-        remedy (util/get-remedy-for-targeting matched-line-in-context)]
-    (merge {:success false
-            :error error-msg
-            :remedy remedy
-            :file-context file-context}
-           extra-keys)))
-
 (defn- resolve-edit-target+
-  "Find target line by text and validate it matches a top-level form.
+  "Finds the edit's target line by its text, and checks that it starts a top level form.
    Returns {:resolved? true :line-number N} or {:resolved? false :result error-map}"
-  [{:editor/keys [file-path line-number target-line search-padding context-padding]}]
+  [{:editor/keys [file-path] :as edit}]
   (p/let [^js vscode-document (get-document-from-path file-path)
-          doc-text (.getText vscode-document)
-          actual-line-number (find-target-line-by-text {:editor/vscode-document vscode-document
-                                                        :editor/line-number line-number
-                                                        :editor/target-text target-line
-                                                        :editor/search-padding search-padding})]
+          document {:document/text (.getText vscode-document)}
+          actual-line-number (edit-plan/target-line-number document edit)]
     (if-not actual-line-number
       {:resolved? false
-       :result (targeting-error-result
-                {:doc-text doc-text
-                 :line-number line-number
-                 :context-padding context-padding
-                 :target-line target-line
-                 :error-msg (str "Target line text not found. Expected: '" target-line "' near line " line-number)})}
-      (p/let [text-validation (validate-top-level-form-targeting
-                               {:editor/file-path file-path
-                                :editor/line-number actual-line-number
-                                :editor/target-text target-line})]
-        (if-not (:valid? text-validation)
+       :result (edit-plan/target-not-found document edit)}
+      (p/let [form-data (get-ranges-form-data-by-line file-path actual-line-number :currentTopLevelForm)
+              mismatch (edit-plan/form-mismatch document edit (second (:ranges-object form-data)))]
+        (if mismatch
           {:resolved? false
-           :result (targeting-error-result
-                    {:doc-text doc-text
-                     :line-number line-number
-                     :context-padding context-padding
-                     :target-line target-line
-                     :error-msg (str "Target text validation failed near line: " line-number)
-                     :extra-keys {:validation-error (:validation-error text-validation)}})}
+           :result mismatch}
           {:resolved? true
            :line-number actual-line-number})))))
 
-(defn- compute-effective-range [^js vscode-document form-range ranges-fn-key trimmed-form]
-  (if (and (string/blank? trimmed-form)
-           (not= :insertionPoint ranges-fn-key))
-    (let [start-line (.. form-range -start -line)
-          end-line (.. form-range -end -line)
-          total-lines (.-lineCount vscode-document)
-          next-line (inc end-line)
-          effective-start (if (and (pos? start-line)
-                                   (string/blank? (.-text (.lineAt vscode-document (dec start-line)))))
-                            (vscode/Position. (dec start-line) 0)
-                            (.-start form-range))
-          effective-end (if (< next-line total-lines)
-                          (vscode/Position. next-line 0)
-                          (.-end form-range))]
-      (vscode/Range. effective-start effective-end))
-    form-range))
+(defn- range-as-data
+  "Returns the VS Code range `vscode-range` as `[[line character] [line character]]`."
+  [^js vscode-range]
+  [[(.. vscode-range -start -line) (.. vscode-range -start -character)]
+   [(.. vscode-range -end -line) (.. vscode-range -end -character)]])
+
+(defn- vscode-range
+  "Returns the VS Code range for `[[line character] [line character]]`."
+  [[[start-line start-character] [end-line end-character]]]
+  (vscode/Range. start-line start-character end-line end-character))
 
 (defn apply-form-edit+
   "Apply a form edit without diagnostics polling. Assumes targeting is already validated."
-  [{:editor/keys [file-path line-number original-line-number new-form ranges-fn-key]}]
+  [{:editor/keys [file-path line-number original-line-number new-form ranges-fn-key] :as edit}]
   (let [validation-result (parinfer/validate-brackets new-form)]
     (if-not (:valid? validation-result)
       (p/resolved (assoc validation-result :success false :saved false))
@@ -197,10 +118,10 @@
               ^js vscode-document (:vscode-document form-data)
               was-dirty? (.-isDirty vscode-document)
               text-before (.getText vscode-document)
-              trimmed-form (string/trim new-form)
-              text (if (= :insertionPoint ranges-fn-key) (str trimmed-form "\n\n") trimmed-form)
-              form-range (first (:ranges-object form-data))
-              effective-range (compute-effective-range vscode-document form-range ranges-fn-key trimmed-form)
+              {:editor/keys [text] plan-range :editor/range} (edit-plan/edit-plan {:document/text text-before}
+                                                                                 (range-as-data (first (:ranges-object form-data)))
+                                                                                 edit)
+              effective-range (vscode-range plan-range)
               range-text (.getText vscode-document effective-range)
               edit-result (edit-replace-range vscode-document effective-range text)
               persist (editor-persist/persist-edit-result+
@@ -228,9 +149,7 @@
    Searches for target-line text within a configurable window around the specified line number.
    For insertions, the new form is inserted before the targeted form."
   [opts]
-  (let [validation (validate-edit-inputs (:editor/target-line opts) (:editor/new-form opts))]
-    (if-not (:valid? validation)
-      {:success false :saved false :error (:error validation)}
+  (or (edit-plan/input-error opts)
       (-> (p/let [targeting (resolve-edit-target+ opts)]
             (if-not (:resolved? targeting)
               (:result targeting)
@@ -238,7 +157,7 @@
                (assoc opts
                       :editor/line-number (:line-number targeting)
                       :editor/original-line-number (:editor/line-number opts)))))
-          (p/catch (fn [e] {:success false :saved false :error (.-message e)}))))))
+          (p/catch (fn [e] {:success false :saved false :error (.-message e)})))))
 
 #_{:clojure-lsp/ignore [:clojure-lsp/unused-public-var]}
 (comment
@@ -327,16 +246,8 @@
                   ^js vscode-document (vscode/workspace.openTextDocument uri)
                   was-dirty? (.-isDirty vscode-document)
                   text-before (.getText vscode-document)
-                  last-line-number (.-lineCount vscode-document)
-                  end-position (vscode/Position. last-line-number 0)
-                  last-line-text (if (pos? last-line-number)
-                                   (.-text (.lineAt vscode-document (dec last-line-number)))
-                                   "")
-                  needs-spacing? (and (pos? last-line-number)
-                                      (not (string/blank? last-line-text)))
-                  spacing (if needs-spacing? "\n\n" "\n")
-                  append-text (str spacing (string/trim code) "\n")
-                  edit (vscode/TextEdit.insert end-position append-text)
+                  {:editor/keys [text] [[end-line end-character]] :editor/range} (edit-plan/append-plan {:document/text text-before} code)
+                  edit (vscode/TextEdit.insert (vscode/Position. end-line end-character) text)
                   workspace-edit (vscode/WorkspaceEdit.)
                   _ (.set workspace-edit uri #js [edit])
                   edit-result (vscode/workspace.applyEdit workspace-edit)
