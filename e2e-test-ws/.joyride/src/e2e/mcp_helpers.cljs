@@ -111,8 +111,9 @@
              :message (str "[MCP helpers] Tool " tool-name " not registered within " timeout "ms")))
 
 (defn ^:async stop-mcp-session! [socket]
-  (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
-  (.end socket))
+  ;; In one do, since SCI's async fn doesn't await one form of its body before the next
+  (do (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
+      (.end socket)))
 
 (def ^:private backseat-driver-setting-defaults
   {"enableMcpReplEvaluation" true

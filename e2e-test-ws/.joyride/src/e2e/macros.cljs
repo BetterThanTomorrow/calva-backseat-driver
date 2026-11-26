@@ -12,7 +12,9 @@
        (cljs.test/async
         ~'done
         (-> (js/Promise.resolve nil)
-            (.then (fn [_#] ((~async-fn [] ~@body))))
+            ;; SCI's async fn doesn't await one form of its body before running the next,
+            ;; so the body goes in one do, where it does.
+            (.then (fn [_#] ((~async-fn [] (do ~@body)))))
             (.catch (fn [err#]
                       (cljs.test/is (= 1 0) (str err# (.-stack err#)))))
             (.finally
