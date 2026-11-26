@@ -17,13 +17,18 @@
 
 (def ^:private reserved-whos #{"ui" "api"})
 
+(defn blank-argument?
+  "True for an argument that a call left out, or gave as a blank string."
+  [v]
+  (or (nil? v)
+      (and (string? v)
+           (string/blank? v))))
+
 (defn who-error
   "Returns the error text for a `who` that a call can't use, or nil."
   [who]
   (cond
-    (or (nil? who)
-        (and (string? who)
-             (string/blank? who)))
+    (blank-argument? who)
     "The `who` parameter is required. Provide a slug identifying your agent (e.g. \"copilot\")."
 
     (contains? reserved-whos who)

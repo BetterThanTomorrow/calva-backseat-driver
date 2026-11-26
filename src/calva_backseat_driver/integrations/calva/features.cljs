@@ -1,186 +1,9 @@
 (ns calva-backseat-driver.integrations.calva.features
+  "A batch of structural edits: validated as a whole, then applied file by file."
   (:require
-   ["vscode" :as vscode]
-   [calva-backseat-driver.integrations.calva.api :as calva]
-   [calva-backseat-driver.integrations.calva.values :as calva-values]
    [calva-backseat-driver.integrations.calva.batch-edit :as batch-edit]
    [calva-backseat-driver.integrations.calva.editor :as editor]
-   [calva-backseat-driver.integrations.calva.session-runtimes :as session-runtimes]
-   [calva-backseat-driver.integrations.parinfer :as parinfer]
-   [clojure.string :as string]
    [promesa.core :as p]))
-
-(def ^:private no-ns-eval-note
-  "When evaluating without providing a namespace argument the evaluation is performed in the `user` namespace. Most often this is not what you want, and instead you should be evaluating providing the namespace argument. If it is the first time you are using a namespace, evaluate its ns-form first.")
-
-(def ^:private empty-result-note
-  "Not expecting a empty string as a result? If it is the first time you are using a namespace, evaluate its ns-form in the `user` namespace first.")
-
-(def ^:private error-result-note
-  "* clj: Evaluating `*e` will give your information about the error.
-   * cljs: Evaluating `(.-stack *e), gives you a stack trace")
-
-
-(def ^:private reserved-whos #{"ui" "api"})
-
-(defn- blank-who? [who]
-  (or (nil? who) (and (string? who) (string/blank? who))))
-
-(defn validate-who
-  "Returns nil if valid, error string if not. Pure function."
-  [who]
-  (cond
-    (blank-who? who)
-    "The `who` parameter is required. Provide a slug identifying your agent (e.g. \"copilot\")."
-
-    (contains? reserved-whos who)
-    (str "The `who` value \"" who "\" is reserved by Calva. Choose a different identifier.")
-
-    :else nil))
-
-;; Session listing and validation
-
-(defn list-sessions+
-  "Returns a promise that resolves to a list of available REPL sessions."
-  [{:uf/keys [dispatch!]
-    :calva/keys [include-all-runtimes?]}]
-  (dispatch! [[:app/ax.log :debug "[Server] Listing REPL sessions"]])
-  (p/let [sessions-js ((get-in calva/calva-api [:repl :listSessionsAndRuntimes]))
-          sessions (or (js->clj sessions-js :keywordize-keys true) [])]
-    {:sessions (mapv #(session-runtimes/project-session % (true? include-all-runtimes?))
-                     sessions)}))
-
-(defn- validate-session-key+
-  "Validates a session key against available sessions.
-   Returns {:valid? true} or {:valid? false :error ... :available-sessions ...}"
-  [session-key]
-  (p/let [sessions ((get-in calva/calva-api [:repl :listSessions]))
-          session-keys (->> sessions
-                            (map #(.-replSessionKey ^js %))
-                            set)]
-    (if (contains? session-keys session-key)
-      {:valid? true}
-      {:valid? false
-       :error (str "Session '" session-key "' not found.")
-       :available-sessions (mapv (fn [^js s]
-                                   {:session-key (.-replSessionKey s)
-                                    :project-root (.-projectRoot s)})
-                                 sessions)})))
-
-(defn- get-nrepl-eval-options [max-length max-depth]
-  (when (or max-length max-depth)
-    #js {:pprintOptions #js {:enabled true
-                             :printEngine "pprint"
-                             :maxLength max-length
-                             :maxDepth max-depth}}))
-
-(defn- handle-eval-error+ [dispatch! err]
-  (dispatch! [[:app/ax.log :debug "[Server] Evaluation failed:" err]])
-  (let [msg (str (.-message err))]
-    (if (re-find #"reserved" msg)
-      {:result "nil"
-       :error msg
-       :notes ["The `who` value you provided is reserved. Choose a different identifier."]}
-      {:result "nil"
-       :stderr (pr-str err)
-       :notes [error-result-note]})))
-
-(defn- validate-eval-inputs+ [code repl-session-key dispatch!]
-  (let [{:keys [valid? balanced-code] :as validation} (parinfer/validate-brackets code)]
-    (when-not valid?
-      (dispatch! [[:app/ax.log :debug "[Server] Code was unbalanced:" code "balanced-code:" balanced-code]]))
-    (if-not valid?
-      (p/resolved {:error validation})
-      (p/let [session-validation (validate-session-key+ repl-session-key)]
-        (if-not (:valid? session-validation)
-          {:error session-validation}
-          {:valid? true})))))
-
-(defn evaluate-code+
-  "Returns a promise that resolves to the result of evaluating Clojure/ClojureScript code.
-   Pre-validates session key against available sessions before evaluation."
-  [{:uf/keys [dispatch!]
-    :calva/keys [code repl-session-key ns who description target-runtime-id max-length max-depth]}]
-  (p/let [input-validation (validate-eval-inputs+ code repl-session-key dispatch!)]
-    (if (:error input-validation)
-      (:error input-validation)
-      (let [evaluate-fn (get-in calva/calva-api [:repl :evaluate])]
-        (p/let [nrepl-eval-options (get-nrepl-eval-options max-length max-depth)
-                result (-> (p/let [options-js (clj->js
-                                               (cond-> {:sessionKey repl-session-key}
-                                                 ns (assoc :ns ns)
-                                                 who (assoc :who who)
-                                                 description (assoc :description description)
-                                                 target-runtime-id (assoc :targetRuntimeId target-runtime-id)
-                                                 nrepl-eval-options (assoc :nReplOptions nrepl-eval-options)))
-                                   ^js evaluation+ (evaluate-fn code options-js)]
-                             (dispatch! [[:app/ax.log :debug "[Server] Evaluating code:" code]])
-                             (let [other-whos (some-> (.-otherWhosSinceLast evaluation+)
-                                                      (js->clj))
-                                   shadow-build (calva-values/js-field-value evaluation+ "shadowBuild")
-                                   shadow-runtime-id (calva-values/js-field-value evaluation+ "shadowRuntimeId")
-                                   notes (cond-> []
-                                           (not ns)
-                                           (conj no-ns-eval-note)
-
-                                           (= "" (.-result evaluation+))
-                                           (conj empty-result-note)
-
-                                           (seq other-whos)
-                                           (conj (str "Other evaluators active since your last eval: "
-                                                      (string/join ", " other-whos)
-                                                      ". Check the output log.")))]
-                               (cond-> {:result (.-result evaluation+)
-                                        :ns (.-ns evaluation+)
-                                        :stdout (.-output evaluation+)
-                                        :stderr (.-errorOutput evaluation+)
-                                        :session-key (.-sessionKey evaluation+)
-                                        :notes notes}
-
-                                 (.-who evaluation+)
-                                 (assoc :who (.-who evaluation+))
-
-                                 (seq other-whos)
-                                 (assoc :other-whos-since-last other-whos)
-
-                                 shadow-build
-                                 (assoc :shadow-build shadow-build)
-
-                                 shadow-runtime-id
-                                 (assoc :shadow-runtime-id shadow-runtime-id)
-
-                                 (.-error evaluation+)
-                                 (merge {:error (.-error evaluation+)
-                                         :stacktrace (.-stacktrace evaluation+)}))))
-                           (p/catch (fn [err] (handle-eval-error+ dispatch! err))))]
-          result)))))
-
-
-(defn get-clojuredocs+ [{:uf/keys [dispatch!]
-                         :calva/keys [clojure-symbol]}]
-  (dispatch! [[:app/ax.log :debug "[Server] Getting clojuredocs for:" clojure-symbol]])
-  ((get-in calva/calva-api [:info :getClojureDocsDotOrg]) clojure-symbol "user"))
-
-(defn get-symbol-info+ [{:uf/keys [dispatch!]
-                         :calva/keys [clojure-symbol ns repl-session-key]}]
-  (dispatch! [[:app/ax.log :debug "[Server] Getting symbol info for:" clojure-symbol]])
-  ((get-in calva/calva-api [:info :getSymbolInfo]) clojure-symbol repl-session-key ns))
-
-(defn load-file+
-  "Loads/evaluates a Clojure file through Calva's connected REPL.
-   Returns a promise resolving to the string result of the last evaluated form."
-  [{:uf/keys [dispatch!]
-    :calva/keys [file-path repl-session-key who]}]
-  (dispatch! [[:app/ax.log :debug "[Server] Loading file:" file-path]])
-  (-> (p/let [result (vscode/commands.executeCommand
-                      "calva.loadFile"
-                      (cond-> #js {:path file-path :silent true}
-                        repl-session-key (doto (aset "sessionKey" repl-session-key))
-                        who (doto (aset "who" who))))]
-        {:result (or result "nil")})
-      (p/catch (fn [err]
-                 (dispatch! [[:app/ax.log :debug "[Server] Load file failed:" err]])
-                 {:error (.-message err)}))))
 
 (defn- apply-single-edit+
   "Apply a single edit operation. Returns {:success true ...} or {:success false ...}"
@@ -234,7 +57,7 @@
   "Execute a batch of structural edits across one or more files.
    Pre-validates schema, groups by file, sorts within each file,
    applies sequentially (continues on failure), and reports per-file diagnostics."
-  [{:calva/keys [edits search-padding context-padding]}]
+  [edits {:editor/keys [search-padding context-padding]}]
   (let [validation-errors (batch-edit/validate-edit-schema edits)]
     (if validation-errors
       (p/resolved {:error "Schema validation failed — no edits were applied"
@@ -258,20 +81,3 @@
                 file-count (count file-results)]
             {:summary (str applied-count "/" total-edits " edits applied across " file-count " file" (when (not= 1 file-count) "s"))
              :files file-results}))))))
-
-(comment
-  (.-line (vscode/Position. 0))
-  (p/let [info (get-symbol-info+ {:uf/dispatch! (comp pr-str println)
-                                  :calva/clojure-symbol "clojure.core/reductions"
-                                  :calva/repl-session-key "clj"
-                                  :calva/ns "user"})]
-    (def info info))
-  (js->clj info :keywordize-keys true)
-
-  (p/let [docs (get-clojuredocs+ {:uf/dispatch! (comp pr-str println)
-                                  :calva/clojure-symbol "clojure.core/reductions"})]
-    (def docs docs))
-  (js->clj docs :keywordize-keys true)
-
-  :rcf)
-

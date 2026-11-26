@@ -1,7 +1,7 @@
 (ns calva-backseat-driver.tools-test
   (:require ["fs" :as fs]
             ["path" :as path]
-            [cljs.test :refer [deftest is testing]]
+            [cljs.test :refer [deftest is testing async]]
             [calva-backseat-driver.tools :as tools]))
 
 (deftest prepared-invocation
@@ -81,3 +81,99 @@
                            (keys (get-in manifest [:contributes :configuration :properties]))))]
     (is (every? (conj settings :calva/output-log) (mapcat :tool/reads (vals tools/tools)))
         "What a tool reads from the state is a setting in package.json, or the output log")))
+
+(deftest log-lines
+  (is (= ["[Server] Getting symbol info for:" "map"]
+         (tools/log-line "clojure_symbol_info" {:clojureSymbol "map" :namespace "user"})))
+  (is (= ["[Server] Listing REPL sessions"]
+         (tools/log-line "clojure_list_sessions" {})))
+  (is (= ["[Server] Loading file:" nil]
+         (tools/log-line "clojure_load_file" {}))
+      "An argument the call leaves out is nil in the line")
+  (is (nil? (tools/log-line "clojure_edit_files" {:edits []}))
+      "Editing writes no line")
+  (is (every? (fn [[tool {:tool/keys [log-line]}]]
+                (let [arguments (set (map keyword (keys (get-in (some #(when (= tool (:name %)) %)
+                                                                      (get-in manifest [:contributes :languageModelTools]))
+                                                                [:inputSchema :properties]))))]
+                  (every? arguments (filter keyword? log-line))))
+              tools/tools)
+      "Every argument a log line names is an argument of its tool in package.json"))
+
+(deftest sessions-result
+  (let [session {:replSessionKey "cljs"
+                 :replType "cljs"
+                 :supportsRuntimes true
+                 :builds [{:buildId ":app"
+                           :isActive true
+                           :isCurrentlyConnected true
+                           :runtimes [{:runtimeId 83 :description "Node" :buildId ":app" :host "node" :lastActivity 1 :extra "x"}]}]}]
+    (is (= {:result/data {:sessions [{:replSessionKey "cljs"
+                                      :replType "cljs"
+                                      :supportsRuntimes true
+                                      :builds [{:buildId ":app"
+                                                :isActive true
+                                                :isCurrentlyConnected true
+                                                :runtimeCount 1
+                                                :mostRecentRuntime {:runtimeId 83 :description "Node" :buildId ":app" :host "node" :lastActivity 1}}]}]}}
+           (tools/sessions-result {} [session]))
+        "Each build has its newest runtime and a count")
+    (is (= [{:runtimeId 83 :description "Node" :buildId ":app" :host "node" :lastActivity 1}]
+           (get-in (tools/sessions-result {:includeAllRuntimes true} [session])
+                   [:result/data :sessions 0 :builds 0 :runtimes]))
+        "and every runtime when the call asks for them")))
+
+(deftest loading-a-file
+  (is (= "The `replSessionKey` parameter is required. Use `clojure_list_sessions` to discover available sessions."
+         (tools/load-file-input-error {:filePath "/a.clj" :replSessionKey "" :who "coder"})
+         (tools/load-file-input-error {:filePath "/a.clj" :who "coder"})))
+  (is (= "The `who` parameter is required. Provide a slug identifying your agent (e.g. \"copilot\")."
+         (tools/load-file-input-error {:filePath "/a.clj" :replSessionKey "clj" :who ""})))
+  (is (nil? (tools/load-file-input-error {:filePath "/a.clj" :replSessionKey "clj" :who "coder"})))
+  (is (= {:result/data {:result "#'user/x"}}
+         (tools/load-file-result {:load/result "#'user/x"})))
+  (is (= {:result/data {:result "nil"}}
+         (tools/load-file-result {:load/result nil}))
+      "A load without a result gives the text nil")
+  (is (= {:result/data {:error "cannot open file:///nope.clj"}
+          :result/error? true
+          :result/log [[:debug "[Server] Load file failed:" "cannot open file:///nope.clj"]]}
+         (tools/load-file-result {:load/error "cannot open file:///nope.clj"}))
+      "A load that fails is a failed tool call, with a log line"))
+
+(deftest calling-a-tool
+  (async done
+    (let [!asked (atom [])
+          perform-effect! (fn [[effect-name :as fx]]
+                            (swap! !asked conj fx)
+                            (js/Promise.resolve (get {:calva/fx.load-file {:load/error "no such file"}
+                                                      :calva/fx.symbol-info js/undefined
+                                                      :calva/fx.edit-files {:summary "0/0 edits applied across 0 files"}}
+                                                     effect-name)))]
+      (-> (js/Promise.all
+           #js [(tools/call-tool+ perform-effect! {:call/tool "clojure_load_file"
+                                                   :call/arguments {:filePath "/nope.clj" :replSessionKey "clj" :who "coder"}})
+                (tools/call-tool+ perform-effect! {:call/tool "clojure_symbol_info"
+                                                   :call/arguments {:clojureSymbol "map" :replSessionKey "clj" :namespace "user"}})
+                (tools/call-tool+ perform-effect! {:call/tool "clojure_edit_files"
+                                                   :call/arguments {:edits []}
+                                                   :call/state {:vscode/config.editor.fuzzyLineTargetingPadding 2
+                                                                :vscode/config.editor.lineContextResponsePadding 10}})])
+          (.then (fn [[failed-load no-info edited]]
+                   (is (= {:result/content [{:type "text" :text "{\"error\":\"no such file\"}"}]
+                           :result/error? true
+                           :result/log [[:debug "[Server] Load file failed:" "no such file"]]}
+                          failed-load)
+                       "A failed load is content with the error, marked as failed, with its log line")
+                   (is (= {:result/content [{:type "text"}]} no-info)
+                       "A tool that Calva answers undefined gives a text part without text")
+                   (is (= [[:calva/fx.load-file "/nope.clj" "clj" "coder"]
+                           [:calva/fx.symbol-info "map" "clj" "user"]
+                           [:calva/fx.edit-files [] {:editor/search-padding 2 :editor/context-padding 10}]]
+                          @!asked)
+                       "Each tool asks Calva with the call's arguments, and editing with the paddings from the settings")
+                   (is (= "{\"summary\":\"0/0 edits applied across 0 files\"}"
+                          (-> edited :result/content first :text)))))
+          (.catch (fn [e]
+                    (is (nil? e) "The calls resolve")))
+          (.finally done)))))

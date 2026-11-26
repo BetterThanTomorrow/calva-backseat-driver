@@ -1,6 +1,5 @@
 (ns calva-backseat-driver.mcp.requests
   (:require
-   [calva-backseat-driver.integrations.calva.features :as calva]
    [clojure.string :as string]
    [promesa.core :as p]
    [vscode-mcp.manifest :as manifest]
@@ -32,23 +31,37 @@
            (fn [e]
              (responses/error-response id -32603 (exception-message e))))))
 
-(defn- bd-read-dynamic-resource [uri options]
+(defn- tool-resource+
+  "Returns a promise of the contents of the resource at `uri`: what a call of `tool`
+   with `arguments` gives, as text."
+  [dispatch! uri tool arguments]
+  ;; vscode-mcp recognizes promesa promises, so the contents are one
+  (p/create
+   (fn [resolve reject]
+     (.then (dispatch! [[:tool/ax.call {:call/tool tool
+                                        :call/arguments arguments}]])
+            (fn [{:result/keys [content thrown]}]
+              (if thrown
+                (reject (js/Error. thrown))
+                (let [text (:text (first content))]
+                  (resolve {:contents [(cond-> {:uri uri}
+                                         text (assoc :text text))]}))))
+            reject))))
+
+(defn- bd-read-dynamic-resource
+  "Returns a promise of the contents of the symbol info or ClojureDocs resource at
+   `uri`, or nil when `uri` is neither."
+  [dispatch! uri]
   (cond
     (string/starts-with? uri "/symbol-info/")
-    (p/let [[_ clojureSymbol session-key ns] (re-find #"^/symbol-info/([^@]+)@([^@]+)@(.+)$" uri)
-            info (calva/get-symbol-info+ (merge options
-                                                {:calva/clojure-symbol clojureSymbol
-                                                 :calva/repl-session-key session-key
-                                                 :calva/ns ns}))]
-      {:contents [{:uri uri
-                   :text (js/JSON.stringify info)}]})
+    (let [[_ clojure-symbol session-key ns] (re-find #"^/symbol-info/([^@]+)@([^@]+)@(.+)$" uri)]
+      (tool-resource+ dispatch! uri "clojure_symbol_info" {:clojureSymbol clojure-symbol
+                                                           :replSessionKey session-key
+                                                           :namespace ns}))
 
     (string/starts-with? uri "/clojuredocs/")
-    (p/let [[_ clojureSymbol] (re-find #"^/clojuredocs/(.+)$" uri)
-            info (calva/get-clojuredocs+ (merge options
-                                                {:calva/clojure-symbol clojureSymbol}))]
-      {:contents [{:uri uri
-                   :text (js/JSON.stringify info)}]})
+    (let [[_ clojure-symbol] (re-find #"^/clojuredocs/(.+)$" uri)]
+      (tool-resource+ dispatch! uri "clojuredocs_info" {:clojureSymbol clojure-symbol}))
 
     :else
     nil))
@@ -72,7 +85,9 @@
           (when repl-enabled?
             " You can evaluate Clojure/ClojureScript code via the `clojure_evaluate_code` tool, load entire files into the REPL with `clojure_load_file`, check REPL output with `clojure_repl_output_log`, look up symbol info, and query clojuredocs.org."))))
 
-(defn- request-opts [{:mcp/keys [when-clause-settings] :as options}]
+(defn- request-opts [{:mcp/keys [when-clause-settings]
+                      :uf/keys [dispatch!]
+                      :as options}]
   {:settings when-clause-settings
    :initialize-opts {:base-text (initialize-base-text options)
                      :name "calva-backseat-driver"
@@ -81,7 +96,7 @@
                                      :resources {:listChanged true}}
                       :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (unless disabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."}
    :resource-templates+ (fn [_ctx _opts] (bd-resource-templates options))
-   :read-resource+ (fn [_ctx uri _opts] (bd-read-dynamic-resource uri options))})
+   :read-resource+ (fn [_ctx uri _opts] (bd-read-dynamic-resource dispatch! uri))})
 
 (defn handle-request-fn [{:uf/keys [dispatch!] :as options}
                          {:keys [method] :as request}]

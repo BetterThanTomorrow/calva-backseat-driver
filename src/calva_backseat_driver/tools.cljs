@@ -4,14 +4,17 @@
   (:require
    ["vscode" :as vscode]
    [calva-backseat-driver.bracket-balance :as balance]
-   [calva-backseat-driver.integrations.calva.features :as calva]
    [calva-backseat-driver.integrations.calva.output :as output]
+   [calva-backseat-driver.integrations.calva.session-runtimes :as session-runtimes]
    [calva-backseat-driver.tools.confirmation :as confirmation]
    [calva-backseat-driver.tools.content :as content]
-   [clojure.string :as string]))
+   [calva-backseat-driver.tools.evaluation :as evaluation]))
 
-;; The tools. Each takes `dispatch!` and a tool call, `{:call/arguments … :call/state …}`,
-;; and returns a promise of `{:result/data …}`, with `:result/error? true` when the tool failed.
+;; The tools. Each takes `perform-effect!` and a tool call, `{:call/arguments … :call/state …}`,
+;; and returns a promise of `{:result/data …}`, with `:result/error? true` when the tool
+;; failed and `:result/log` with the log lines it writes. A tool touches Calva and VS Code
+;; through `perform-effect!`, which takes an effect vector and returns a promise of what
+;; the effect gave.
 
 (defn- result-of+
   "Returns a promise of the result map for the data that `data+` resolves to."
@@ -20,136 +23,126 @@
          (fn [data]
            {:result/data data})))
 
-(defn- evaluate-code+
-  "Evaluates the call's code through Calva."
-  [dispatch! {:call/keys [arguments state]}]
-  (let [{:keys [code replSessionKey who description targetRuntimeId]
-         ns :namespace} arguments]
-    (if-let [who-error (calva/validate-who who)]
-      (result-of+ {:error who-error})
-      (result-of+ (calva/evaluate-code+ (cond-> {:uf/dispatch! dispatch!
-                                                 :calva/code code
-                                                 :calva/repl-session-key replSessionKey
-                                                 :calva/who who
-                                                 :calva/description description
-                                                 :calva/max-length (:vscode/config.evaluation.maxLength state)
-                                                 :calva/max-depth (:vscode/config.evaluation.maxDepth state)}
-                                          ns (assoc :calva/ns ns)
-                                          targetRuntimeId (assoc :calva/target-runtime-id targetRuntimeId)))))))
+(defn sessions-result
+  "Returns the result of the session listing for Calva's `sessions`, with every runtime
+   of each build when the call's arguments ask for it."
+  [{:keys [includeAllRuntimes]} sessions]
+  {:result/data {:sessions (mapv #(session-runtimes/project-session % (true? includeAllRuntimes))
+                                 sessions)}})
 
 (defn- list-sessions+
   "Lists Calva's REPL sessions."
-  [dispatch! {:call/keys [arguments]}]
-  (result-of+ (calva/list-sessions+ {:uf/dispatch! dispatch!
-                                     :calva/include-all-runtimes? (true? (:includeAllRuntimes arguments))})))
+  [perform-effect! {:call/keys [arguments]}]
+  (.then (perform-effect! [:calva/fx.list-sessions-and-runtimes])
+         (fn [sessions]
+           (sessions-result arguments sessions))))
 
 (defn- symbol-info+
   "Looks the call's symbol up through Calva."
-  [dispatch! {:call/keys [arguments]}]
+  [perform-effect! {:call/keys [arguments]}]
   (let [{:keys [clojureSymbol replSessionKey]
          ns :namespace} arguments]
-    (result-of+ (calva/get-symbol-info+ {:uf/dispatch! dispatch!
-                                         :calva/clojure-symbol clojureSymbol
-                                         :calva/repl-session-key replSessionKey
-                                         :calva/ns ns}))))
+    (result-of+ (perform-effect! [:calva/fx.symbol-info clojureSymbol replSessionKey ns]))))
 
 (defn- clojuredocs+
   "Looks the call's symbol up on ClojureDocs through Calva."
-  [dispatch! {:call/keys [arguments]}]
-  (result-of+ (calva/get-clojuredocs+ {:uf/dispatch! dispatch!
-                                       :calva/clojure-symbol (:clojureSymbol arguments)})))
+  [perform-effect! {:call/keys [arguments]}]
+  (result-of+ (perform-effect! [:calva/fx.clojuredocs (:clojureSymbol arguments)])))
 
 (defn- output-log+
   "Runs the call's Datalog query on the output log."
-  [dispatch! {:call/keys [arguments state]}]
-  (let [{:keys [query inputs]} arguments]
-    (dispatch! [[:app/ax.log :debug "[Server] Querying output log with:" query]])
-    (result-of+ (output/query (:calva/output-log state) query inputs))))
+  [_perform-effect! {:call/keys [arguments state]}]
+  (result-of+ (output/query (:calva/output-log state) (:query arguments) (:inputs arguments))))
 
 (defn- balance-brackets+
   "Balances the brackets of the call's text from its indentation."
-  [dispatch! {:call/keys [arguments]}]
-  (result-of+ (balance/infer-parens-response {:uf/dispatch! dispatch!
-                                              :calva/text (:text arguments)})))
+  [_perform-effect! {:call/keys [arguments]}]
+  (result-of+ (balance/infer-parens-response (:text arguments))))
 
-(defn- blank-session-key? [session-key]
-  (or (nil? session-key)
-      (and (string? session-key)
-           (string/blank? session-key))))
-
-(defn- load-file-input-error
+(defn load-file-input-error
   "Returns the error for a load file call that can't run, or nil."
   [{:keys [replSessionKey who]}]
-  (if (blank-session-key? replSessionKey)
+  (if (evaluation/blank-argument? replSessionKey)
     "The `replSessionKey` parameter is required. Use `clojure_list_sessions` to discover available sessions."
-    (calva/validate-who who)))
+    (evaluation/who-error who)))
+
+(defn load-file-result
+  "Returns the result of a file load for what Calva gave: the load's result, or the
+   error it failed with. A load that fails is a failed tool call."
+  [{:load/keys [result error]}]
+  (if error
+    {:result/data {:error error}
+     :result/error? true
+     :result/log [[:debug "[Server] Load file failed:" error]]}
+    {:result/data {:result (or result "nil")}}))
 
 (defn- load-clojure-file+
-  "Loads the call's file through Calva. A load that fails is a failed tool call."
-  [dispatch! {:call/keys [arguments]}]
+  "Loads the call's file through Calva."
+  [perform-effect! {:call/keys [arguments]}]
   (let [{:keys [filePath replSessionKey who]} arguments]
     (if-let [input-error (load-file-input-error arguments)]
       (result-of+ {:error input-error})
-      (.then (js/Promise.resolve (calva/load-file+ {:uf/dispatch! dispatch!
-                                                    :calva/file-path filePath
-                                                    :calva/repl-session-key replSessionKey
-                                                    :calva/who who}))
-             (fn [{:keys [error] :as data}]
-               (if error
-                 {:result/data {:error error}
-                  :result/error? true}
-                 {:result/data data}))))))
+      (.then (perform-effect! [:calva/fx.load-file filePath replSessionKey who])
+             load-file-result))))
 
 (defn- edit-files+
   "Applies the call's edits to the files they name."
-  [_dispatch! {:call/keys [arguments state]}]
-  (result-of+ (calva/edit-files+ {:calva/edits (:edits arguments)
-                                  :calva/search-padding (:vscode/config.editor.fuzzyLineTargetingPadding state)
-                                  :calva/context-padding (:vscode/config.editor.lineContextResponsePadding state)})))
+  [perform-effect! {:call/keys [arguments state]}]
+  (result-of+ (perform-effect! [:calva/fx.edit-files
+                                (:edits arguments)
+                                {:editor/search-padding (:vscode/config.editor.fuzzyLineTargetingPadding state)
+                                 :editor/context-padding (:vscode/config.editor.lineContextResponsePadding state)}])))
 
 ;; The tool table
 
 (def tools
-  "One row per tool: the var that runs it, what it reads from the app state, the default for its
-   `maxImages` argument when images in its result become image parts, and what a person
-   is shown before it runs."
+  "One row per tool: the var that runs it, what it reads from the app state, the log
+   line a call writes (a keyword in it stands for that argument of the call), the
+   default for its `maxImages` argument when images in its result become image parts,
+   and what a person is shown before it runs."
   {"clojure_evaluate_code"
-   {:tool/function #'evaluate-code+
-    :tool/reads [:vscode/config.evaluation.maxLength
-                 :vscode/config.evaluation.maxDepth]
+   {:tool/function #'evaluation/evaluate-code+
+    :tool/reads [:vscode/config.evaluation.maxLength :vscode/config.evaluation.maxDepth]
+    :tool/log-line ["[Server] Evaluating code:" :code]
     :tool/default-max-images 10
     :tool/invocation-message "Evaluating code"
     :tool/confirmation #'confirmation/evaluate-code}
 
    "clojure_list_sessions"
    {:tool/function #'list-sessions+
+    :tool/log-line ["[Server] Listing REPL sessions"]
     :tool/invocation-message "Listing REPL sessions"
     :tool/confirmation #'confirmation/list-sessions}
 
    "clojure_symbol_info"
    {:tool/function #'symbol-info+
+    :tool/log-line ["[Server] Getting symbol info for:" :clojureSymbol]
     :tool/invocation-message "Getting symbol info"
     :tool/confirmation #'confirmation/symbol-info}
 
    "clojuredocs_info"
    {:tool/function #'clojuredocs+
+    :tool/log-line ["[Server] Getting clojuredocs for:" :clojureSymbol]
     :tool/invocation-message "Looking up ClojureDocs"
     :tool/confirmation #'confirmation/clojuredocs}
 
    "clojure_repl_output_log"
    {:tool/function #'output-log+
     :tool/reads [:calva/output-log]
+    :tool/log-line ["[Server] Querying output log with:" :query]
     :tool/default-max-images 0
     :tool/invocation-message "Querying REPL output log"
     :tool/confirmation #'confirmation/output-log}
 
    "clojure_balance_brackets"
    {:tool/function #'balance-brackets+
+    :tool/log-line ["[Server] Infering brackets for:" :text]
     :tool/invocation-message "Inferred brackets"
     :tool/confirmation #'confirmation/balance-brackets}
 
    "clojure_load_file"
    {:tool/function #'load-clojure-file+
+    :tool/log-line ["[Server] Loading file:" :filePath]
     :tool/invocation-message "Loading file"
     :tool/confirmation #'confirmation/load-clojure-file}
 
@@ -159,6 +152,17 @@
                  :vscode/config.editor.lineContextResponsePadding]
     :tool/invocation-message "Editing Clojure files"
     :tool/confirmation #'confirmation/edit-files}})
+
+(defn log-line
+  "Returns the messages of the log line that a call of `tool` with `arguments` writes,
+   or nil when the tool writes none."
+  [tool arguments]
+  (when-let [line (get-in tools [tool :tool/log-line])]
+    (mapv (fn [part]
+            (if (keyword? part)
+              (get arguments part)
+              part))
+          line)))
 
 (defn prepared-invocation
   "Returns what VS Code shows before `tool` runs with `arguments`: the invocation message
@@ -175,17 +179,19 @@
     (content/parts data)))
 
 (defn call-tool+
-  "Runs the tool of `tool-call`, `{:call/tool … :call/arguments … :call/state …}`.
-   Returns a promise of `{:result/content parts}`, with `:result/error? true` when the
-   tool failed. The promise rejects when the tool throws."
-  [dispatch! {:call/keys [tool arguments] :as tool-call}]
+  "Runs the tool of `tool-call`, `{:call/tool … :call/arguments … :call/state …}`, with
+   `perform-effect!` for what it does outside. Returns a promise of `{:result/content
+   parts}`, with `:result/error? true` when the tool failed and `:result/log` when it
+   has log lines to write. The promise rejects when the tool throws."
+  [perform-effect! {:call/keys [tool arguments] :as tool-call}]
   (let [{:tool/keys [function] :as row} (get tools tool)]
     (-> (js/Promise.resolve nil)
         (.then (fn [_]
-                 (function dispatch! tool-call)))
-        (.then (fn [{:result/keys [data error?]}]
+                 (function perform-effect! tool-call)))
+        (.then (fn [{:result/keys [data error? log]}]
                  (cond-> {:result/content (content-parts row arguments data)}
-                   error? (assoc :result/error? true)))))))
+                   error? (assoc :result/error? true)
+                   log (assoc :result/log log)))))))
 
 ;; The Language Model API's entry point
 

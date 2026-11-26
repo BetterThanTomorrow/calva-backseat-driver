@@ -2,10 +2,9 @@
   (:require [calva-backseat-driver.integrations.parinfer :as parinfer]))
 
 (defn infer-parens-response
-  "Infer parens from the indentation"
-  [{:uf/keys [dispatch!]
-    :calva/keys [text]}]
-  (dispatch! [[:app/ax.log :debug "[Server] Infering brackets for:" text]])
+  "Returns what the bracket balancing tool answers for `text`: the text with its
+   brackets inferred from its indentation, or a note that it was balanced already."
+  [text]
   (try
     (let [result (parinfer/infer-brackets text)]
       (clj->js
@@ -20,5 +19,5 @@
       #js {:error (.-message e)})))
 
 (comment
-  (infer-parens-response {:uf/dispatch! println
-                          :calva/text "(def foo [a b"}))
+  (infer-parens-response "(def foo [a b")
+  :rcf)

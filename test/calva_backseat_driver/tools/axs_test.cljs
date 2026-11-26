@@ -11,6 +11,8 @@
    :vscode/config.enableMcpReplEvaluation true
    :vscode/config.provideBdSkill true
    :vscode/config.provideEditSkill false
+   :app/min-log-level :debug
+   :app/log-file-uri "file:///logs/mcp-server.log"
    :calva/output-line-counter 7
    :calva/output-log (sorted-map 7 {:output/line 7 :output/text "(+ 1 2)"})})
 
@@ -20,14 +22,30 @@
    "config.calva-backseat-driver.enableMcpReplEvaluation" true
    ":calva-mcp-extension/activated?" true})
 
-(defn- run-effect
-  "The effect that the handlers give for a call of `tool` with `arguments`."
+(defn- effects
+  "The effects that the handlers give for a call of `tool` with `arguments`."
   [tool arguments]
-  (-> (event-handler/handle-actions tools-axs/actions state {:system/now 0}
-                                    [[:tool/ax.call {:call/tool tool
-                                                     :call/arguments arguments}]])
-      :uf/fxs
-      first))
+  (:uf/fxs (event-handler/handle-actions tools-axs/actions state {:system/now 0}
+                                         [[:tool/ax.call {:call/tool tool
+                                                          :call/arguments arguments}]])))
+
+(defn- run-effect
+  "The effect that runs a call of `tool` with `arguments`."
+  [tool arguments]
+  (some #(when (= :uf/await (first %)) %)
+        (effects tool arguments)))
+
+(deftest the-log-line-of-a-call
+  (is (= [:app/fx.log
+          {:app/min-log-level :debug :app/log-file-uri "file:///logs/mcp-server.log"}
+          :debug
+          ["[Server] Evaluating code:" "(+ 1 2)"]]
+         (first (effects "clojure_evaluate_code" {:code "(+ 1 2)"})))
+      "A call writes its tool's log line before it runs")
+  (is (= [:uf/await :tool/fx.run]
+         (take 2 (second (effects "clojure_evaluate_code" {:code "(+ 1 2)"})))))
+  (is (= 1 (count (effects "clojure_edit_files" {:edits []})))
+      "A tool without a log line writes none"))
 
 (deftest call
   (is (= [:uf/await :tool/fx.run
