@@ -99,7 +99,7 @@
           (await (mcp/stop-mcp-session! socket)))
         (catch :default e
           (js/console.error "[stdio-wrapper-test] Error:" (.-message e) e)
-          (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+          (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
           (throw e))
         (finally
           (mcp/stop-stdio-wrapper! @!wrapper)

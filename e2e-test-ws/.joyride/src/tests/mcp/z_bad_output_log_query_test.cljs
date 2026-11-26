@@ -51,7 +51,7 @@
               "Error message should describe the Datascript binding failure")))
       (catch :default e
         (js/console.error "[bad-output-log-query] Error:" (.-message e) e)
-        (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+        (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
         (throw e))
       (finally
         (await (mcp/restore-settings! backup-path))))))

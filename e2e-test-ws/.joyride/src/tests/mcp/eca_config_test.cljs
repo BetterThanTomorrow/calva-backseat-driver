@@ -108,7 +108,7 @@
               (str "no home directory path in the entry: " (pr-str entry)))))
       (catch :default e
         (js/console.error "[eca-config]" (.-message e) e)
-        (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+        (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
         (throw e))
       (finally
         (delete-config!)))))

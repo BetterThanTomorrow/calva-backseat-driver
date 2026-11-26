@@ -269,7 +269,7 @@
         (await (mcp/stop-mcp-session! socket)))
       (catch :default e
         (js/console.error "[output-log] Error:" (.-message e) e)
-        (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+        (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
         (throw e))
       (finally
         (await (mcp/restore-settings! backup-path))))))

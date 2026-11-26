@@ -87,10 +87,12 @@
       (update-in [:lm :data] dissoc k)))
 
 (defn- language-model-tools?
-  "True when the editor lists Language Model tools. Cursor lists none, and rejects
-   every call through the Language Model API."
+  "False in Cursor, which lists no Language Model tools and rejects every call through
+   the Language Model API. An editor is taken for Cursor when it has Cursor's
+   registration API. In any other editor the cases through the Language Model API run,
+   so that tools that go missing there fail a test."
   []
-  (pos? (count (.-tools vscode/lm))))
+  (not (fn? (some-> vscode/cursor .-mcp .-registerServer))))
 
 (defn- skipped [what]
   (js/console.log "[tool-results] This editor has no Language Model tools:" what "skipped"))
@@ -436,7 +438,7 @@
         (await (mcp/stop-mcp-session! socket)))
       (catch :default e
         (js/console.error "[tool-results] Error:" (.-message e) e)
-        (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+        (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
         (throw e))
       (finally
         (await (mcp/restore-settings! backup-path))))))
@@ -467,7 +469,7 @@
                 (str "and through the Language Model API: " (pr-str through-lm)))))
         (catch :default e
           (js/console.error "[tool-results] Error:" (.-message e) e)
-          (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+          (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
           (throw e))
         (finally
           (await (mcp/restore-settings! backup-path)))))))

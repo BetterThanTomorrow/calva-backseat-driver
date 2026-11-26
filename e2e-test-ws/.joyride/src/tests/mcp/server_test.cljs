@@ -82,7 +82,7 @@
 
       (catch :default e
         (js/console.error "[tools-validation] Error:" (.-message e) e)
-        (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+        (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
         (throw e)))))
 
 (deftest-async tools-validation-with-specific-tools
@@ -119,7 +119,7 @@
         (js/console.log "Evaluation tool present?" (contains? tool-names "clojure_evaluate_code")))
       (catch :default e
         (js/console.error "[tools-validation] Error:" (.-message e) e)
-        (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+        (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
         (throw e)))))
 
 (deftest-async tools-validation-with-repl-eval-enabled
@@ -147,7 +147,7 @@
               "Evaluation tool should be present when setting is enabled and REPL is connected"))
         (catch :default e
           (js/console.error "[eval-tool-test] Error:" (.-message e) e)
-          (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+          (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
           (throw e))
         (finally
           (await (mcp/restore-settings! backup-path)))))))
@@ -188,7 +188,7 @@
               (str "URI ends with canonical /SKILL.md: " (:uri resource)))))
       (catch :default e
         (js/console.error "[resources-list] Error:" (.-message e) e)
-        (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+        (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
         (throw e)))))
 
 (deftest-async resources-read-skill
@@ -237,7 +237,7 @@
               "Content contains frontmatter markers")))
       (catch :default e
         (js/console.error "[resources-read] Error:" (.-message e) e)
-        (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+        (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
         (throw e)))))
 
 (deftest-async resources-read-unknown-skill
@@ -262,7 +262,7 @@
             "Error code is -32602 (invalid params)"))
       (catch :default e
         (js/console.error "[resources-read-unknown] Error:" (.-message e) e)
-        (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+        (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
         (throw e)))))
 
 (deftest-async initialize-dynamic-instructions
@@ -297,7 +297,7 @@
             "Instructions mention skill://index.json"))
       (catch :default e
         (js/console.error "[init-instructions] Error:" (.-message e) e)
-        (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+        (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
         (throw e)))))
 
 (deftest-async conditional-skills-filtering
@@ -413,7 +413,7 @@
               "Image content should have base64 data string"))
         (catch :default e
           (js/console.error "[image-content] Error:" (.-message e) e)
-          (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+          (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
           (throw e))
         (finally
           (await (mcp/restore-settings! backup-path)))))))
@@ -436,7 +436,7 @@
               "Text should contain capped image marker"))
         (catch :default e
           (js/console.error "[eval-max-images-zero] Error:" (.-message e) e)
-          (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+          (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
           (throw e))
         (finally
           (await (mcp/restore-settings! backup-path)))))))
