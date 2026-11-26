@@ -1,7 +1,6 @@
 (ns calva-backseat-driver.mcp.requests
   (:require
    [clojure.string :as string]
-   [promesa.core :as p]
    [vscode-mcp.manifest :as manifest]
    [vscode-mcp.requests :as mcp-requests]
    [vscode-mcp.responses :as responses]))
@@ -35,18 +34,14 @@
   "Returns a promise of the contents of the resource at `uri`: what a call of `tool`
    with `arguments` gives, as text."
   [dispatch! uri tool arguments]
-  ;; vscode-mcp recognizes promesa promises, so the contents are one
-  (p/create
-   (fn [resolve reject]
-     (.then (dispatch! [[:tool/ax.call {:call/tool tool
-                                        :call/arguments arguments}]])
-            (fn [{:result/keys [content thrown]}]
-              (if thrown
-                (reject (js/Error. thrown))
-                (let [text (:text (first content))]
-                  (resolve {:contents [(cond-> {:uri uri}
-                                         text (assoc :text text))]}))))
-            reject))))
+  (.then (dispatch! [[:tool/ax.call {:call/tool tool
+                                     :call/arguments arguments}]])
+         (fn [{:result/keys [content thrown]}]
+           (when thrown
+             (throw (js/Error. thrown)))
+           (let [text (:text (first content))]
+             {:contents [(cond-> {:uri uri}
+                           text (assoc :text text))]}))))
 
 (defn- bd-read-dynamic-resource
   "Returns a promise of the contents of the symbol info or ClojureDocs resource at

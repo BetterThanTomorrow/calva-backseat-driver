@@ -19,7 +19,6 @@
                 _ (js/console.log "[server-lifecycle] Attempting to start MCP server...")
                 server-info+ (vscode/commands.executeCommand "calva-backseat-driver.startMcpServer")
                 server-info (js->clj server-info+ :keywordize-keys true)
-                instance (:instance server-info)
                 assigned-port (or (:server/assigned-port server-info) (:assigned-port server-info))
                 host (or (:server/host server-info) (:host server-info))
                 workspace-root (.-uri (first vscode/workspace.workspaceFolders))
@@ -30,9 +29,6 @@
 
                 _ (js/console.log "[server-lifecycle] Attempting to stop MCP server...")
                 success?+ (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")]
-          (is (not= nil
-                    instance)
-              "Server instance is something")
           (is (number? assigned-port)
               "Server started on a port")
           (is (= "127.0.0.1" host)

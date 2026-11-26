@@ -6,7 +6,6 @@
   "The kinds of key. A key is a kind, or a vector that starts with one."
   #{:vscode/extension-context
     :extension/disposables
-    :mcp/lifecycle-state
     :timer})
 
 (defonce ^:private !live-objects (atom {}))

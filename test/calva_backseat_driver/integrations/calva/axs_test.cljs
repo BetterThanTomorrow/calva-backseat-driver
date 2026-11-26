@@ -105,10 +105,22 @@
         "The actions are dispatched once Calva is active")))
 
 (deftest sessions
-  (is (= [[:mcp/ax.update-registry]]
-         (:uf/dxs (handle state [:calva/ax.sessions-changed {:reason "connected"}])))
-      "A change of Calva's sessions refreshes the registry entry")
-  (let [result (handle state [:calva/ax.subscribe-to-sessions-changed])]
-    (is (= [[:calva/fx.subscribe-to-sessions-changed]] (:uf/fxs result)))
-    (is (= [[:mcp/ax.update-registry]] (:uf/dxs result))
-        "and so does subscribing to the changes")))
+  (testing "a change of Calva's sessions"
+    (let [result (handle state [:calva/ax.sessions-changed {:reason "connected"}])]
+      (is (= [[:uf/await :calva/fx.read-sessions]] (:uf/fxs result))
+          "reads the sessions")
+      (is (= [[:calva/ax.sessions-read :uf/prev-result]] (:uf/dxs result)))))
+  (testing "subscribing to the changes"
+    (let [result (handle state [:calva/ax.subscribe-to-sessions-changed])]
+      (is (= [[:calva/fx.subscribe-to-sessions-changed]
+              [:uf/await :calva/fx.read-sessions]]
+             (:uf/fxs result))
+          "reads the sessions as they are")
+      (is (= [[:calva/ax.sessions-read :uf/prev-result]] (:uf/dxs result)))))
+  (testing "the sessions that were read"
+    (let [sessions [{:replSessionKey "clj" :projectRoot "/projects/mini"}]
+          result (handle state [:calva/ax.sessions-read sessions])]
+      (is (= sessions (:calva/sessions (:uf/db result)))
+          "are in the state")
+      (is (= [[:mcp/ax.update-registry]] (:uf/dxs result))
+          "and go on to the window's registry entry"))))

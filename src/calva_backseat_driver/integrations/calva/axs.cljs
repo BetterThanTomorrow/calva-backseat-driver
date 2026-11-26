@@ -18,13 +18,24 @@
   {:uf/fxs [[:calva/fx.subscribe-to-output]]})
 
 (defn- subscribe-to-sessions-changed
+  "Subscribes to changes of Calva's sessions, and reads the sessions as they are now."
   [_state _uf-data]
-  {:uf/fxs [[:calva/fx.subscribe-to-sessions-changed]]
-   :uf/dxs [[:mcp/ax.update-registry]]})
+  {:uf/fxs [[:calva/fx.subscribe-to-sessions-changed]
+            [:uf/await :calva/fx.read-sessions]]
+   :uf/dxs [[:calva/ax.sessions-read :uf/prev-result]]})
 
 (defn- sessions-changed
+  "Reads Calva's sessions after they changed."
   [_state _uf-data _event]
-  {:uf/dxs [[:mcp/ax.update-registry]]})
+  {:uf/fxs [[:uf/await :calva/fx.read-sessions]]
+   :uf/dxs [[:calva/ax.sessions-read :uf/prev-result]]})
+
+(defn- sessions-read
+  "Takes Calva's `sessions`, with their builds and runtimes, and hands them on to the
+   window's registry entry."
+  [state _uf-data sessions]
+  {:uf/db (assoc state :calva/sessions sessions)
+   :uf/dxs [[:mcp/ax.update-registry]]})
 
 (defn- add-output
   "Adds a `message` from Calva to the output log, and to the eval history when it is
@@ -64,6 +75,7 @@
    :calva/ax.subscribe-to-output #'subscribe-to-output
    :calva/ax.subscribe-to-sessions-changed #'subscribe-to-sessions-changed
    :calva/ax.sessions-changed #'sessions-changed
+   :calva/ax.sessions-read #'sessions-read
    :calva/ax.add-output #'add-output
    :calva/ax.save-history #'save-history
    :calva/ax.init-history #'init-history

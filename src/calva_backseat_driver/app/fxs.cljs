@@ -44,12 +44,12 @@
 
 (defn- register-command
   "Registers the command `command-id`. Running it dispatches `actions`, and the command
-   resolves to the result of that dispatch."
+   resolves to the result of that dispatch, as JavaScript data."
   [dispatch! command-id actions]
   (live-objects/add-disposables!
    [(vscode/commands.registerCommand command-id
                                      (fn [& _args]
-                                       (dispatch! actions)))]))
+                                       (.then (dispatch! actions) clj->js)))]))
 
 (defn- register-language-model-tools
   "Registers the tools with the Language Model API."

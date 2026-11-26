@@ -84,6 +84,20 @@
            (or (js->clj sessions :keywordize-keys true)
                []))))
 
+(defn- read-sessions
+  "Returns a promise of Calva's REPL sessions with their builds and runtimes, for the
+   window's registry entry. It resolves to no sessions when Calva can't list them."
+  [_dispatch!]
+  (-> (js/Promise.resolve nil)
+      (.then (fn [_]
+               (when-let [list-sessions-and-runtimes (get-in calva/calva-api [:repl :listSessionsAndRuntimes])]
+                 (list-sessions-and-runtimes))))
+      (.then (fn [sessions]
+               (or (js->clj sessions :keywordize-keys true)
+                   []))
+             (fn [_]
+               []))))
+
 (defn- evaluation
   "What Calva's `evaluation` object holds, as a map."
   [^js evaluation]
@@ -159,5 +173,6 @@
          {:calva/fx.calva-activated #'calva-activated
           :calva/fx.subscribe-to-output #'subscribe-to-output
           :calva/fx.subscribe-to-sessions-changed #'subscribe-to-sessions-changed
+          :calva/fx.read-sessions #'read-sessions
           :calva/fx.read-history #'read-history
           :calva/fx.save-history #'save-history}))
