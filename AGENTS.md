@@ -95,9 +95,9 @@ bb package-pre-release  # Package pre-release VSIX
 **Note**: `bb run-e2e-tests-ws` runs the tests in a Linux container on a virtual display (`e2e-test-ws/run-containerized.sh`), against the `out/` your build keeps current, so no test window opens on your screen. It needs Docker. With `--local` they run in a VS Code on this machine; from a VS Code terminal, unset `ELECTRON_RUN_AS_NODE` first. `--vscode-executable` takes the editor to run them in, with `--local`. `e2e-test-ws/.joyride/src/tests/mcp/cursor_test.cljs` tests the Cursor registration, and its tests are skipped in an editor without Cursor's registration API. Detailed output goes to .tmp/e2e-output.log — read that file for details, if needed. The command outputs a very brief summary. Don't pipe or redirect.
 
 ### E2E Testing
-Load the `e2e-testing` skill (`.github/skills/e2e-testing/SKILL.md`) when writing, modifying, or debugging e2e tests. It covers test runner mechanics, shared helpers, session lifecycle patterns, and data shape through MCP. The e2e suite (plus the `bd-tester` agent in the dev extension host's test project) provides full coverage of the MCP server/tools protocol.
+Load the `e2e-testing` skill (`.github/skills/e2e-testing/SKILL.md`) when writing, modifying, or debugging e2e tests. It covers test runner mechanics, SCI's async functions, shared helpers, session lifecycle patterns, and data shape through MCP. The e2e suite (plus the `bd-tester` agent in the dev extension host's test project) provides full coverage of the MCP server/tools protocol.
 
-Key rule: always use `wait-for+` polling instead of `p/delay`/`setTimeout` for async conditions.
+Key rule: a condition is polled with `wait-for+`, never waited for with a fixed `delay+` or `setTimeout`. `delay+` in `e2e.utils` is for the tests' own waits, such as the pause in a poll loop.
 
 ## Key Implementation Patterns
 
