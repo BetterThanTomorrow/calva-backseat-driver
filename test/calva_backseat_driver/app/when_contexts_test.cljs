@@ -7,8 +7,6 @@
 (def ^:private all-off
   {:calva-mcp-extension/activated? false
    :calva-backseat-driver/started? false
-   :calva-backseat-driver/starting? false
-   :calva-backseat-driver/stopping? false
    :calva-backseat-driver/cursor-mcp-available? false
    :calva-backseat-driver/mcp-server-registered-with-cursor? false})
 
@@ -18,15 +16,12 @@
   (is (= (assoc all-off :calva-mcp-extension/activated? true)
          (when-contexts/when-contexts {:app/activated? true}))
       "An activated extension with no server")
-  (is (= (assoc all-off
-                :calva-mcp-extension/activated? true
-                :calva-backseat-driver/starting? true)
+  (is (= (assoc all-off :calva-mcp-extension/activated? true)
          (when-contexts/when-contexts {:app/activated? true
                                        :server/starting? true}))
-      "A server that is starting, before it listens")
+      "A server that is starting, before it listens, isn't started")
   (is (= (assoc all-off
                 :calva-mcp-extension/activated? true
-                :calva-backseat-driver/starting? true
                 :calva-backseat-driver/started? true)
          (when-contexts/when-contexts {:app/activated? true
                                        :server/starting? true
@@ -40,8 +35,7 @@
       "A running server")
   (is (= (assoc all-off
                 :calva-mcp-extension/activated? true
-                :calva-backseat-driver/started? true
-                :calva-backseat-driver/stopping? true)
+                :calva-backseat-driver/started? true)
          (when-contexts/when-contexts {:app/activated? true
                                        :server/running? true
                                        :server/stopping? true}))
@@ -78,8 +72,8 @@
              ":calva-backseat-driver/mcp-server-registered-with-cursor?"}
            named)
         "package.json names these contexts")
-    (is (every? (set (map str (keys (when-contexts/when-contexts {})))) named)
-        "and each of them is computed from the state")))
+    (is (= named (set (map str (keys (when-contexts/when-contexts {})))))
+        "and they are the contexts that are computed from the state")))
 
 (deftest effects
   (is (nil? (when-contexts/effects {:app/activated? true :calva/output-line-counter 1}

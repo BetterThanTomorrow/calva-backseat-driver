@@ -6,12 +6,10 @@
   "Returns the when-contexts for `state`, by context key."
   [{:app/keys [activated?]
     :mcp/keys [cursor-mcp-available?]
-    :server/keys [running? starting? stopping?]
+    :server/keys [running?]
     :lifecycle/keys [registered-name]}]
   {:calva-mcp-extension/activated? (boolean activated?)
    :calva-backseat-driver/started? (boolean running?)
-   :calva-backseat-driver/starting? (boolean starting?)
-   :calva-backseat-driver/stopping? (boolean stopping?)
    :calva-backseat-driver/cursor-mcp-available? (boolean cursor-mcp-available?)
    :calva-backseat-driver/mcp-server-registered-with-cursor? (boolean (and running?
                                                                            registered-name))})
