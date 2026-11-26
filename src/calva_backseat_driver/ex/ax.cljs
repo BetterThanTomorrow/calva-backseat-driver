@@ -88,7 +88,7 @@
       "ex-test"      (ex-test-axs/handle-action state context enriched-action)
       "mcp"          (mcp-axs/handle-action state context enriched-action)
       "app"          (app-axs/handle-action state context enriched-action)
-      :else {:fxs [[:node/fx.log-error "Unknown action namespace for action:" (pr-str action)]]})))
+      :else {:ex/fxs [[:node/fx.log-error "Unknown action namespace for action:" (pr-str action)]]})))
 
 (defn handle-actions [state context actions]
   (reduce (fn [{state :ex/db :as acc} action]

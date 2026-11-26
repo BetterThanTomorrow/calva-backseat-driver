@@ -67,3 +67,8 @@
               [:ex-test/ax.message-logged]]
              dxs)
           "Dispatches are accumulated"))))
+
+(deftest unknown-action-namespace
+  (is (= [[:node/fx.log-error "Unknown action namespace for action:" "[:nope/ax.anything 1]"]]
+         (:ex/fxs (ax/handle-actions {} nil [[:nope/ax.anything 1]])))
+      "An action in an unknown namespace returns an effect that logs the error"))
