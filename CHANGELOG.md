@@ -9,6 +9,13 @@ Changes to Calva Backseat Driver
 - Fix: Cursor registrations are not written to the MCP server log
 - Tools called through the Language Model API now refuse a blank session key for load file matching the MCP server's behaviour
 - Tools called through the Language Model API now refuse a tool whose setting is off, matching the MCP server's behaviour
+- Fix: [An edit to the file in the active editor can leave the buffer unsaved](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/72). An edit comes back when VS Code has saved the file, format on save included
+- Fix: Text after an image, and a second image in the same result, are taken as part of the first image
+- Fix: The start message's copy buttons copy nothing
+- Fix: Skill descriptions are listed with their YAML quotes
+- Fix: A start that fails after the server began to listen leaves the socket open
+- Removed when-contexts `calva-backseat-driver/starting?` and `calva-backseat-driver/stopping?` (they were never used for anything)
+- For contributors: the e2e suite runs in another editor, such as Cursor, with `bb run-e2e-tests-ws --local --vscode-executable <path>`
 
 ## [v0.0.47] - 2026-11-25
 
