@@ -1,5 +1,7 @@
 (ns calva-backseat-driver.integrations.calva.editor-test
-  (:require [cljs.test :refer [deftest testing is]]
+  (:require ["vscode" :as vscode]
+            [cljs.test :refer [deftest testing is]]
+            [calva-backseat-driver.integrations.calva.editor :as editor]
             [calva-backseat-driver.integrations.calva.editor-persist :as editor-persist]))
 
 (defn- stub-document
@@ -113,5 +115,86 @@
           (is (= {:success true :saved false :error "disk full"}
                  (select-keys result [:success :saved :error]))
               "The edit is reported as in the buffer only, with the error's message"))
+        (catch :default e
+          (is false (str e)))))))
+
+(defn- document-and-apply-edit
+  "A TextDocument stand-in without unsaved changes, and an `applyEdit` for it that returns
+   a thenable that isn't a native promise, as VS Code's does, and settles after 30 ms
+   through `settle`. With `edits?`, `applyEdit` changes the document's text at once, as
+   VS Code does before its thenable resolves. The save resolves to true and leaves the
+   document saved."
+  [!events edits? settle]
+  (let [!text (atom "(ns a)\n")
+        !dirty (atom false)
+        doc #js {}]
+    (js/Object.defineProperty doc "isDirty" #js {:configurable true
+                                                 :get (fn [] @!dirty)})
+    (set! (.-getText doc) (fn [] @!text))
+    (set! (.-save doc) (fn []
+                         (swap! !events conj :save)
+                         (reset! !dirty false)
+                         (js/Promise.resolve true)))
+    {:document doc
+     :apply-edit (fn [_workspace-edit]
+                   (when edits?
+                     (reset! !text "(ns a)\n\n(foo)\n")
+                     (reset! !dirty true))
+                   (lazy-thenable 30 (fn [resolve reject]
+                                       (swap! !events conj :edit-settled)
+                                       (settle {:resolve resolve
+                                                :reject reject}))))}))
+
+(defn- ^:async append-with-apply-edit
+  "Appends a form with `append-code-core+`, with `document` as the document VS Code opens
+   and `apply-edit` as `workspace.applyEdit`."
+  [{:keys [document apply-edit]}]
+  (let [open-text-document (.-openTextDocument vscode/workspace)
+        workspace-apply-edit (.-applyEdit vscode/workspace)]
+    (set! (.-openTextDocument vscode/workspace) (fn [_uri] (js/Promise.resolve document)))
+    (set! (.-applyEdit vscode/workspace) apply-edit)
+    (try
+      (await (editor/append-code-core+ "/project/src/a.clj" "(foo)"))
+      (finally
+        (set! (.-openTextDocument vscode/workspace) open-text-document)
+        (set! (.-applyEdit vscode/workspace) workspace-apply-edit)))))
+
+(deftest ^:async append-code-awaits-the-edit
+  (testing "an applyEdit that VS Code resolves to true later, through a thenable that isn't a native promise"
+    (let [!events (atom [])]
+      (try
+        (let [result (await (append-with-apply-edit
+                             (document-and-apply-edit !events true (fn [{:keys [resolve]}] (resolve true)))))]
+          (is (= [:edit-settled :save] @!events)
+              "The edit has resolved when the document is saved")
+          (is (= {:success true :saved true :appended-at-end true}
+                 (select-keys result [:success :saved :appended-at-end :error]))
+              "and the append is reported as saved"))
+        (catch :default e
+          (is false (str e)))))))
+
+(deftest ^:async append-code-edit-that-is-not-applied
+  (testing "an applyEdit that VS Code resolves to false"
+    (let [!events (atom [])]
+      (try
+        (let [result (await (append-with-apply-edit
+                             (document-and-apply-edit !events false (fn [{:keys [resolve]}] (resolve false)))))]
+          (is (= {:success false :error "Failed to apply edit" :saved false} result)
+              "The append is reported as not applied")
+          (is (= [:edit-settled] @!events)
+              "and the document isn't saved"))
+        (catch :default e
+          (is false (str e)))))))
+
+(deftest ^:async append-code-edit-that-rejects
+  (testing "an applyEdit that rejects"
+    (let [!events (atom [])]
+      (try
+        (let [result (await (append-with-apply-edit
+                             (document-and-apply-edit !events false (fn [{:keys [reject]}] (reject (js/Error. "edit refused"))))))]
+          (is (= {:success false :saved false :error "edit refused"} result)
+              "The append is reported as not successful, with the error's message")
+          (is (= [:edit-settled] @!events)
+              "and the document isn't saved"))
         (catch :default e
           (is false (str e)))))))

@@ -11,6 +11,7 @@ export const extensions = {
 };
 
 export const Uri = {
+  file: (path) => ({ fsPath: path }),
   joinPath: (base, ...rest) => {
     if (!base || typeof base.fsPath !== 'string') {
       throw new Error('Uri.joinPath: base must be a vscode.Uri');
@@ -18,6 +19,26 @@ export const Uri = {
     return { fsPath: [base.fsPath, ...rest.filter(Boolean)].join('/') };
   }
 };
+
+export class Position {
+  constructor(line, character) {
+    this.line = line;
+    this.character = character;
+  }
+}
+
+export const TextEdit = {
+  insert: (position, newText) => ({ range: { start: position, end: position }, newText })
+};
+
+export class WorkspaceEdit {
+  constructor() {
+    this.entries = [];
+  }
+  set(uri, edits) {
+    this.entries.push([uri, edits]);
+  }
+}
 
 export const workspace = {
   getConfiguration: () => ({ get: () => undefined }),
@@ -27,7 +48,8 @@ export const workspace = {
     writeFile: async () => undefined,
     delete: async () => undefined
   },
-  openTextDocument: async () => undefined
+  openTextDocument: async () => undefined,
+  applyEdit: async () => true
 };
 
 export const window = {
