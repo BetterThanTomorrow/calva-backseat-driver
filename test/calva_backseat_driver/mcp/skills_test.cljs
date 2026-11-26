@@ -8,8 +8,10 @@
   (js/JSON.parse (fs/readFileSync (path/resolve "package.json") "utf8")))
 
 (def mock-context
-  #js {:extensionPath (js/process.cwd)
-       :extension #js {:packageJSON package-json}})
+  "The extension's manifest as data."
+  (manifest/manifest-data
+   #js {:extensionPath (js/process.cwd)
+        :extension #js {:packageJSON package-json}}))
 
 (defn settings-map [{:mcp/keys [provide-bd-skill? provide-edit-skill?]}]
   {"config.calva-backseat-driver.provideBdSkill" provide-bd-skill?
