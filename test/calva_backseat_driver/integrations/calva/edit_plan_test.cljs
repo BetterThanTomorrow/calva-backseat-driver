@@ -43,8 +43,8 @@
           :remedy "The target text was not found in the context shown below. Read the file to understand the actual structure, then target the correct line with the first line of the existing top level form starting at that line."
           :file-context " 2 | \n→3 | (defn add-numbers\n 4 |   [a b]"}
          (edit-plan/target-not-found document (assoc replace-edit
-                                                    :editor/target-line "(defn no-such-function"
-                                                    :editor/context-padding 1)))
+                                                     :editor/target-line "(defn no-such-function"
+                                                     :editor/context-padding 1)))
       "A target that isn't found gets the lines around where it was looked for")
   (is (re-find #"^Line 7 in the context below matches your target text"
                (:remedy (edit-plan/target-not-found document (assoc replace-edit

@@ -120,8 +120,8 @@
             was-dirty? (.-isDirty vscode-document)
             text-before (.getText vscode-document)
             {:editor/keys [text] plan-range :editor/range} (edit-plan/edit-plan {:document/text text-before}
-                                                                               (range-as-data (first (:ranges-object form-data)))
-                                                                               edit)
+                                                                                (range-as-data (first (:ranges-object form-data)))
+                                                                                edit)
             effective-range (vscode-range plan-range)
             range-text (.getText vscode-document effective-range)
             edit-result (await (edit-replace-range vscode-document effective-range text))
@@ -163,14 +163,16 @@
 
 #_{:clojure-lsp/ignore [:clojure-lsp/unused-public-var]}
 (comment
-  (def edit-result (await (apply-form-edit-by-line-with-text-targeting
-                            {:editor/file-path "/Users/pez/Projects/calva-mcp-server/test-projects/example/src/mini/playground.clj"
-                             :editor/line-number 214
-                             :editor/target-line ";foo"
-                             :editor/new-form "(foo"
-                             :editor/ranges-fn-key :currentTopLevelForm
-                             :editor/search-padding 2
-                             :editor/context-padding 10})))
+  (.then (apply-form-edit-by-line-with-text-targeting
+          {:editor/file-path "/Users/pez/Projects/calva-mcp-server/test-projects/example/src/mini/playground.clj"
+           :editor/line-number 214
+           :editor/target-line ";foo"
+           :editor/new-form "(foo"
+           :editor/ranges-fn-key :currentTopLevelForm
+           :editor/search-padding 2
+           :editor/context-padding 10})
+         (fn [result]
+           (def edit-result result)))
 
   ;; Test validation - these should fail with proper error messages
   (apply-form-edit-by-line-with-text-targeting
@@ -192,14 +194,16 @@
     :editor/context-padding 10})
 
   ;; This should succeed
-  (def the-result (await (apply-form-edit-by-line-with-text-targeting
-                           {:editor/file-path "/some/file.clj"
-                            :editor/line-number 10
-                            :editor/target-line "(defn old-fn [])"
-                            :editor/new-form "(defn new-fn [])"
-                            :editor/ranges-fn-key :currentTopLevelForm
-                            :editor/search-padding 2
-                            :editor/context-padding 10})))
+  (.then (apply-form-edit-by-line-with-text-targeting
+          {:editor/file-path "/some/file.clj"
+           :editor/line-number 10
+           :editor/target-line "(defn old-fn [])"
+           :editor/new-form "(defn new-fn [])"
+           :editor/ranges-fn-key :currentTopLevelForm
+           :editor/search-padding 2
+           :editor/context-padding 10})
+         (fn [result]
+           (def the-result result)))
 
   :rcf)
 

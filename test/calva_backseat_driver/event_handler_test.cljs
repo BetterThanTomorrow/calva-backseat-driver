@@ -245,10 +245,10 @@
                              (swap! !logged conj (first args))))
     (try
       (let [outcome (await (dispatch-outcome+ dispatch! [[:test/ax.nope]
-                                                     [:test/ax.assoc :a 1]
-                                                     [:test/ax.unknown-effect]
-                                                     [:test/ax.effect-among-actions]
-                                                     [:test/ax.note :ran]]))]
+                                                         [:test/ax.assoc :a 1]
+                                                         [:test/ax.unknown-effect]
+                                                         [:test/ax.effect-among-actions]
+                                                         [:test/ax.note :ran]]))]
         (set! event-handler/*development-build?* true)
         (set! js/console.error console-error)
         (is (= [:resolved nil] outcome)

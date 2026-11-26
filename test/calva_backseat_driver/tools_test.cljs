@@ -10,10 +10,10 @@
             :confirmationMessages {:title "Evaluate as **coder** in the **clj** REPL"
                                    :message "Evaluate?\n```clojure\n(in-ns user)\n\n(+ 1 2)\n```"}}
            (tools/prepared-invocation "clojure_evaluate_code"
-                                             {:code "(+ 1 2)" :namespace "user" :replSessionKey "clj" :who "coder"})))
+                                      {:code "(+ 1 2)" :namespace "user" :replSessionKey "clj" :who "coder"})))
     (is (= "Evaluate as **unknown** in the **cljs** REPL (runtime 83)"
            (get-in (tools/prepared-invocation "clojure_evaluate_code"
-                                                     {:code "1" :replSessionKey "cljs" :targetRuntimeId 83})
+                                              {:code "1" :replSessionKey "cljs" :targetRuntimeId 83})
                    [:confirmationMessages :title]))
         "without a who, and with a runtime"))
   (testing "clojure_list_sessions"
@@ -36,7 +36,7 @@
             :confirmationMessages {:title "Query REPL Output Log"
                                    :message "Query REPL output log: [:find ?e :where [?e :output/line]]"}}
            (tools/prepared-invocation "clojure_repl_output_log"
-                                             {:query "[:find ?e :where [?e :output/line]]"}))))
+                                      {:query "[:find ?e :where [?e :output/line]]"}))))
   (testing "clojure_balance_brackets"
     (is (= {:invocationMessage "Inferred brackets"
             :confirmationMessages {:title "Infer brackets"
@@ -47,7 +47,7 @@
             :confirmationMessages {:title "Load file as **coder**"
                                    :message "Load file: /a/b.clj in **clj** REPL"}}
            (tools/prepared-invocation "clojure_load_file"
-                                             {:filePath "/a/b.clj" :replSessionKey "clj" :who "coder"})))
+                                      {:filePath "/a/b.clj" :replSessionKey "clj" :who "coder"})))
     (is (= {:title "Load file as **unknown**"
             :message "Load file: /a/b.clj"}
            (:confirmationMessages (tools/prepared-invocation "clojure_load_file" {:filePath "/a/b.clj"})))
@@ -59,7 +59,7 @@
            (tools/prepared-invocation "clojure_edit_files" {:edits [{:filePath "/a.clj"}]})))
     (is (= "3 edits across 2 files"
            (get-in (tools/prepared-invocation "clojure_edit_files"
-                                                     {:edits [{:filePath "/a.clj"} {:filePath "/a.clj"} {:filePath "/b.clj"}]})
+                                              {:edits [{:filePath "/a.clj"} {:filePath "/a.clj"} {:filePath "/b.clj"}]})
                    [:confirmationMessages :message])))))
 
 (def ^:private manifest
