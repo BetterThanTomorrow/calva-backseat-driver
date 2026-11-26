@@ -152,6 +152,8 @@
      ":calva-mcp-extension/activated?" true}))
 
 (defn- language-model-part
+  "Returns the Language Model API's part for a content part. A text part without text,
+   from a tool that answered `undefined`, becomes the text `null`."
   [{:keys [type text mimeType data]}]
   (if (= "image" type)
     (vscode/LanguageModelDataPart.image (js/Uint8Array. (js/Buffer.from data "base64")) mimeType)

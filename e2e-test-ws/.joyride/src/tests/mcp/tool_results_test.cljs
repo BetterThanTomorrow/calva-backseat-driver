@@ -42,6 +42,28 @@
       (p/catch (fn [e]
                  {:rejected (.-message e)}))))
 
+(defn- mcp-content+
+  "Calls `tool` through MCP. Resolves to the result's content parts, as they came."
+  [socket tool arguments]
+  (p/let [response (mcp/send-request socket {:jsonrpc "2.0"
+                                             :id (swap! !request-id inc)
+                                             :method "tools/call"
+                                             :params {:name tool
+                                                      :arguments arguments}})]
+    (-> response (js->clj :keywordize-keys true) :result :content)))
+
+(defn- lm-parts+
+  "Calls `tool` through the Language Model API. Resolves to a map per result part:
+   `:value` for a text part, `:mime-type` and `:data?` for a data part."
+  [tool arguments]
+  (p/let [^js result (vscode/lm.invokeTool tool #js {:input (clj->js arguments)
+                                                      :toolInvocationToken js/undefined})]
+    (mapv (fn [^js part]
+            {:value (.-value part)
+             :mime-type (.-mimeType part)
+             :data? (some? (.-data part))})
+          (.-content result))))
+
 (defn- both+
   "Calls `tool` through MCP and then through the Language Model API."
   [socket tool arguments]
@@ -56,6 +78,13 @@
                   (:replSessionKey session)))
               (:sessions data))
         (:replSessionKey (first (:sessions data))))))
+
+(defn- data-without
+  "Drops `k` from the data of both answers."
+  [both k]
+  (-> both
+      (update-in [:mcp :data] dissoc k)
+      (update-in [:lm :data] dissoc k)))
 
 (defn- is-same-data
   "Asserts that MCP and the Language Model API gave `expected`."
@@ -115,49 +144,81 @@
   (p/let [arguments {:code "(+ 1 2)" :namespace "user" :replSessionKey session-key :who who}
           _warm-up (mcp-call+ socket "clojure_evaluate_code" arguments)
           success (both+ socket "clojure_evaluate_code" arguments)
+          printing (both+ socket "clojure_evaluate_code"
+                          (assoc arguments :code "(do (println \"e2e-tool-results out\") (+ 1 2))"))
           no-namespace (mcp-call+ socket "clojure_evaluate_code" (dissoc arguments :namespace))
           thrown (both+ socket "clojure_evaluate_code"
                         (assoc arguments :code "(throw (js/Error. \"e2e-tool-results boom\"))"))
-          stable-keys [:result :ns :session-key :notes :who :error]]
+          result {:result "3" :ns "user" :stdout nil :stderr nil :session-key session-key :notes [] :who who}]
     (testing "clojure_evaluate_code, results"
-      (is (= {:result "3" :ns "user" :session-key session-key :notes [] :who who}
-             (select-keys (get-in success [:mcp :data]) stable-keys))
-          "a success, through MCP")
-      (is (= (select-keys (get-in success [:mcp :data]) stable-keys)
-             (select-keys (get-in success [:lm :data]) stable-keys))
-          "a success, the same through the Language Model API")
+      (is-same-data result success "a success")
+      (is-same-data (assoc result :stdout "e2e-tool-results out\n")
+                    printing "a success that prints")
       (is (= ["When evaluating without providing a namespace argument the evaluation is performed in the `user` namespace. Most often this is not what you want, and instead you should be evaluating providing the namespace argument. If it is the first time you are using a namespace, evaluate its ns-form first."]
              (:notes (:data no-namespace)))
           "no namespace gives the note about the user namespace")
-      (is (= (select-keys (get-in thrown [:mcp :data]) stable-keys)
-             (select-keys (get-in thrown [:lm :data]) stable-keys))
-          (str "a thrown evaluation, the same through both: " (pr-str (get-in thrown [:mcp :data])))))))
+      (is-same-data {:result "nil"
+                     :ns "user"
+                     :stdout nil
+                     :stderr "e2e-tool-results boom\n"
+                     :stacktrace nil
+                     :session-key session-key
+                     :notes []
+                     :who who}
+                    (data-without thrown :error) "a thrown evaluation, without its error")
+      (is (string/starts-with? (str (get-in thrown [:mcp :data :error]))
+                               "#error {:message \"e2e-tool-results boom\"")
+          (str "a thrown evaluation has the error through MCP: " (pr-str (get-in thrown [:mcp :data :error]))))
+      (is (string/starts-with? (str (get-in thrown [:lm :data :error]))
+                               "#error {:message \"e2e-tool-results boom\"")
+          "and through the Language Model API"))))
 
 (defn- test-list-sessions+ [socket]
   (p/let [{through-mcp :mcp through-lm :lm} (both+ socket "clojure_list_sessions" {})
-          stable (fn [{:keys [data]}]
-                   (mapv #(select-keys % [:replSessionKey :replType :projectRoot :globs :supportsRuntimes])
-                         (:sessions data)))]
+          joyride-session (fn [{:keys [data]}]
+                            (some (fn [session]
+                                    (when (= "joyride" (:replSessionKey session))
+                                      session))
+                                  (:sessions data)))
+          changing-keys [:lastActivity :currentRoutedTarget :globs]
+          stable (fn [answer]
+                   (apply dissoc (joyride-session answer) changing-keys))]
     (testing "clojure_list_sessions"
-      (is (seq (stable through-mcp))
-          "lists a session through MCP")
-      (is (= (stable through-mcp) (stable through-lm))
-          "the same sessions through the Language Model API"))))
+      (is (= {:replSessionKey "joyride"
+              :replType "clj"
+              :projectRoot (.-fsPath mcp/workspace-uri)
+              :supportsRuntimes false
+              :hasBuilds false
+              :availableBuilds nil
+              :currentlyConnectedCljsBuild nil
+              :currentlyConnectedRuntimeId nil}
+             (stable through-mcp))
+          "lists the Joyride session through MCP")
+      (is (every? (set (keys (joyride-session through-mcp))) changing-keys)
+          "with its last activity, routing and globs")
+      (is (some #{"**/*.cljs"} (:globs (joyride-session through-mcp)))
+          "the globs cover ClojureScript files")
+      (is (= (dissoc (joyride-session through-mcp) :lastActivity)
+             (dissoc (joyride-session through-lm) :lastActivity))
+          "the same session through the Language Model API"))))
 
 (defn- test-symbol-info+ [socket session-key]
-  (p/let [{through-mcp :mcp through-lm :lm} (both+ socket "clojure_symbol_info"
-                                                   {:clojureSymbol "map"
-                                                    :namespace "user"
-                                                    :replSessionKey session-key})]
+  (p/let [answers (both+ socket "clojure_symbol_info"
+                         {:clojureSymbol "map"
+                          :namespace "user"
+                          :replSessionKey session-key})]
     (testing "clojure_symbol_info"
-      (is (some? (:data through-mcp))
-          "gives symbol info through MCP")
-      (is (= (:data through-mcp) (:data through-lm))
-          "the same through the Language Model API"))))
+      (is-same-data {:error "Can't retrieve REPL session for session key. Is the REPL connected?"}
+                    answers "the Joyride session, which Calva has no symbol info for")
+      (is (nil? (get-in answers [:mcp :is-error?]))
+          "and it is not marked as an error through MCP"))))
 
 (defn- test-output-log+ [socket]
   (p/let [query "[:find [?text ...] :in $ ?who :where [?e :output/who ?who] [?e :output/category \"evaluatedCode\"] [?e :output/text ?text]]"
           found (both+ socket "clojure_repl_output_log" {:query query :inputs [who]})
+          map-input (both+ socket "clojure_repl_output_log"
+                           {:query "[:find ?v . :in $ ?m :where [(get ?m :k) ?v]]"
+                            :inputs [{:k "from-a-keyword-key"}]})
           failing (both+ socket "clojure_repl_output_log"
                          {:query "[:find ?e :where [?e :output/text ?text] [(clojure.string/includes? ?nope \"x\")]]"})]
     (testing "clojure_repl_output_log"
@@ -166,6 +227,8 @@
       (is (= (set (get-in found [:mcp :data]))
              (set (get-in found [:lm :data])))
           "the same through the Language Model API")
+      (is-same-data "from-a-keyword-key"
+                    map-input "a map in the inputs is read with keyword keys")
       (is (= -32603 (get-in failing [:mcp :rpc-error :code]))
           "a query that fails is a JSON-RPC error through MCP")
       (is (re-find #"Insufficient bindings" (str (get-in failing [:mcp :rpc-error :message])))
@@ -183,8 +246,11 @@
     (testing "clojure_load_file"
       (is (true? (get-in missing-file [:mcp :is-error?]))
           "a failed load has isError through MCP")
-      (is (string? (get-in missing-file [:mcp :data :error]))
-          "a failed load gives the error text")
+      (is (= [:error] (keys (get-in missing-file [:mcp :data])))
+          "a failed load gives only the error")
+      (is (string/starts-with? (str (get-in missing-file [:mcp :data :error]))
+                               "cannot open file:///nonexistent/path/foo.clj. Detail: ")
+          (str "with the text VS Code gave: " (pr-str (get-in missing-file [:mcp :data :error]))))
       (is (= (get-in missing-file [:mcp :data])
              (get-in missing-file [:lm :data]))
           "a failed load, the same data through the Language Model API")
@@ -238,6 +304,71 @@
                      (when (fs/existsSync file-path)
                        (fs/unlinkSync file-path)))))))
 
+(defn- set-context-padding+
+  "Sets `editor.lineContextResponsePadding` in the workspace to `value`, and waits
+   until the setting reads `expected`."
+  [value expected]
+  (let [setting "editor.lineContextResponsePadding"
+        config #(vscode/workspace.getConfiguration "calva-backseat-driver")]
+    (p/do (.update (config) setting value vscode/ConfigurationTarget.Workspace)
+          (wait-for+ #(= expected (.get (config) setting))
+                     :timeout 15000
+                     :message (str "[tool-results] " setting " did not become " expected " within 15s")))))
+
+(defn- test-context-padding+ [socket]
+  (let [file-path (path/join (.-fsPath mcp/workspace-uri) "tool_results_padding_target.clj")
+        default-padding (.get (vscode/workspace.getConfiguration "calva-backseat-driver")
+                              "editor.lineContextResponsePadding")]
+    (p/let [outcome (-> (p/let [_ (fs/writeFileSync file-path "(ns tool-results-padding-target)\n\n(defn add-numbers\n  [a b]\n  (+ a b))\n")
+                                _ (set-context-padding+ 1 1)]
+                          (mcp-call+ socket "clojure_edit_files"
+                                     {:edits [{:type "replace"
+                                               :filePath file-path
+                                               :line 3
+                                               :targetLineText "(defn no-such-function"
+                                               :newForm "(defn no-such-function [])"}]}))
+                        (p/catch (fn [e]
+                                   {:failed e})))
+            _ (set-context-padding+ js/undefined default-padding)]
+      (when (fs/existsSync file-path)
+        (fs/unlinkSync file-path))
+      (when-let [e (:failed outcome)]
+        (throw e))
+      (testing "clojure_edit_files with lineContextResponsePadding 1"
+        (is (= " 2 | \n→3 | (defn add-numbers\n 4 |   [a b]"
+               (get-in outcome [:data :files (keyword file-path) :edits 0 :file-context]))
+            "the file context is one line each side of the target")))))
+
+(defn- test-clojuredocs-without-symbol+ [socket]
+  (p/let [through-mcp (mcp-content+ socket "clojuredocs_info" {})
+          through-lm (lm-parts+ "clojuredocs_info" {})]
+    (testing "clojuredocs_info without a symbol, where Calva answers undefined"
+      (is (= [{:type "text"}] through-mcp)
+          "is a text part without text through MCP")
+      (is (= ["null"] (mapv :value through-lm))
+          "and the text null through the Language Model API"))))
+
+(defn- test-image-parts+ [session-key]
+  (p/let [arguments {:code "\"data:image/png;base64,iVBORw0KGgo=\""
+                     :namespace "user"
+                     :replSessionKey session-key
+                     :who who}
+          with-image (lm-parts+ "clojure_evaluate_code" arguments)
+          capped (lm-parts+ "clojure_evaluate_code" (assoc arguments :maxImages 0))
+          result-of (fn [parts]
+                      (-> parts first :value js/JSON.parse (js->clj :keywordize-keys true) :result))]
+    (testing "an image in a result, through the Language Model API"
+      (is (= "\"<<image-1>>\"" (result-of with-image))
+          "the text part has a marker where the image was")
+      (is (= ["image/png"] (mapv :mime-type (rest with-image)))
+          "and a second part has the image's mime type")
+      (is (true? (:data? (second with-image)))
+          "and its data")
+      (is (= "\"<<image-1-capped>>\"" (result-of capped))
+          "with maxImages 0 the marker says the image is capped")
+      (is (= 1 (count capped))
+          "and the text part is the only part"))))
+
 (defn- test-resource-templates+ [socket session-key]
   (p/let [templates-response (mcp/send-request socket {:jsonrpc "2.0"
                                                        :id (swap! !request-id inc)
@@ -278,11 +409,14 @@
           (p/do (test-balance-brackets+ socket)
                 (test-evaluation-input-errors+ socket session-key)
                 (test-evaluation-results+ socket session-key)
+                (test-image-parts+ session-key)
                 (test-list-sessions+ socket)
                 (test-symbol-info+ socket session-key)
+                (test-clojuredocs-without-symbol+ socket)
                 (test-output-log+ socket)
                 (test-load-file+ socket session-key)
                 (test-edit-files+ socket)
+                (test-context-padding+ socket)
                 (test-resource-templates+ socket session-key)
                 (mcp/stop-mcp-session! socket)))
         (p/catch (fn [e]
@@ -311,8 +445,8 @@
             (is (= {:code -32601 :message "Unknown tool"}
                    (:rpc-error through-mcp))
                 "is an unknown tool through MCP")
-            (is (string? (:rejected through-lm))
-                (str "and is refused through the Language Model API: " (pr-str through-lm)))))
+            (is (= "Unknown tool" (:rejected through-lm))
+                (str "and through the Language Model API: " (pr-str through-lm)))))
         (p/catch (fn [e]
                    (js/console.error "[tool-results] Error:" (.-message e) e)
                    (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
