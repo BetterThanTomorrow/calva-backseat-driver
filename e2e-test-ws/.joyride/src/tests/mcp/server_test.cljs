@@ -294,7 +294,11 @@
         (is (re-find #"resources/read" instructions)
             "Instructions mention resources/read")
         (is (re-find #"skill://index.json" instructions)
-            "Instructions mention skill://index.json"))
+            "Instructions mention skill://index.json")
+        (is (re-find #"installed in `~/\.config/vscode-mcp/skills/calva-backseat-driver/`" instructions)
+            "Instructions name Backseat Driver's folder in the skills home")
+        (is (re-find #"`~/\.config/vscode-mcp/registry`" instructions)
+            "Instructions name the registry home"))
       (catch :default e
         (js/console.error "[init-instructions] Error:" (.-message e) e)
         (await (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer"))
