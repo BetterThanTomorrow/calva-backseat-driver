@@ -1,6 +1,5 @@
 (ns calva-backseat-driver.mcp.requests
   (:require
-   [calva-backseat-driver.bracket-balance :as bracket-balance]
    [calva-backseat-driver.tools :as tools]
    [calva-backseat-driver.integrations.calva.features :as calva]
    [clojure.string :as string]
@@ -21,111 +20,24 @@
   [e]
   (or (ex-message e) (str e)))
 
-(defn- handle-evaluate-code [options id arguments]
-  (let [{:keys [code replSessionKey who description maxImages targetRuntimeId]
-         ns :namespace} arguments
-        who-error (calva/validate-who who)]
-    (if who-error
-      (responses/clj-response id {:error who-error})
-      (p/let [result (calva/evaluate-code+ (merge options
-                                                  {:calva/code code
-                                                   :calva/repl-session-key replSessionKey
-                                                   :calva/who who
-                                                   :calva/description description}
-                                                  (when ns {:calva/ns ns})
-                                                  (when targetRuntimeId {:calva/target-runtime-id targetRuntimeId})))]
-        (responses/content-response id (tools/mcp-content-with-images result :max-images (if (some? maxImages) maxImages 10)))))))
-
-(defn- handle-list-sessions [options id arguments]
-  (let [{:keys [includeAllRuntimes]} arguments]
-    (p/let [result (calva/list-sessions+ (merge options
-                                                {:calva/include-all-runtimes? (true? includeAllRuntimes)}))]
-      (responses/clj-response id result))))
-
-(defn- handle-symbol-info [options id arguments]
-  (p/let [{:keys [clojureSymbol replSessionKey]
-           ns :namespace} arguments
-          info (calva/get-symbol-info+ (merge options
-                                              {:calva/clojure-symbol clojureSymbol
-                                               :calva/repl-session-key replSessionKey
-                                               :calva/ns ns}))]
-    (responses/text-response id info)))
-
-(defn- handle-clojuredocs [options id arguments]
-  (p/let [{:keys [clojureSymbol]} arguments
-          info (calva/get-clojuredocs+ (merge options
-                                              {:calva/clojure-symbol clojureSymbol}))]
-    (responses/text-response id info)))
-
-(defn- handle-output-log [options id arguments]
-  (let [{:keys [query inputs maxImages]} arguments
-        output (calva/query-output (merge options
-                                          {:calva/query-edn-str query
-                                           :calva/inputs inputs}))]
-    (responses/content-response id (tools/mcp-content-with-images output :max-images (if (some? maxImages) maxImages 0)))))
-
-(defn- handle-balance-brackets [options id arguments]
-  (let [{:keys [text]} arguments
-        result (bracket-balance/infer-parens-response (merge options {:calva/text text}))]
-    (responses/text-response id result)))
-
-(defn- blank-session-key? [k]
-  (or (nil? k) (and (string? k) (string/blank? k))))
-
-(defn- handle-load-file [options id arguments]
-  (let [{:keys [filePath replSessionKey who]} arguments
-        who-error (calva/validate-who who)]
-    (cond
-      (blank-session-key? replSessionKey)
-      (responses/clj-response id {:error "The `replSessionKey` parameter is required. Use `clojure_list_sessions` to discover available sessions."})
-
-      who-error
-      (responses/clj-response id {:error who-error})
-
-      :else
-      (p/let [result (calva/load-file+ (merge options
-                                              {:calva/file-path filePath
-                                               :calva/repl-session-key replSessionKey
-                                               :calva/who who}))]
-        (if (:error result)
-          (responses/success-response id {:content [{:type "text"
-                                                     :text (js/JSON.stringify (clj->js {:error (:error result)}))}]
-                                          :isError true})
-          (responses/clj-response id result))))))
-
-(defn- handle-edit-files [options id arguments]
-  (p/let [{:keys [edits]} arguments
-          result (calva/edit-files+ (merge options {:calva/edits edits}))]
-    (responses/clj-response id result)))
-
-(def ^:private tool-handlers
-  {"clojure_evaluate_code"    {:handler handle-evaluate-code}
-   "clojure_list_sessions"    {:handler handle-list-sessions}
-   "clojure_symbol_info"      {:handler handle-symbol-info}
-   "clojuredocs_info"         {:handler handle-clojuredocs}
-   "clojure_repl_output_log"  {:handler handle-output-log}
-   "clojure_balance_brackets" {:handler handle-balance-brackets}
-   "clojure_edit_files"       {:handler handle-edit-files}
-   "clojure_load_file"        {:handler handle-load-file}})
+(defn- call-result-response
+  [id {:result/keys [content error?]}]
+  (responses/success-response id (cond-> {:content content}
+                                   error? (assoc :isError true))))
 
 (defn- handle-tools-call [{:keys [id params] :as _request} options]
   (let [{:keys [arguments] tool :name} params
-        allowed (manifest/tool-call-allowed? (:vscode/extension-context options) tool {:settings (settings-map options)})
-        {:keys [handler]} (tool-handlers tool)]
-    (cond
-      (or (= :disabled allowed) (= :unknown allowed))
+        allowed (manifest/tool-call-allowed? (:vscode/extension-context options) tool {:settings (settings-map options)})]
+    (if (or (= :disabled allowed) (= :unknown allowed))
       (responses/error-response id -32601 "Unknown tool")
-
-      :else
-      (try
-        (let [result (handler options id arguments)]
-          (if (p/promise? result)
-            (p/catch result
-                     (fn [e]
-                       (responses/error-response id -32603 (exception-message e))))
-            result))
-        (catch :default e
-          (responses/error-response id -32603 (exception-message e)))))))
+      ;; vscode-mcp's socket code recognizes promesa promises, so the response is one
+      (p/create
+       (fn [resolve _reject]
+         (-> (tools/call-tool+ (:ex/dispatch! options) tool arguments)
+             (.then (fn [result]
+                      (resolve (call-result-response id result))))
+             (.catch (fn [e]
+                       (resolve (responses/error-response id -32603 (exception-message e)))))))))))
 
 (defn- bd-read-dynamic-resource [uri options]
   (cond

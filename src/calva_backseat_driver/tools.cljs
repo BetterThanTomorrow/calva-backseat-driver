@@ -1,279 +1,183 @@
 (ns calva-backseat-driver.tools
+  "The tool table, the one function each tool runs through for both the Language Model
+   API and MCP, and the Language Model API's entry point."
   (:require
    ["vscode" :as vscode]
    [calva-backseat-driver.bracket-balance :as balance]
    [calva-backseat-driver.integrations.calva.features :as calva]
-   [promesa.core :as p]
+   [calva-backseat-driver.tools.confirmation :as confirmation]
+   [calva-backseat-driver.tools.content :as content]
    [clojure.string :as string]
-   [clojure.walk :as walk]))
+   [vscode-mcp.manifest :as manifest]))
 
-(defn reduce-images
-  "Walks a Clojure data structure, replacing data:image/ URLs with <<image-N>>
-   references. Returns {:data <cleaned-data> :images [{:mime :data :base64} ...]}
-   or nil if no images found. Images beyond max-images (default 20) are replaced
-   with <<image-N-capped>> markers but not included in the returned images.
-   When max-images is 0, all images are capped (stripped from text, none returned)."
-  [data & {:keys [max-images]}]
-  (let [max-images (if (some? max-images) max-images 20)
-        !images (atom [])
-        !idx (atom 0)
-        pattern #"data:(image/[^;]+);base64,([A-Za-z0-9+/=\s]+)"
-        reduced (walk/postwalk
-                 (fn [x]
-                   (if (and (string? x) (string/includes? x "data:image/"))
-                     (let [matches (re-seq pattern x)]
-                       (if (seq matches)
-                         (reduce (fn [s [full-match mime base64]]
-                                   (let [idx (swap! !idx inc)]
-                                     (if (<= idx max-images)
-                                       (let [clean (string/replace base64 #"\s" "")]
-                                         (swap! !images conj {:mime mime
-                                                              :data (js/Uint8Array. (js/Buffer.from clean "base64"))
-                                                              :base64 clean})
-                                         (string/replace-first s full-match (str "<<image-" idx ">>")))
-                                       (string/replace-first s full-match (str "<<image-" idx "-capped>>")))))
-                                 x matches)
-                         x))
-                     x))
-                 data)]
-    (when (pos? @!idx)
-      {:data reduced
-       :images @!images})))
+;; The tools. Each takes a call, `{:ex/dispatch! … :call/arguments …}`, and returns a
+;; promise of `{:result/data …}`, with `:result/error? true` when the tool failed.
 
-(defn- tool-result-with-images
-  "Builds a LanguageModelToolResult, extracting embedded images as separate parts.
-   Works on Clojure data (before clj->js)."
-  [data & {:keys [max-images]}]
-  (if-let [{:keys [data images]} (reduce-images data :max-images max-images)]
-    (let [text-part (vscode/LanguageModelTextPart. (js/JSON.stringify (clj->js data)))
-          image-parts (mapv (fn [{:keys [mime data]}]
-                              (vscode/LanguageModelDataPart.image data mime))
-                            images)]
-      (vscode/LanguageModelToolResult.
-       (into-array (cons text-part image-parts))))
-    (vscode/LanguageModelToolResult.
-     #js [(vscode/LanguageModelTextPart.
-           (js/JSON.stringify (clj->js data)))])))
+(defn- result-of+
+  "Returns a promise of the result map for the data that `data+` resolves to."
+  [data+]
+  (.then (js/Promise.resolve data+)
+         (fn [data]
+           {:result/data data})))
 
-(defn mcp-content-with-images
-  "Builds MCP content array, extracting embedded images as separate items.
-   Works on Clojure data (before clj->js)."
-  [data & {:keys [max-images]}]
-  (if-let [{:keys [data images]} (reduce-images data :max-images max-images)]
-    (into [{:type "text" :text (js/JSON.stringify (clj->js data))}]
-          (map (fn [{:keys [mime base64]}]
-                 {:type "image" :mimeType mime :data base64}))
-          images)
-    [{:type "text" :text (js/JSON.stringify (clj->js data))}]))
+(defn- evaluate-code+
+  [{:ex/keys [dispatch!]
+    :call/keys [arguments]}]
+  (let [{:keys [code replSessionKey who description targetRuntimeId]
+         ns :namespace} arguments]
+    (if-let [who-error (calva/validate-who who)]
+      (result-of+ {:error who-error})
+      (result-of+ (calva/evaluate-code+ (cond-> {:ex/dispatch! dispatch!
+                                                 :calva/code code
+                                                 :calva/repl-session-key replSessionKey
+                                                 :calva/who who
+                                                 :calva/description description}
+                                          ns (assoc :calva/ns ns)
+                                          targetRuntimeId (assoc :calva/target-runtime-id targetRuntimeId)))))))
 
-(defn- text-tool-result [data]
-  (vscode/LanguageModelToolResult.
-   #js [(vscode/LanguageModelTextPart.
-         (js/JSON.stringify (clj->js data)))]))
+(defn- list-sessions+
+  [{:ex/keys [dispatch!]
+    :call/keys [arguments]}]
+  (result-of+ (calva/list-sessions+ {:ex/dispatch! dispatch!
+                                     :calva/include-all-runtimes? (true? (:includeAllRuntimes arguments))})))
 
-(defn- text-tool-result-raw [js-data]
-  (vscode/LanguageModelToolResult.
-   #js [(vscode/LanguageModelTextPart.
-         (js/JSON.stringify js-data))]))
+(defn- symbol-info+
+  [{:ex/keys [dispatch!]
+    :call/keys [arguments]}]
+  (let [{:keys [clojureSymbol replSessionKey]
+         ns :namespace} arguments]
+    (result-of+ (calva/get-symbol-info+ {:ex/dispatch! dispatch!
+                                         :calva/clojure-symbol clojureSymbol
+                                         :calva/repl-session-key replSessionKey
+                                         :calva/ns ns}))))
 
-(defn- prepare-invocation-messages [invocation-msg confirm-title confirm-msg]
-  #js {:invocationMessage invocation-msg
-       :confirmationMessages #js {:title confirm-title
-                                  :message confirm-msg}})
+(defn- clojuredocs+
+  [{:ex/keys [dispatch!]
+    :call/keys [arguments]}]
+  (result-of+ (calva/get-clojuredocs+ {:ex/dispatch! dispatch!
+                                       :calva/clojure-symbol (:clojureSymbol arguments)})))
 
-(defn EvaluateClojureCodeTool [dispatch!]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [code (-> options .-input .-code)
-                                  ns (-> options .-input .-namespace)
-                                  session-key (-> options .-input .-replSessionKey)
-                                  who (-> options .-input .-who)
-                                  target-runtime-id (-> options .-input .-targetRuntimeId)
-                                  message (str "Evaluate?\n```clojure\n(in-ns " ns ")\n\n" code "\n```")
-                                  title (cond-> (str "Evaluate as **" (or who "unknown") "** in the **" session-key "** REPL")
-                                          target-runtime-id
-                                          (str " (runtime " target-runtime-id ")"))]
-                              #js {:invocationMessage "Evaluating code"
-                                   :confirmationMessages #js {:title title
-                                                              :message message}}))
+(defn- output-log+
+  [{:ex/keys [dispatch!]
+    :call/keys [arguments]}]
+  (result-of+ (calva/query-output {:ex/dispatch! dispatch!
+                                   :calva/query-edn-str (:query arguments)
+                                   :calva/inputs (:inputs arguments)})))
 
-       :invoke (fn invoke [^js options _token]
-                 (let [who (-> options .-input .-who)
-                       max-images (-> options .-input .-maxImages)]
-                   (if-let [who-error (calva/validate-who who)]
-                     (p/resolved
-                      (vscode/LanguageModelToolResult.
-                       #js [(vscode/LanguageModelTextPart.
-                             (js/JSON.stringify (clj->js {:error who-error})))]))
-                     (p/let [code (-> options .-input .-code)
-                             ns (-> options .-input .-namespace)
-                             session-key (-> options .-input .-replSessionKey)
-                             description (-> options .-input .-description)
-                             target-runtime-id (-> options .-input .-targetRuntimeId)
-                             result (calva/evaluate-code+ {:ex/dispatch! dispatch!
-                                                           :calva/code code
-                                                           :calva/ns ns
-                                                           :calva/repl-session-key session-key
-                                                           :calva/who who
-                                                           :calva/description description
-                                                           :calva/target-runtime-id target-runtime-id})]
-                       (tool-result-with-images result :max-images (if (some? max-images) max-images 10))))))})
+(defn- balance-brackets+
+  [{:ex/keys [dispatch!]
+    :call/keys [arguments]}]
+  (result-of+ (balance/infer-parens-response {:ex/dispatch! dispatch!
+                                              :calva/text (:text arguments)})))
 
+(defn- blank-session-key? [session-key]
+  (or (nil? session-key)
+      (and (string? session-key)
+           (string/blank? session-key))))
 
-(defn GetSymbolInfoTool [dispatch!]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [symbol (-> options .-input .-clojureSymbol)
-                                  message (str "Get info for Clojure symbol: **" symbol "**")]
-                              #js {:invocationMessage "Getting symbol info"
-                                   :confirmationMessages #js {:title "Get Symbol Info"
-                                                              :message message}}))
+(defn- load-file-input-error
+  "Returns the error for a load file call that can't run, or nil."
+  [{:keys [replSessionKey who]}]
+  (if (blank-session-key? replSessionKey)
+    "The `replSessionKey` parameter is required. Use `clojure_list_sessions` to discover available sessions."
+    (calva/validate-who who)))
 
-       :invoke (fn invoke [^js options _token]
-                 (p/let [symbol (-> options .-input .-clojureSymbol)
-                         ns (-> options .-input .-namespace)
-                         session-key (-> options .-input .-replSessionKey)
-                         result (calva/get-symbol-info+ {:ex/dispatch! dispatch!
-                                                         :calva/clojure-symbol symbol
-                                                         :calva/ns ns
-                                                         :calva/repl-session-key session-key})]
-                   (text-tool-result result)))})
+(defn- load-clojure-file+
+  [{:ex/keys [dispatch!]
+    :call/keys [arguments]}]
+  (let [{:keys [filePath replSessionKey who]} arguments]
+    (if-let [input-error (load-file-input-error arguments)]
+      (result-of+ {:error input-error})
+      (.then (js/Promise.resolve (calva/load-file+ {:ex/dispatch! dispatch!
+                                                    :calva/file-path filePath
+                                                    :calva/repl-session-key replSessionKey
+                                                    :calva/who who}))
+             (fn [{:keys [error] :as data}]
+               (if error
+                 {:result/data {:error error}
+                  :result/error? true}
+                 {:result/data data}))))))
 
-(defn- simple-tool
-  "Build a VS Code Language Model tool with one input field, simple messages, and a direct invoke function.
-   Returns a function that takes dispatch! and produces a JS tool object."
-  [{:keys [input-field invocation-msg confirm-title confirm-msg-fn invoke-fn result-fn]
-    :or {result-fn text-tool-result}}]
-  (fn [dispatch!]
-    #js {:prepareInvocation
-         (fn prepareInvocation [^js options _token]
-           (let [input (aget (.-input options) input-field)]
-             (prepare-invocation-messages invocation-msg confirm-title (confirm-msg-fn input))))
-         :invoke
-         (fn invoke [^js options _token]
-           (p/let [input (aget (.-input options) input-field)
-                   result (invoke-fn dispatch! input)]
-             (result-fn result)))}))
+(defn- edit-files+
+  [{:call/keys [arguments]}]
+  (result-of+ (calva/edit-files+ {:calva/edits (:edits arguments)})))
 
-(def GetClojureDocsTool
-  (simple-tool
-   {:input-field "clojureSymbol"
-    :invocation-msg "Looking up ClojureDocs"
-    :confirm-title "Get ClojureDocs Info"
-    :confirm-msg-fn #(str "Look up docs for Clojure symbol: **" % "**")
-    :invoke-fn (fn [dispatch! symbol]
-                 (calva/get-clojuredocs+ {:ex/dispatch! dispatch!
-                                          :calva/clojure-symbol symbol}))}))
+;; The tool table
 
-(defn GetOutputLogTool [dispatch!]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [query (-> options .-input .-query)
-                                  message (str "Query REPL output log: " query)]
-                              #js {:invocationMessage "Querying REPL output log"
-                                   :confirmationMessages #js {:title "Query REPL Output Log"
-                                                              :message message}}))
+(def tools
+  "One row per tool: the var that runs it, the default for its `maxImages` argument when
+   images in its result become image parts, and what a person is shown before it runs."
+  (merge-with merge
+              confirmation/confirmations
+              {"clojure_evaluate_code"    {:tool/function #'evaluate-code+
+                                           :tool/default-max-images 10}
+               "clojure_list_sessions"    {:tool/function #'list-sessions+}
+               "clojure_symbol_info"      {:tool/function #'symbol-info+}
+               "clojuredocs_info"         {:tool/function #'clojuredocs+}
+               "clojure_repl_output_log"  {:tool/function #'output-log+
+                                           :tool/default-max-images 0}
+               "clojure_balance_brackets" {:tool/function #'balance-brackets+}
+               "clojure_load_file"        {:tool/function #'load-clojure-file+}
+               "clojure_edit_files"       {:tool/function #'edit-files+}}))
 
-       :invoke (fn invoke [^js options _token]
-                 (let [query (-> options .-input .-query)
-                       inputs (some-> options .-input .-inputs js->clj)
-                       max-images (-> options .-input .-maxImages)
-                       result (calva/query-output {:ex/dispatch! dispatch!
-                                                   :calva/query-edn-str query
-                                                   :calva/inputs inputs})]
-                   (tool-result-with-images result :max-images (if (some? max-images) max-images 0))))})
+(defn- content-parts
+  [{:tool/keys [default-max-images]} {:keys [maxImages]} data]
+  (if default-max-images
+    (content/parts data (if (some? maxImages) maxImages default-max-images))
+    (content/parts data)))
 
+(defn call-tool+
+  "Runs `tool` with `arguments`. Returns a promise of `{:result/content parts}`, with
+   `:result/error? true` when the tool failed. The promise rejects when the tool throws."
+  [dispatch! tool arguments]
+  (let [{:tool/keys [function] :as row} (get tools tool)]
+    (-> (js/Promise.resolve nil)
+        (.then (fn [_]
+                 (function {:ex/dispatch! dispatch!
+                            :call/tool tool
+                            :call/arguments arguments})))
+        (.then (fn [{:result/keys [data error?]}]
+                 (cond-> {:result/content (content-parts row arguments data)}
+                   error? (assoc :result/error? true)))))))
 
-(def InferBracketsTool
-  (simple-tool
-   {:input-field "text"
-    :invocation-msg "Inferred brackets"
-    :confirm-title "Infer brackets"
-    :confirm-msg-fn #(str "Infer from indents for: " %)
-    :invoke-fn (fn [dispatch! text]
-                 (balance/infer-parens-response {:ex/dispatch! dispatch!
-                                                 :calva/text text}))
-    :result-fn text-tool-result-raw}))
+;; The Language Model API's entry point
 
-(defn ListSessionsTool [dispatch!]
-  #js {:prepareInvocation (fn prepareInvocation [^js _options _token]
-                            #js {:invocationMessage "Listing REPL sessions"
-                                 :confirmationMessages #js {:title "List REPL Sessions"
-                                                            :message "List available REPL sessions"}})
+(defn- when-clause-settings
+  "The settings that the tools' when clauses in package.json name, by clause."
+  []
+  (let [^js config (vscode/workspace.getConfiguration "calva-backseat-driver")]
+    {"config.calva-backseat-driver.provideBdSkill" (.get config "provideBdSkill")
+     "config.calva-backseat-driver.provideEditSkill" (.get config "provideEditSkill")
+     "config.calva-backseat-driver.enableMcpReplEvaluation" (true? (.get config "enableMcpReplEvaluation"))
+     ":calva-mcp-extension/activated?" true}))
 
-       :invoke (fn invoke [^js options _token]
-                 (let [include-all-runtimes? (true? (-> options .-input .-includeAllRuntimes))]
-                   (p/let [result (calva/list-sessions+ {:ex/dispatch! dispatch!
-                                                         :calva/include-all-runtimes? include-all-runtimes?})]
-                     (text-tool-result result))))})
+(defn- language-model-part
+  [{:keys [type text mimeType data]}]
+  (if (= "image" type)
+    (vscode/LanguageModelDataPart.image (js/Uint8Array. (js/Buffer.from data "base64")) mimeType)
+    (vscode/LanguageModelTextPart. (or text "null"))))
 
-(defn LoadFileTool [dispatch!]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [file-path (-> options .-input .-filePath)
-                                  session-key (-> options .-input .-replSessionKey)
-                                  who (-> options .-input .-who)
-                                  message (str "Load file: " file-path
-                                               (when session-key (str " in **" session-key "** REPL")))]
-                              #js {:invocationMessage "Loading file"
-                                   :confirmationMessages #js {:title (str "Load file as **" (or who "unknown") "**")
-                                                              :message message}}))
+(defn- language-model-result
+  [{:result/keys [content]}]
+  (vscode/LanguageModelToolResult. (into-array (map language-model-part content))))
 
-       :invoke (fn invoke [^js options _token]
-                 (let [who (-> options .-input .-who)]
-                   (if-let [who-error (calva/validate-who who)]
-                     (p/resolved (text-tool-result {:error who-error}))
-                     (p/let [file-path (-> options .-input .-filePath)
-                             session-key (-> options .-input .-replSessionKey)
-                             result (calva/load-file+ {:ex/dispatch! dispatch!
-                                                       :calva/file-path file-path
-                                                       :calva/repl-session-key session-key
-                                                       :calva/who who})]
-                       (if (:error result)
-                         (text-tool-result {:error (:error result)})
-                         (text-tool-result result))))))})
+(defn- arguments-of [^js options]
+  (js->clj (.-input options) :keywordize-keys true))
 
-(defn EditFilesTool [dispatch!]
-  #js {:prepareInvocation (fn prepareInvocation [^js options _token]
-                            (let [edits (js->clj (-> options .-input .-edits) :keywordize-keys true)
-                                  file-count (count (distinct (map :filePath edits)))
-                                  edit-count (count edits)]
-                              #js {:invocationMessage "Editing Clojure files"
-                                   :confirmationMessages #js {:title "Edit Clojure Files"
-                                                              :message (str edit-count " edit" (when (not= 1 edit-count) "s")
-                                                                            " across " file-count " file" (when (not= 1 file-count) "s"))}}))
+(defn- language-model-tool
+  "Returns the object VS Code calls for `tool`."
+  [dispatch! extension-context tool]
+  #js {:prepareInvocation (fn [^js options _token]
+                            (clj->js (confirmation/prepared-invocation tool (arguments-of options))))
+       :invoke (fn [^js options _token]
+                 (if (= :allowed (manifest/tool-call-allowed? extension-context tool {:settings (when-clause-settings)}))
+                   (.then (call-tool+ dispatch! tool (arguments-of options))
+                          language-model-result)
+                   (js/Promise.reject (js/Error. "Unknown tool"))))})
 
-       :invoke (fn invoke [^js options _token]
-                 (p/let [edits (js->clj (-> options .-input .-edits) :keywordize-keys true)
-                         result (calva/edit-files+ {:ex/dispatch! dispatch!
-                                                    :calva/edits edits})]
-                   (text-tool-result result)))})
-
-(defn register-language-model-tools [dispatch!]
-  [(vscode/lm.registerTool
-    "clojure_evaluate_code"
-    (#'EvaluateClojureCodeTool dispatch!))
-
-   (vscode/lm.registerTool
-    "clojure_list_sessions"
-    (#'ListSessionsTool dispatch!))
-
-   (vscode/lm.registerTool
-    "clojure_symbol_info"
-    (#'GetSymbolInfoTool dispatch!))
-
-   (vscode/lm.registerTool
-    "clojuredocs_info"
-    (#'GetClojureDocsTool dispatch!))
-
-   (vscode/lm.registerTool
-    "clojure_repl_output_log"
-    (#'GetOutputLogTool dispatch!))
-
-   (vscode/lm.registerTool
-    "clojure_balance_brackets"
-    (#'InferBracketsTool dispatch!))
-
-   (vscode/lm.registerTool
-    "clojure_edit_files"
-    (#'EditFilesTool dispatch!))
-
-   (vscode/lm.registerTool
-    "clojure_load_file"
-    (#'LoadFileTool dispatch!))])
+(defn register-language-model-tools
+  "Registers every tool in the tool table with the Language Model API. Returns the disposables."
+  [dispatch! extension-context]
+  (mapv (fn [tool]
+          (vscode/lm.registerTool tool (language-model-tool dispatch! extension-context tool)))
+        (keys tools)))

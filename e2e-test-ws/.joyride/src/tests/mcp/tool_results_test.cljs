@@ -8,6 +8,7 @@
    [clojure.string :as string]
    [e2e.macros :refer [deftest-async]]
    [e2e.mcp-helpers :as mcp]
+   [e2e.utils :refer [wait-for+]]
    [promesa.core :as p]))
 
 (def ^:private who "e2e-tool-results")
@@ -177,8 +178,8 @@
                               {:filePath "/nonexistent/path/foo.clj" :replSessionKey session-key :who who})
           blank-who (both+ socket "clojure_load_file"
                            {:filePath "/nonexistent/path/foo.clj" :replSessionKey session-key :who ""})
-          blank-session (mcp-call+ socket "clojure_load_file"
-                                   {:filePath "/nonexistent/path/foo.clj" :replSessionKey "" :who who})]
+          blank-session (both+ socket "clojure_load_file"
+                               {:filePath "/nonexistent/path/foo.clj" :replSessionKey "" :who who})]
     (testing "clojure_load_file"
       (is (true? (get-in missing-file [:mcp :is-error?]))
           "a failed load has isError through MCP")
@@ -189,9 +190,8 @@
           "a failed load, the same data through the Language Model API")
       (is-same-data {:error "The `who` parameter is required. Provide a slug identifying your agent (e.g. \"copilot\")."}
                     blank-who "blank who")
-      (is (= {:error "The `replSessionKey` parameter is required. Use `clojure_list_sessions` to discover available sessions."}
-             (:data blank-session))
-          "a blank session key is an error through MCP"))))
+      (is-same-data {:error "The `replSessionKey` parameter is required. Use `clojure_list_sessions` to discover available sessions."}
+                    blank-session "a blank session key"))))
 
 (defn- test-edit-files+ [socket]
   (let [file-path (path/join (.-fsPath mcp/workspace-uri) "tool_results_edit_target.clj")
@@ -285,6 +285,34 @@
                 (test-edit-files+ socket)
                 (test-resource-templates+ socket session-key)
                 (mcp/stop-mcp-session! socket)))
+        (p/catch (fn [e]
+                   (js/console.error "[tool-results] Error:" (.-message e) e)
+                   (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+                   (throw e)))
+        (p/finally (fn []
+                     (mcp/restore-settings! backup-path))))))
+
+(deftest-async a-tool-whose-setting-is-off
+  (let [backup-path (mcp/backup-settings! "tool-results-setting-off-backup.json")]
+    (-> (p/let [_ (mcp/ensure-repl-and-eval-enabled!)
+                {:keys [socket]} (mcp/start-mcp-session!)
+                session-key (session-key+ socket)
+                config (vscode/workspace.getConfiguration "calva-backseat-driver")
+                _ (.update config "enableMcpReplEvaluation" false vscode/ConfigurationTarget.Workspace)
+                _ (wait-for+ #(false? (.get (vscode/workspace.getConfiguration "calva-backseat-driver")
+                                            "enableMcpReplEvaluation"))
+                             :timeout 15000
+                             :message "[tool-results] enableMcpReplEvaluation false not propagated within 15s")
+                arguments {:code "(+ 1 2)" :namespace "user" :replSessionKey session-key :who who}
+                through-mcp (mcp-call+ socket "clojure_evaluate_code" arguments)
+                through-lm (lm-call+ "clojure_evaluate_code" arguments)
+                _ (mcp/stop-mcp-session! socket)]
+          (testing "clojure_evaluate_code with enableMcpReplEvaluation off"
+            (is (= {:code -32601 :message "Unknown tool"}
+                   (:rpc-error through-mcp))
+                "is an unknown tool through MCP")
+            (is (string? (:rejected through-lm))
+                (str "and is refused through the Language Model API: " (pr-str through-lm)))))
         (p/catch (fn [e]
                    (js/console.error "[tool-results] Error:" (.-message e) e)
                    (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
