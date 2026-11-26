@@ -86,6 +86,15 @@
       (update-in [:mcp :data] dissoc k)
       (update-in [:lm :data] dissoc k)))
 
+(defn- language-model-tools?
+  "True when the editor lists Language Model tools. Cursor lists none, and rejects
+   every call through the Language Model API."
+  []
+  (pos? (count (.-tools vscode/lm))))
+
+(defn- skipped [what]
+  (js/console.log "[tool-results] This editor has no Language Model tools:" what "skipped"))
+
 (defn- is-same-data
   "Asserts that MCP and the Language Model API gave `expected`."
   [expected {through-mcp :mcp through-lm :lm} case-name]
@@ -408,17 +417,20 @@
             {:keys [socket]} (await (mcp/start-mcp-session!))
             _ (await (mcp/wait-for-tool! socket "clojure_evaluate_code"))
             session-key (await (session-key+ socket))]
-        (test-language-model-tools-registered)
-        (await (test-balance-brackets+ socket))
-        (await (test-evaluation-input-errors+ socket session-key))
-        (await (test-evaluation-results+ socket session-key))
-        (await (test-image-parts+ session-key))
-        (await (test-list-sessions+ socket))
-        (await (test-symbol-info+ socket session-key))
-        (await (test-clojuredocs-without-symbol+ socket))
-        (await (test-output-log+ socket))
-        (await (test-load-file+ socket session-key))
-        (await (test-edit-files+ socket))
+        (if-not (language-model-tools?)
+          (skipped "the cases through the Language Model API are")
+          (do
+            (test-language-model-tools-registered)
+            (await (test-balance-brackets+ socket))
+            (await (test-evaluation-input-errors+ socket session-key))
+            (await (test-evaluation-results+ socket session-key))
+            (await (test-image-parts+ session-key))
+            (await (test-list-sessions+ socket))
+            (await (test-symbol-info+ socket session-key))
+            (await (test-clojuredocs-without-symbol+ socket))
+            (await (test-output-log+ socket))
+            (await (test-load-file+ socket session-key))
+            (await (test-edit-files+ socket))))
         (await (test-context-padding+ socket))
         (await (test-resource-templates+ socket session-key))
         (await (mcp/stop-mcp-session! socket)))
@@ -430,30 +442,32 @@
         (await (mcp/restore-settings! backup-path))))))
 
 (deftest-async a-tool-whose-setting-is-off
-  (let [backup-path (mcp/backup-settings! "tool-results-setting-off-backup.json")]
-    (try
-      (let [_ (await (mcp/ensure-repl-and-eval-enabled!))
-            {:keys [socket]} (await (mcp/start-mcp-session!))
-            session-key (await (session-key+ socket))
-            config (vscode/workspace.getConfiguration "calva-backseat-driver")
-            _ (await (.update config "enableMcpReplEvaluation" false vscode/ConfigurationTarget.Workspace))
-            _ (await (wait-for+ #(false? (.get (vscode/workspace.getConfiguration "calva-backseat-driver")
-                                               "enableMcpReplEvaluation"))
-                                :timeout 15000
-                                :message "[tool-results] enableMcpReplEvaluation false not propagated within 15s"))
-            arguments {:code "(+ 1 2)" :namespace "user" :replSessionKey session-key :who who}
-            through-mcp (await (mcp-call+ socket "clojure_evaluate_code" arguments))
-            through-lm (await (lm-call+ "clojure_evaluate_code" arguments))
-            _ (await (mcp/stop-mcp-session! socket))]
-        (testing "clojure_evaluate_code with enableMcpReplEvaluation off"
-          (is (= {:code -32601 :message "Unknown tool"}
-                 (:rpc-error through-mcp))
-              "is an unknown tool through MCP")
-          (is (= "Unknown tool" (:rejected through-lm))
-              (str "and through the Language Model API: " (pr-str through-lm)))))
-      (catch :default e
-        (js/console.error "[tool-results] Error:" (.-message e) e)
-        (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
-        (throw e))
-      (finally
-        (await (mcp/restore-settings! backup-path))))))
+  (if-not (language-model-tools?)
+    (skipped "a-tool-whose-setting-is-off is")
+    (let [backup-path (mcp/backup-settings! "tool-results-setting-off-backup.json")]
+      (try
+        (let [_ (await (mcp/ensure-repl-and-eval-enabled!))
+              {:keys [socket]} (await (mcp/start-mcp-session!))
+              session-key (await (session-key+ socket))
+              config (vscode/workspace.getConfiguration "calva-backseat-driver")
+              _ (await (.update config "enableMcpReplEvaluation" false vscode/ConfigurationTarget.Workspace))
+              _ (await (wait-for+ #(false? (.get (vscode/workspace.getConfiguration "calva-backseat-driver")
+                                                 "enableMcpReplEvaluation"))
+                                  :timeout 15000
+                                  :message "[tool-results] enableMcpReplEvaluation false not propagated within 15s"))
+              arguments {:code "(+ 1 2)" :namespace "user" :replSessionKey session-key :who who}
+              through-mcp (await (mcp-call+ socket "clojure_evaluate_code" arguments))
+              through-lm (await (lm-call+ "clojure_evaluate_code" arguments))
+              _ (await (mcp/stop-mcp-session! socket))]
+          (testing "clojure_evaluate_code with enableMcpReplEvaluation off"
+            (is (= {:code -32601 :message "Unknown tool"}
+                   (:rpc-error through-mcp))
+                "is an unknown tool through MCP")
+            (is (= "Unknown tool" (:rejected through-lm))
+                (str "and through the Language Model API: " (pr-str through-lm)))))
+        (catch :default e
+          (js/console.error "[tool-results] Error:" (.-message e) e)
+          (vscode/commands.executeCommand "calva-backseat-driver.stopMcpServer")
+          (throw e))
+        (finally
+          (await (mcp/restore-settings! backup-path)))))))
