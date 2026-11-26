@@ -82,6 +82,7 @@ Day-to-day co-development: run the default **Watch** task (`watch:local`), not `
 ```bash
 bb run-e2e-tests-ws     # Full E2E (exercises MCP server for many tests), in Docker
 bb run-e2e-tests-ws --local  # The same, in a VS Code on this machine
+bb run-e2e-tests-ws --local --vscode-executable /Applications/Cursor.app/Contents/MacOS/Cursor  # The same, in another editor, such as Cursor
 bb package-pre-release  # Package pre-release VSIX
 ```
 
@@ -91,7 +92,7 @@ bb package-pre-release  # Package pre-release VSIX
 - Full MCP coverage comes from the e2e tests + the `bd-tester` agent in the example/test project used inside the dev Extension Host.
 - For any change affecting the MCP server, tools, port file, or Cursor/ECA auto-registration: after the change, launch the dev Extension Host (F5), use `bd-tester` to specifically test the modified behavior, and frequently run its full protocol as a regression check.
 
-**Note**: `bb run-e2e-tests-ws` runs the tests in a Linux container on a virtual display (`e2e-test-ws/run-containerized.sh`), against the `out/` your build keeps current, so no test window opens on your screen. It needs Docker. With `--local` they run in a VS Code on this machine; from a VS Code terminal, unset `ELECTRON_RUN_AS_NODE` first. Detailed output goes to .tmp/e2e-output.log — read that file for details, if needed. The command outputs a very brief summary. Don't pipe or redirect.
+**Note**: `bb run-e2e-tests-ws` runs the tests in a Linux container on a virtual display (`e2e-test-ws/run-containerized.sh`), against the `out/` your build keeps current, so no test window opens on your screen. It needs Docker. With `--local` they run in a VS Code on this machine; from a VS Code terminal, unset `ELECTRON_RUN_AS_NODE` first. `--vscode-executable` takes the editor to run them in, with `--local`. `e2e-test-ws/.joyride/src/tests/mcp/cursor_test.cljs` tests the Cursor registration, and its tests are skipped in an editor without Cursor's registration API. Detailed output goes to .tmp/e2e-output.log — read that file for details, if needed. The command outputs a very brief summary. Don't pipe or redirect.
 
 ### E2E Testing
 Load the `e2e-testing` skill (`.github/skills/e2e-testing/SKILL.md`) when writing, modifying, or debugging e2e tests. It covers test runner mechanics, shared helpers, session lifecycle patterns, and data shape through MCP. The e2e suite (plus the `bd-tester` agent in the dev extension host's test project) provides full coverage of the MCP server/tools protocol.
@@ -111,7 +112,19 @@ An effect written as `[:uf/await :some/fx.name & args]` is awaited before the ne
 {:uf/fxs [[:uf/await :app/fx.return v]]}
 ```
 
-A name that is in no table, a handler result with an unknown key, a vector with the wrong number of arguments, and two awaiting actions in one batch each fail: they throw in a development build and are logged in a release build. `:uf/fx.dispatch`, `:uf/fx.defer-dispatch` (with a key; a later one with the same key replaces the one waiting) and `:uf/fx.cancel-deferred-dispatch` are in `app/fxs.cljs`.
+A name that is in no table, a handler result with an unknown key, a vector with the wrong number of arguments, and two awaiting actions in one batch each fail: they throw in a development build and are logged in a release build. The var `*development-build?*` in `event_handler.cljs` says which, and tests set it. vscode-mcp has a copy of `event_handler.cljs`, the same text apart from the namespace name, so a change to one goes to the other. `:uf/fx.dispatch`, `:uf/fx.defer-dispatch` (with a key; a later one with the same key replaces the one waiting) and `:uf/fx.cancel-deferred-dispatch` are in `app/fxs.cljs`.
+
+### Async Functions
+Promise code in `src` and `test` is written as async functions, with no promise library. ClojureScript 1.12.145 and shadow-cljs 3.5.14 compile them:
+```clojure
+(defn ^:async save-document+ [^js document]
+  (let [saved? (await (.save document))]
+    {:saved saved?}))
+```
+- Inside an async function a promise is awaited. The compiler awaits the expressions it wraps in a function of their own: a `do`, `let` or `try` used as a value, and a call of a local that isn't a `fn` literal when its arguments aren't plain values. A promise from such an expression can't be handed on, or chained with `.then`. A helper that takes the function and its arguments, and makes the call itself, gets the promise.
+- A function that only hands a promise on stays a plain function, as `dispatch!` does.
+- `await` takes any thenable. VS Code's `document.save()`, `workspace.applyEdit` and `window.showInformationMessage` return thenables that aren't native promises.
+- A test of async code is `(deftest ^:async …)` that awaits what it checks, one async test per `deftest`.
 
 ### File Context Feature
 When structural editing fails, returns diagnostic context:
@@ -155,6 +168,7 @@ The `clojure_edit_files` tool uses `targetLineText` (first line of target form) 
 - **Bracket balancing**: Parinfer-powered (`integrations/parinfer.cljs`)
 - **Rich Comment support**: Forms inside `(comment ...)` treated as top-level
 - **Diagnostic context**: On failure, returns 21-line context + remedy message
+- **Saving**: An edit to a file without unsaved changes is saved. The edit flow (`integrations/calva/editor.cljs`, `editor_persist.cljs`, `features.cljs`) awaits `applyEdit` and the document's save, so an edit is reported with `:saved true` when VS Code has saved it, with whatever takes part in the save, such as format on save. A file with unsaved changes keeps the edit in its buffer, with `:saved false`
 
 ### Critical: Bottom-to-Top Editing
 When making multiple edits, work from highest line number to lowest (line numbers shift down as you edit above).
@@ -170,7 +184,7 @@ When making multiple edits, work from highest line number to lowest (line number
 - Window registry: `:registry/enabled?` from setting `enableMcpRegistry` (default true) in `mcp/fxs.cljs` `lifecycle-config`; `:registry/custom-data` carries the compact sessions made from `:calva/sessions`. Entry path: `~/.config/vscode-mcp/registry/windows/calva-backseat-driver-<window-id>.json`. Session changes go through `[:calva/ax.sessions-changed]` → `:calva/fx.read-sessions` → `[:calva/ax.sessions-read sessions]` → `[:mcp/ax.update-registry]` → `(vscode-mcp.core/update-registry!+ config)`
 
 ### Cursor registration lifecycle
-- Stop unregisters from Cursor (best-effort), then stops the socket. The next registration gets a new name (vscode-mcp's Cursor registration)
+- Stop closes the socket and removes the port file, then unregisters from Cursor (best-effort), then removes the registry entry. The next registration gets a new name (vscode-mcp's Cursor registration). A server that is still starting is left to start
 - Deactivate dispatches `[:mcp/ax.stop-server {:lifecycle/silent? true}]`, the same teardown without a message
 - Register command: `calva-backseat-driver.registerMcpServerWithCursor` dispatches `[:mcp/ax.register-with-cursor]`, which awaits `register-with-cursor!+` (starts the server when it doesn't run, then registers). Enablement: `:calva-backseat-driver/cursor-mcp-available? && !:calva-backseat-driver/mcp-server-registered-with-cursor?`
 - When-contexts: `app/when_contexts.cljs` computes `:calva-backseat-driver/cursor-mcp-available?` and `:calva-backseat-driver/mcp-server-registered-with-cursor?` (registered only while the server is running) from the state
@@ -266,11 +280,11 @@ Both entry points, MCP `tools/call` in `mcp/requests.cljs` and the Language Mode
 **Build Artifacts**:
 - `out/extension.js` - Main extension bundle
 - `dist/calva-mcp-server.js` - MCP stdio wrapper
-- `out/extension-tests.js` - Unit tests (they load every namespace; `test/vscode_stub.js` stubs `vscode` with named exports)
+- `out/extension-tests.js` - Unit tests (they load every namespace; `test/vscode_stub.js` stubs `vscode` with named exports, with enough of `workspace` for them to drive the edit flow). `npm run release` compiles them too, and a release compile refuses an assignment to `goog.DEBUG`, so a test of what a release build does sets `event-handler/*development-build?*`
 
 ---
 
 For deeper architecture details, see:
 - `dev/EX_ARCHITECTURE.md` - The loop: what is particular to Backseat Driver's
 - `dev/MCP_OVERVIEW.md` - MCP protocol specifics
-- `PROJECT_SUMMARY.md` - Complete project overview
+- `dev/PROJECT_SUMMARY.md` - Complete project overview

@@ -2,7 +2,7 @@
 
 Backseat Driver is built around a unidirectional action/effect loop, following the Uniflow idea: actions decide, effects execute, and the loop is the only writer of the state. For the idea itself, load the Uniflow skill (`uniflow`). [Replicant TodoMVC](https://github.com/anteoas/replicant-todomvc) is where Uniflow was invented. This page covers what is particular to Backseat Driver's loop.
 
-The loop lives in the project source, in [`event_handler.cljs`](../src/calva_backseat_driver/event_handler.cljs), so it can evolve with the extension.
+The loop lives in the project source, in [`event_handler.cljs`](../src/calva_backseat_driver/event_handler.cljs), so it can evolve with the extension. vscode-mcp runs its server's lifecycle on a copy of it, `vscode-mcp.event-handler`, the same text apart from the namespace name, so a change to one goes to the other.
 
 ## Actions and effects
 
@@ -47,7 +47,7 @@ Dispatching later is done with effects in `app/fxs.cljs`: `:uf/fx.dispatch`, `:u
 
 ## When something is wrong
 
-A name that is in no table, a handler result with an unknown key, an action or effect vector with the wrong number of arguments, and two awaiting actions in one batch each fail. They throw in a development build and are logged in a release build.
+A name that is in no table, a handler result with an unknown key, an action or effect vector with the wrong number of arguments, and two awaiting actions in one batch each fail. They throw in a development build and are logged in a release build. The var `*development-build?*` in `event_handler.cljs` says which kind of build it is, and the loop's tests set it to test both.
 
 `@calva-backseat-driver.app.dispatch/!dispatch-log` holds the last 200 dispatches of a development build: the actions, the effects, the deferred actions, and the state before and after.
 

@@ -77,7 +77,8 @@ For subsystem contracts and architecture reference, load the `backseat-driver-in
   | side_effects → effect_handler(fxs.cljs) | receives_dispatch! | !_suffix
   | state_change → through_dispatch!(app.dispatch) | ¬direct_atom_swap
   | outside_data → arrives_as_action_argument | ¬reach_outside_from_actions
-  | promise_returning → +_suffix | always_await
+  | promise_returning → +_suffix | always_await | async_function: (defn ^:async f+ [...] (await ...))
+  | what_the_compiler_awaits_on_its_own → AGENTS.md(Async Functions)
   | new_tool → manifest(package.json) + row(tools/tools) + confirmation(tools/confirmation.cljs) + unit_tests
   | new_skill → assets/skills/{name}/SKILL.md + package.json(chatSkills)
 
@@ -103,7 +104,7 @@ For subsystem contracts and architecture reference, load the `backseat-driver-in
   | mcp_inspector > theoretical_reasoning | for_mcp_behavior
 
 λ test_layer_selection.
-  pure_logic(¬requires_vscode) → unit_test | test/ | cljs.test
+  pure_logic(¬requires_vscode) → unit_test | test/ | cljs.test | async → (deftest ^:async …)
   mcp_protocol → bb_run-mcp-inspector | interactive
   full_integration → bb_run-e2e-tests-ws | output → .tmp/e2e-output.log
   | unit_first | e2e_when_needed | repl_always
@@ -138,7 +139,8 @@ For subsystem contracts and architecture reference, load the `backseat-driver-in
     3_async_pattern: [:uf/await :ns/fx.name & args] → :uf/prev-result in later_fxs ∨ dxs
   dispatch_result: last_awaited_result | [:uf/await :app/fx.return v] gives_value
   failures: unknown_name ∨ unknown_result_key ∨ wrong_arity ∨ two_awaiting_actions_in_batch
-    | throw in(development_build) | logged in(release_build)
+    | throw in(development_build) | logged in(release_build) | which: event-handler/*development-build?*
+  loop_copy: vscode-mcp.event-handler ≡ same_text_but(ns_name) | change_one → change_other
   listings: (keys (dispatch/actions)) ∧ (keys (dispatch/effects)) ∧ (keys tools/tools)
 
 λ mcp_tool_development.

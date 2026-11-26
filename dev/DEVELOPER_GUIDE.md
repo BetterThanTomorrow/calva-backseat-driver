@@ -50,6 +50,9 @@ bb package-pre-release
 
 # End-to-end testing with workspace files
 bb run-e2e-tests-ws
+
+# The same, in another editor on this machine, such as Cursor
+bb run-e2e-tests-ws --local --vscode-executable /Applications/Cursor.app/Contents/MacOS/Cursor
 ```
 
 ### Testing Strategy

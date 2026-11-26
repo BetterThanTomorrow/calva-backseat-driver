@@ -56,9 +56,13 @@ An effect written as `[:uf/await :ns/fx.name & args]` is awaited before the next
 
 A dispatch resolves to the chain's last awaited result; `[:uf/await :app/fx.return v]` gives it a value. Two awaiting actions in one batch fail, so dispatch each on its own. Native promises throughout the loop.
 
+### Async Functions
+
+Promise code is an async function, `(defn ^:async f+ [...] (await ...))`, with no promise library. `await` takes any thenable, such as what `document.save()` and `workspace.applyEdit` return. A function that only hands a promise on stays a plain function. A test of async code is `(deftest ^:async …)`. What the compiler awaits on its own, so that a promise can't be handed on or chained with `.then`, is in `AGENTS.md` under Async Functions.
+
 ### Tables
 
-Each namespace ends with its table: `(def actions {:calva/ax.add-output #'add-output …})` in `*/axs.cljs`, `(def effects {…})` in `*/fxs.cljs`. A new namespace's table goes into `actions` or `effects` in `app/dispatch.cljs`. A name that is in no table, a handler result with an unknown key, and a vector with the wrong number of arguments each fail: they throw in a development build and are logged in a release build.
+Each namespace ends with its table: `(def actions {:calva/ax.add-output #'add-output …})` in `*/axs.cljs`, `(def effects {…})` in `*/fxs.cljs`. A new namespace's table goes into `actions` or `effects` in `app/dispatch.cljs`. A name that is in no table, a handler result with an unknown key, and a vector with the wrong number of arguments each fail: they throw in a development build and are logged in a release build, as `event-handler/*development-build?*` says. A test sets that var, and never assigns `goog.DEBUG`, which a release compile of the tests refuses. vscode-mcp has a copy of `event_handler.cljs`, so a change to one goes to the other.
 
 ## State Management
 

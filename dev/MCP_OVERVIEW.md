@@ -50,7 +50,7 @@ We solve this by implementing the server running inside the Calva MCP Extension,
 
 ### Cursor registration and commands
 
-Lifecycle is driven by `vscode-mcp.core` via `mcp/fxs.cljs` (`lifecycle-config`). The config names the server by `:server/name` and the wrapper script by `:wrapper/script-relative-path`, carries `:server/request-port` and `:registry/custom-data`, and has three functions: `:mcp/on-request`, `:mcp/on-log` and `:mcp/on-server-changed`. `start!+`, `maybe-start!+`, `stop!+`, `register-with-cursor!+` and `update-registry!+` resolve to the server's state, and `[:mcp/ax.server-changed server-state]` stores it in the app state. Manual stop and deactivate always unregister from Cursor (best-effort), then stop the socket; deactivate is silent. The next registration gets a new name. vscode-mcp's own contract is in its `AGENTS.md`.
+Lifecycle is driven by `vscode-mcp.core` via `mcp/fxs.cljs` (`lifecycle-config`). The config names the server by `:server/name` and the wrapper script by `:wrapper/script-relative-path`, carries `:server/request-port` and `:registry/custom-data`, and has three functions: `:mcp/on-request`, `:mcp/on-log` and `:mcp/on-server-changed`. `start!+`, `maybe-start!+`, `stop!+`, `register-with-cursor!+` and `update-registry!+` resolve to the server's state, and `[:mcp/ax.server-changed server-state]` stores it in the app state. Manual stop and deactivate stop the socket and remove the port file, then unregister from Cursor (best-effort), then remove the registry entry; deactivate is silent. The next registration gets a new name. vscode-mcp's own contract is in its `AGENTS.md`.
 
 **When-contexts** (computed from the app state by `app/when_contexts.cljs`):
 

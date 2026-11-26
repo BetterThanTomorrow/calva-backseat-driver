@@ -73,7 +73,9 @@ The stdio wrapper and the skill resources are in vscode-mcp (`vscode-mcp.stdio.w
   | state_effects_hook: app.when-contexts/effects → [:vscode/fx.set-contexts …] when(values_changed)
   | fails(unknown_name ∨ unknown_result_key ∨ wrong_arity ∨ two_awaiting_actions_in_batch)
   |   → throw in(development_build) | logged in(release_build)
-  | native_promises_throughout | ¬promesa_in_loop
+  |   which: event-handler/*development-build?* | tests_set_it | ¬assign(goog.DEBUG)
+  | native_promises_throughout | promise_code ≡ async_functions(defn ^:async … await) | ¬promesa
+  | event_handler.cljs ≡ copy_in(vscode-mcp) | same_text_but(ns_name) | change_one → change_other
 
 λ tables.
   ∀namespace: ends_with (def actions {…}) in */axs.cljs ∨ (def effects {…}) in */fxs.cljs
@@ -149,6 +151,8 @@ The stdio wrapper and the skill resources are in vscode-mcp (`vscode-mcp.stdio.w
   | rich_comments: forms_inside(comment ...) ≡ top_level
   | diagnostic_context: 21_line_window | line_numbers | → arrow_marker
   | bottom_to_top: multiple_edits_highest_line_first
+  | saving: awaits(applyEdit ∧ document.save) | :saved true when(VS_Code_saved_it)
+  |   unsaved_changes_before_edit → buffer_only(:saved false)
 ```
 
 ## Temporal Sequences
@@ -173,7 +177,7 @@ The stdio wrapper and the skill resources are in vscode-mcp (`vscode-mcp.stdio.w
     2_await: :mcp/fx.lifecycle-start → vscode-mcp start!+ ∨ maybe-start!+
     3_server_changes: :mcp/on-server-changed → [:mcp/ax.server-changed server-state]
     4_ax.lifecycle-updated: merge(server_state) | dispatch resolves to it, nil when ¬running
-    5_when_contexts: follow_from_state | started? ∧ starting? ∧ stopping? ∧ registered_with_cursor?
+    5_when_contexts: follow_from_state | activated? ∧ started? ∧ cursor_mcp_available? ∧ registered_with_cursor?
 
   request:
     1_vscode-mcp: socket_line → :mcp/on-request
@@ -183,7 +187,9 @@ The stdio wrapper and the skill resources are in vscode-mcp (`vscode-mcp.stdio.w
 
   stop:
     1_dispatch: [:mcp/ax.stop-server] | deactivate: {:lifecycle/silent? true}
-    2_await: :mcp/fx.lifecycle-stop → vscode-mcp stop!+ | unregisters_Cursor ∧ stops_socket
+    2_await: :mcp/fx.lifecycle-stop → vscode-mcp stop!+
+    |   closes_socket ∧ removes_port_file → unregisters_Cursor → removes_registry_entry
+    |   starting_server → left_to_start
     3_ax.lifecycle-stopped: merge(server_state) | dispatch resolves to true
 
   sessions:

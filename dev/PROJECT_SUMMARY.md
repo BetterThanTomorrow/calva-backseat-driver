@@ -101,10 +101,9 @@ User ↔ AI Agent ↔ [VS Code LM API | MCP Server] ↔ Calva ↔ REPL ↔ Runni
 ## Dependencies
 
 ### Core Dependencies
-- **Clojure 1.12.0** - Core language
-- **ClojureScript 1.11.132** - Client-side compilation
-- **Shadow-CLJS 2.28.23** - Build tooling and hot reload
-- **Promesa 11.0.678** - Promise handling and async coordination
+- **Clojure 1.12.7** - Core language
+- **ClojureScript 1.12.145** - Client-side compilation, with async functions for promise code
+- **Shadow-CLJS 3.5.14** - Build tooling and hot reload
 - **Baldr 1.0.9** - Updates test output to do positive reporting
 
 ### VS Code Integration
