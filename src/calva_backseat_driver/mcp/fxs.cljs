@@ -47,7 +47,7 @@
                     (if (:ok result)
                       (dispatch! context (ax/enrich-with-args on-success (:state result)))
                       (do
-                        (dispatch! context [[:vscode/fx.show-information-message
+                        (dispatch! context [[:vscode/ax.show-information-message
                                              (case (:reason result)
                                                :cursor-api-unavailable "Cursor MCP registration API is not available in this editor."
                                                "Could not register Backseat Driver MCP server with Cursor.")]])
