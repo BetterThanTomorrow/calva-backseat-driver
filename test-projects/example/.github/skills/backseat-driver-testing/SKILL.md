@@ -96,7 +96,7 @@ Non-shadow sessions (`clj`, `bb`, etc.) must **not** include `builds` — flat s
 ## Shadow-cljs Runtime Targeting
 
 Prerequisites:
-- **Calva >= 2.0.592** (`repl.listSessionsAndRuntimes` API)
+- **Calva >= 2.0.608** (`repl.listSessionsAndRuntimes` API, and the error for an unknown `targetRuntimeId`)
 - The `shadow-cljs` session, with two browser runtimes on `:app` (tabs on http://localhost:8780) and two node runtimes on `:tui` (the tasks **tui 1** and **tui 2**)
 
 If `supportsRuntimes` is absent or a build has fewer runtimes, run the task **test project: start** and list the sessions again. Automated E2E does not cover live shadow runtimes.
@@ -158,12 +158,12 @@ Use the `"shadow-cljs"` session and the `runtimeId` values from a `includeAllRun
 
 Call `clojure_evaluate_code` with a `targetRuntimeId` that is not in the current listing (e.g. `99999`).
 
-**Verify** (shadow-cljs behavior — not a Backseat Driver bug):
-- Evaluation **succeeds** on the editor's currently connected runtime (e.g. `(+ 1 1)` → `2`), not an error response
+**Verify**:
+- The evaluation fails: `result` is `"nil"` and `stderr` has `No shadow-cljs runtime with id 99999 on this connection`
 - No crash
 - Re-list sessions: `currentlyConnectedRuntimeId` unchanged
 
-Do **not** expect a clear error for unknown ids unless shadow-cljs / Calva change this upstream. When targeting must be exact, confirm via `lastActivity` on the intended runtime after eval, or use a runtime-specific observable (e.g. `js/window` in browser vs node context).
+The error comes from Calva: its API rejects the same call with the same message.
 
 ### 5. Calva API cross-check (diagnosis)
 
@@ -634,7 +634,7 @@ When reporting results, cover only the sections that were tested.
 
 **Session Listing**: The five expected sessions discovered, with the `currentRoutedTarget` field. `:app` and `:tui` have two runtimes each. Shadow sessions expose compact `builds[]`; non-shadow sessions omit `builds`.
 
-**Shadow-cljs Runtime Targeting**: Compact vs `includeAllRuntimes: true` listing shapes correct. `targetRuntimeId` evaluates on the chosen runtime without changing `currentlyConnectedRuntimeId`, for two tabs on `:app` and for a browser and a node runtime. Unknown/stale `targetRuntimeId` succeeds on the editor-connected runtime (shadow-cljs behavior — not an error). Non-shadow sessions unchanged.
+**Shadow-cljs Runtime Targeting**: Compact vs `includeAllRuntimes: true` listing shapes correct. `targetRuntimeId` evaluates on the chosen runtime without changing `currentlyConnectedRuntimeId`, for two tabs on `:app` and for a browser and a node runtime. Unknown/stale `targetRuntimeId` fails with `No shadow-cljs runtime with id N on this connection`. Non-shadow sessions unchanged.
 
 **REPL Evaluation**: `who` echoed, result correct, `description` appears in output log. Babashka and `mini-clj` evals return the correct session key.
 
