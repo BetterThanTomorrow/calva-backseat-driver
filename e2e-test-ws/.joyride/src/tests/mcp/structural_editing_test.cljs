@@ -303,20 +303,27 @@
       (is (batch-success? replace-result))
       (is (string/includes? content "(def x 2)")))))
 
-(def ^:private continue-file-name "structural_edit_continue_target.clj")
-(defn- continue-file-path []
-  (path/join (.-fsPath mcp/workspace-uri) continue-file-name))
+(def ^:private continue-file-names
+  "A target file for each of the two tests of a batch that continues. With one file for
+   both, the second test removed a file that VS Code still had a model of, and saving
+   the edit could fail with File Modified Since."
+  {:runtime-failure "structural_edit_continue_runtime_target.clj"
+   :validation-failure "structural_edit_continue_validation_target.clj"})
 
-(defn- delete-continue-file! []
-  (when (fs/existsSync (continue-file-path))
-    (fs/unlinkSync (continue-file-path))))
+(defn- continue-file-path [test-key]
+  (path/join (.-fsPath mcp/workspace-uri) (get continue-file-names test-key)))
+
+(defn- delete-continue-files! []
+  (doseq [test-key (keys continue-file-names)]
+    (when (fs/existsSync (continue-file-path test-key))
+      (fs/unlinkSync (continue-file-path test-key)))))
 
 (defn- test-continue-on-failure+
   "Test that a batch with one valid and one invalid edit applies the valid one."
-  [socket {:keys [test-label id-create id-batch valid-edit invalid-edit
+  [socket {:keys [test-label test-key id-create id-batch valid-edit invalid-edit
                   expected-content expected-error]}]
-  (p/let [file-path (continue-file-path)
-          _ (do (delete-continue-file!)
+  (p/let [file-path (continue-file-path test-key)
+          _ (do (delete-continue-files!)
                 (mcp/call-tool socket id-create "clojure_edit_files"
                                {:edits [{:type "create"
                                          :filePath file-path
@@ -341,11 +348,12 @@
 (defn- test-continue-on-runtime-failure+ [socket]
   (test-continue-on-failure+ socket
                              {:test-label "batch continues past runtime failure"
+                              :test-key :runtime-failure
                               :id-create 120 :id-batch 121
-                              :valid-edit {:type "replace" :filePath (continue-file-path)
+                              :valid-edit {:type "replace" :filePath (continue-file-path :runtime-failure)
                                            :line 3 :targetLineText "(defn add-numbers"
                                            :newForm "(defn add-numbers\n  \"Adds two numbers\"\n  [a b]\n  (+ a b))"}
-                              :invalid-edit {:type "replace" :filePath (continue-file-path)
+                              :invalid-edit {:type "replace" :filePath (continue-file-path :runtime-failure)
                                              :line 8 :targetLineText "(defn nonexistent-function"
                                              :newForm "(defn replaced [] :replaced)"}
                               :expected-content "Adds two numbers"
@@ -354,11 +362,12 @@
 (defn- test-continue-on-edit-validation-failure+ [socket]
   (test-continue-on-failure+ socket
                              {:test-label "batch continues past edit-level validation failure"
+                              :test-key :validation-failure
                               :id-create 122 :id-batch 123
-                              :valid-edit {:type "replace" :filePath (continue-file-path)
+                              :valid-edit {:type "replace" :filePath (continue-file-path :validation-failure)
                                            :line 3 :targetLineText "(defn add-numbers"
                                            :newForm "(defn add-numbers\n  \"Modified\"\n  [a b]\n  (+ a b))"}
-                              :invalid-edit {:type "replace" :filePath (continue-file-path)
+                              :invalid-edit {:type "replace" :filePath (continue-file-path :validation-failure)
                                              :line 8 :targetLineText "; this is a comment"
                                              :newForm "(defn replaced [] :replaced)"}
                               :expected-content "\"Modified\""
@@ -627,5 +636,5 @@
       (p/finally (fn []
                    (delete-test-file!)
                    (delete-tiny-file!)
-                   (delete-continue-file!)
+                   (delete-continue-files!)
                    (delete-active-file!)))))
