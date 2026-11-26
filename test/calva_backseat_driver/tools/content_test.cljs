@@ -18,6 +18,25 @@
                                    :more [blue-dot]}
                                   10))
         "are replaced by references, in order, with whitespace removed from the base64"))
+  (testing "what ends an image's data"
+    (is (= {:data "<<image-1>> and then some text"
+            :images [{:mime "image/png" :base64 "iVBORw0KGgoA"}]}
+           (content/reduce-images "data:image/png;base64,iVBORw0KGgoA and then some text" 10))
+        "A space does, also when the data has no padding")
+    (is (= {:data "<<image-1>> and <<image-2>>"
+            :images [{:mime "image/png" :base64 "iVBORw0KGgo="}
+                     {:mime "image/jpeg" :base64 "/9j/4AAQSkZJRg=="}]}
+           (content/reduce-images (str red-dot " and " blue-dot) 10))
+        "so two images in one string are two images")
+    (is (= {:data "<<image-1>>\n<<image-2>>"
+            :images [{:mime "image/png" :base64 "iVBORw0KGgoA"}
+                     {:mime "image/png" :base64 "iVBORw0KGgo="}]}
+           (content/reduce-images (str "data:image/png;base64,iVBORw0KGgoA\n" red-dot) 10))
+        "A line that starts another image does")
+    (is (= {:data "<<image-1>>\tb"
+            :images [{:mime "image/png" :base64 "iVBORw0KGgoA"}]}
+           (content/reduce-images "data:image/png;base64,iVBORw0KGgoA\tb" 10))
+        "A tab does"))
   (testing "images past the cap"
     (is (= {:data ["<<image-1>>" "<<image-2-capped>>"]
             :images [{:mime "image/png" :base64 "iVBORw0KGgo="}]}

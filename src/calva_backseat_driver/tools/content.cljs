@@ -6,7 +6,9 @@
    [clojure.walk :as walk]))
 
 (def ^:private image-url-pattern
-  #"data:(image/[^;]+);base64,([A-Za-z0-9+/=\s]+)")
+  "An image data URL. Its base64 data can be broken over lines, as an encoder that breaks
+   lines prints it. A space, a tab, or a line that starts another data URL ends it."
+  #"data:(image/[^;]+);base64,([A-Za-z0-9+/]+(?:\r?\n(?!data:)[A-Za-z0-9+/]+)*={0,2})")
 
 (defn- reduce-images-in-string
   "Replaces the image data URLs in `s` with `<<image-N>>` references, numbering on from
