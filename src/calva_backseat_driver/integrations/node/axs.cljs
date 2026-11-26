@@ -7,4 +7,4 @@
     {:ex/fxs [(into [:node/fx.log] args)]}
 
     :else
-    {:ex/fxs [[:node/fx.log-error-greeting "Unknown action:" action]]}))
+    {:ex/fxs [[:node/fx.log-error "Unknown action:" (pr-str action)]]}))
