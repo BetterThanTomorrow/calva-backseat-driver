@@ -1,47 +1,53 @@
 (ns calva-backseat-driver.app.fxs
   (:require
    ["vscode" :as vscode]
-   [calva-backseat-driver.ex.ax :as ax]
-   [calva-backseat-driver.tools :as tools]
+   [calva-backseat-driver.app.live-objects :as live-objects]
    [calva-backseat-driver.mcp.logging :as logging]
-   [clojure.core.match :refer [match]]))
+   [calva-backseat-driver.tools :as tools]))
 
-(defn perform-effect! [dispatch! ^js context effect]
-  (match effect
-    [:app/fx.init-logging options]
-    (logging/init!+ (merge options
-                           {:ex/dispatch! (partial dispatch! context)}))
+(def ^:private log-levels {:error 0, :warn 1, :info 2, :debug 3})
 
-    [:app/fx.log options level messages]
-    (let [min-level (:app/min-log-level options :debug)
-          levels {:error 0, :warn 1, :info 2, :debug 3}]
-      (when (<= (levels level) (levels min-level))
-        (apply logging/log! (assoc options :ex/dispatch! dispatch!) level messages)))
+(defn- log
+  "Writes `messages` to the log file when `level` is at or above the minimum level in `options`."
+  [_dispatch! options level messages]
+  (when (<= (log-levels level) (log-levels (:app/min-log-level options :debug)))
+    (apply logging/log! options level messages)))
 
-    [:app/fx.return v]
-    v
+(defn- return
+  "Returns `v`. Awaited, it makes `v` the result of the dispatch."
+  [_dispatch! v]
+  v)
 
-    [:app/fx.register-command command-id actions]
-    (let [disposable (vscode/commands.registerCommand
-                      command-id
-                      (fn [& args]
-                        (dispatch!
-                         context
-                         (ax/enrich-with-args actions
-                                              (js->clj args :keywordize-keys true)))))]
-      (.push (.-subscriptions context) disposable)
-      (dispatch! context [[:db/ax.update-in [:extension/disposables] conj disposable]]))
+(defn- dispatch
+  "Dispatches `actions` as a chain of their own."
+  [dispatch! actions]
+  (dispatch! actions)
+  nil)
 
-    [:app/fx.register-language-model-tools]
-    (let [disposables (tools/register-language-model-tools (partial dispatch! context) context)]
-      (doseq [disposable disposables]
-        (.push (.-subscriptions context) disposable))
-      (dispatch! context [[:db/ax.update-in [:extension/disposables] into disposables]]))
+(defn- register-command
+  "Registers the command `command-id`. Running it dispatches `actions`, and the command
+   resolves to the result of that dispatch."
+  [dispatch! command-id actions]
+  (live-objects/add-disposables!
+   [(vscode/commands.registerCommand command-id
+                                     (fn [& _args]
+                                       (dispatch! actions)))]))
 
+(defn- register-language-model-tools
+  "Registers the tools with the Language Model API."
+  [dispatch!]
+  (live-objects/add-disposables!
+   (tools/register-language-model-tools dispatch!)))
 
-    [:app/fx.clear-disposables disposables]
-    (doseq [^js disposable disposables]
-      (.dispose disposable))
+(defn- clear-disposables
+  "Disposes what the extension has registered."
+  [_dispatch!]
+  (live-objects/dispose-all!))
 
-    :else
-    (js/console.warn "Unknown extension effect:" (pr-str effect))))
+(def effects
+  {:app/fx.log #'log
+   :app/fx.return #'return
+   :app/fx.register-command #'register-command
+   :app/fx.register-language-model-tools #'register-language-model-tools
+   :app/fx.clear-disposables #'clear-disposables
+   :uf/fx.dispatch #'dispatch})

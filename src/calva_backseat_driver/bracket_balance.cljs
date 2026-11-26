@@ -3,7 +3,7 @@
 
 (defn infer-parens-response
   "Infer parens from the indentation"
-  [{:ex/keys [dispatch!]
+  [{:uf/keys [dispatch!]
     :calva/keys [text]}]
   (dispatch! [[:app/ax.log :debug "[Server] Infering brackets for:" text]])
   (try
@@ -20,5 +20,5 @@
       #js {:error (.-message e)})))
 
 (comment
-  (infer-parens-response {:ex/dispatch! println
+  (infer-parens-response {:uf/dispatch! println
                           :calva/text "(def foo [a b"}))

@@ -1,93 +1,97 @@
 (ns calva-backseat-driver.app.axs
   (:require
-   [vscode-mcp.policy :as mcp-policy]
-   [cljs.core.match :refer [match]]))
+   [vscode-mcp.policy :as mcp-policy]))
+
+(def ^:private commands
+  "The actions each command dispatches."
+  {"calva-backseat-driver.startMcpServer" [[:mcp/ax.start-server]]
+   "calva-backseat-driver.stopMcpServer" [[:mcp/ax.stop-server]]
+   "calva-backseat-driver.registerMcpServerWithCursor" [[:mcp/ax.register-with-cursor]]
+   "calva-backseat-driver.openLogFile" [[:mcp/ax.open-server-log]]})
 
 (defn should-auto-start-mcp-server?
-  [auto-start-mcp? auto-register-cursor-mcp? cursor-mcp-available?
-   auto-register-eca? eca-available? workspace-root-present?]
-  (mcp-policy/should-auto-start? {:mcp/auto-start? auto-start-mcp?
-                                  :mcp/auto-register? auto-register-cursor-mcp?
+  "True when the settings and what is installed call for starting the MCP server at activation."
+  [{:mcp/keys [cursor-mcp-available? eca-available? workspace-root-present?]
+    :as state}]
+  (mcp-policy/should-auto-start? {:mcp/auto-start? (:vscode/config.autoStartMCPServer state)
+                                  :mcp/auto-register? (:vscode/config.autoRegisterCursorMcp state)
                                   :mcp/cursor-available? cursor-mcp-available?
-                                  :mcp/auto-register-eca? auto-register-eca?
+                                  :mcp/auto-register-eca? (:vscode/config.autoRegisterEcaMcp state)
                                   :mcp/eca-available? eca-available?
                                   :mcp/workspace-root-present? workspace-root-present?}))
 
-(defn- handle-init
-  [state auto-start-mcp? auto-register-cursor-mcp? auto-register-eca?]
-  {:ex/dxs [[:app/ax.register-command "calva-backseat-driver.startMcpServer"
-             [[:mcp/ax.start-server]]]
-            [:app/ax.register-command "calva-backseat-driver.stopMcpServer"
-             [[:mcp/ax.stop-server]]]
-            [:app/ax.register-command "calva-backseat-driver.registerMcpServerWithCursor"
-             [[:mcp/ax.register-with-cursor]]]
-            [:app/ax.register-command "calva-backseat-driver.openLogFile"
-             [[:mcp/ax.open-server-log]]]
-            [:app/ax.register-language-model-tools]
-            [:calva/ax.init-history]
-            [:calva/ax.when-activated [[:app/ax.init-output-listener]
-                                       [:calva/ax.subscribe-to-sessions-changed]]]
-            [:app/ax.set-when-context :calva-mcp-extension/activated?
-             true]
+(defn- activate
+  "Takes the state the extension starts with: the settings, and what `activate` found installed."
+  [state _uf-data initial-state]
+  {:uf/db (merge state initial-state)
+   :uf/dxs [[:app/ax.init]]})
+
+(defn- init
+  "Registers the commands and the tools, and starts what the extension runs."
+  [_state _uf-data]
+  {:uf/fxs (-> (mapv (fn [[command-id actions]]
+                       [:app/fx.register-command command-id actions])
+                     commands)
+               (conj [:app/fx.register-language-model-tools]
+                     [:vscode/fx.subscribe-to-settings]))
+   :uf/dxs [[:calva/ax.init-history]
+            [:app/ax.set-when-context :calva-mcp-extension/activated? true]
             [:mcp/ax.sync-cursor-mcp-when-contexts]
-            (when (should-auto-start-mcp-server? auto-start-mcp?
-                                                 auto-register-cursor-mcp?
-                                                 (:mcp/cursor-mcp-available? state)
-                                                 auto-register-eca?
-                                                 (:mcp/eca-available? state)
-                                                 (:mcp/workspace-root-present? state))
-              [:mcp/ax.start-server {:silent? true}])]})
+            [:app/ax.start-background-work]]})
 
-(defn handle-action [state _context action]
-  (match action
-    [:app/ax.activate initial-state]
-    (let [new-state (merge state initial-state)]
-      {:ex/db new-state
-       :ex/fxs [[:app/fx.init-logging {:app/log-file-uri (:app/log-file-uri new-state)
-                                       :ex/uri-action [:db/ax.assoc-in [:app/log-dir-initialized+]]
-                                       :ex/then [[:app/ax.init {:auto-start-mcp? :vscode/config.autoStartMCPServer
-                                                                :auto-register-cursor-mcp? :vscode/config.autoRegisterCursorMcp
-                                                                :auto-register-eca? :vscode/config.autoRegisterEcaMcp}]]}]]})
+(defn- start-background-work
+  "Starts the chains that wait for something: Calva being active, and the MCP server starting."
+  [state _uf-data]
+  {:uf/fxs [[:uf/fx.dispatch [[:calva/ax.when-activated [[:calva/ax.subscribe-to-output]
+                                                         [:calva/ax.subscribe-to-sessions-changed]]]]]
+            (when (should-auto-start-mcp-server? state)
+              [:uf/fx.dispatch [[:mcp/ax.start-server {:silent? true}]]])]})
 
-    [:app/ax.init {:auto-start-mcp? auto-start-mcp?
-                   :auto-register-cursor-mcp? auto-register-cursor-mcp?
-                   :auto-register-eca? auto-register-eca?}]
-    (handle-init state auto-start-mcp? auto-register-cursor-mcp? auto-register-eca?)
+(defn- settings-changed
+  "Takes the extension's `settings` after one of them changed."
+  [state _uf-data settings]
+  {:uf/db (merge state settings)})
 
-    [:app/ax.init-output-listener]
-    {:ex/dxs [[:calva/ax.subscribe-to-output]]}
+(defn- hot-reloaded
+  "Takes what the reload hook found installed, and initializes when a reload came before the first init."
+  [state _uf-data facts]
+  {:uf/db (merge state facts)
+   :uf/dxs (when-not (get-in state [:extension/when-contexts :calva-mcp-extension/activated?])
+             [[:app/ax.init]])})
 
-    [:app/ax.set-when-context k v]
-    {:ex/db (assoc-in state [:extension/when-contexts k] v)
-     :ex/fxs [[:vscode/fx.set-context k v]]}
+(defn- set-when-context
+  [state _uf-data k v]
+  {:uf/db (assoc-in state [:extension/when-contexts k] v)
+   :uf/fxs [[:vscode/fx.set-context k v]]})
 
-    [:app/ax.set-min-log-level level]
-    {:ex/db (assoc state :app/min-log-level level)}
+(defn- log
+  "Writes `messages` to the log file at `level`."
+  [state _uf-data level & messages]
+  {:uf/fxs [[:app/fx.log
+             (select-keys state [:app/min-log-level :app/log-file-uri])
+             level
+             messages]]})
 
-    [:app/ax.log level & messages]
-    {:ex/fxs [[:app/fx.log
-               (select-keys state [:app/min-log-level :app/log-file-uri :app/log-dir-initialized+])
-               level
-               messages]]}
+(defn- cleanup
+  [_state _uf-data]
+  {:uf/fxs [[:app/fx.clear-disposables]]
+   :uf/dxs [[:app/ax.set-when-context :calva-mcp-extension/activated? false]]})
 
-    [:app/ax.register-command command-id actions]
-    {:ex/fxs [[:app/fx.register-command command-id actions]]}
+(defn- deactivate
+  "Saves the history at once, and stops the MCP server without a message."
+  [state _uf-data]
+  {:uf/fxs [[:calva/fx.flush-history (:calva/history-storage-uri state)]
+            [:app/fx.clear-disposables]]
+   :uf/dxs [[:app/ax.set-when-context :calva-mcp-extension/activated? false]
+            [:mcp/ax.stop-server {:lifecycle/silent? true}]]})
 
-    [:app/ax.clear-disposables]
-    {:ex/db (assoc state :extension/disposables [])
-     :ex/fxs [[:app/fx.clear-disposables (:extension/disposables state)]]}
-
-    [:app/ax.cleanup]
-    {:ex/dxs [[:app/ax.set-when-context :calva-mcp-extension/activated? false]
-              [:app/ax.clear-disposables]]}
-
-    [:app/ax.register-language-model-tools]
-    {:ex/fxs [[:app/fx.register-language-model-tools]]}
-
-    [:app/ax.deactivate]
-    {:ex/fxs [[:calva/fx.flush-history]]
-     :ex/dxs [[:mcp/ax.stop-server {:lifecycle/silent? true}]
-              [:app/ax.cleanup]]}
-
-    :else nil))
-
+(def actions
+  {:app/ax.activate #'activate
+   :app/ax.init #'init
+   :app/ax.start-background-work #'start-background-work
+   :app/ax.settings-changed #'settings-changed
+   :app/ax.hot-reloaded #'hot-reloaded
+   :app/ax.set-when-context #'set-when-context
+   :app/ax.log #'log
+   :app/ax.cleanup #'cleanup
+   :app/ax.deactivate #'deactivate})

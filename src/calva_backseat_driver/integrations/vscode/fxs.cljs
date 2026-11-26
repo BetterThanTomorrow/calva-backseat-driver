@@ -1,55 +1,46 @@
 (ns calva-backseat-driver.integrations.vscode.fxs
   (:require
    ["vscode" :as vscode]
-   [calva-backseat-driver.ex.ax :as ax]
-   [clojure.core.match :refer [match]]))
+   [calva-backseat-driver.app.live-objects :as live-objects]
+   [calva-backseat-driver.integrations.vscode.settings :as settings]))
 
-(defn- show-input-box! [dispatch! context options]
-  (let [{:ex/keys [then]} options]
-    (if-not then
-      (vscode/window.showInputBox options)
-      (-> (vscode/window.showInputBox (clj->js options))
-          (.then (fn [input]
-                   (when input
-                     (dispatch! context (ax/enrich-with-args then input)))))))))
+(defn- show-information-message
+  "Shows `message` as an information message."
+  [_dispatch! message]
+  (vscode/window.showInformationMessage message))
 
-(defn- open-text-document! [dispatch! context options]
-  (let [{:keys [ex/then app/content]} options]
-    (if-not then
-      (vscode/window.showInputBox options)
-      (-> (vscode/workspace.openTextDocument #js {:content content})
-          (.then (fn [document]
-                   (when document
-                     (dispatch! context (ax/enrich-with-args then document)))))))))
+(defn- show-error-message
+  "Shows `message` as an error message."
+  [_dispatch! message]
+  (vscode/window.showErrorMessage message))
 
-(defn perform-effect! [dispatch! context effect]
-  (match effect
-    [:vscode/fx.show-information-message & args]
-    (apply vscode/window.showInformationMessage args)
+(defn- show-text-document-at
+  "Opens the document at `uri` in an editor."
+  [_dispatch! uri]
+  (-> (vscode/workspace.openTextDocument uri)
+      (.then (fn [document]
+               (when document
+                 (vscode/window.showTextDocument document)))
+             (fn [error]
+               (js/console.error "Error opening or showing document:" uri error)))))
 
-    [:vscode/fx.show-error-message & args]
-    (apply vscode/window.showErrorMessage args)
+(defn- set-context
+  "Sets the when-context `k` to `v`."
+  [_dispatch! k v]
+  (vscode/commands.executeCommand "setContext" (str k) v))
 
-    [:vscode/fx.show-input-box options]
-    (show-input-box! dispatch! context options)
+(defn- subscribe-to-settings
+  "Dispatches `[:app/ax.settings-changed settings]` whenever a setting of the extension changes."
+  [dispatch!]
+  (live-objects/add-disposables!
+   [(vscode/workspace.onDidChangeConfiguration
+     (fn [^js event]
+       (when (.affectsConfiguration event settings/section)
+         (dispatch! [[:app/ax.settings-changed (settings/settings (live-objects/extension-context))]]))))]))
 
-    [:vscode/fx.window.open-text-document options]
-    (open-text-document! dispatch! context options)
-
-    [:vscode/fx.workspace.open-text-document options]
-    (let [{:keys [open/uri ex/then]} options]
-      (-> (vscode/workspace.openTextDocument uri)
-          (.then (fn [document]
-                   (when (and document then)
-                     (dispatch! context (ax/enrich-with-args then document))))
-                 (fn [error]
-                   (js/console.error "Error opening or showing document:" uri error)))))
-
-    [:vscode/fx.show-text-document document]
-    (vscode/window.showTextDocument document)
-
-    [:vscode/fx.set-context k v]
-    (vscode/commands.executeCommand "setContext" (str k) v)
-
-    :else
-    (js/console.error "Unknown effect:" (pr-str effect))))
+(def effects
+  {:vscode/fx.show-information-message #'show-information-message
+   :vscode/fx.show-error-message #'show-error-message
+   :vscode/fx.show-text-document-at #'show-text-document-at
+   :vscode/fx.set-context #'set-context
+   :vscode/fx.subscribe-to-settings #'subscribe-to-settings})

@@ -1,6 +1,5 @@
 (ns calva-backseat-driver.mcp.requests
   (:require
-   [calva-backseat-driver.tools :as tools]
    [calva-backseat-driver.integrations.calva.features :as calva]
    [clojure.string :as string]
    [promesa.core :as p]
@@ -8,36 +7,30 @@
    [vscode-mcp.requests :as mcp-requests]
    [vscode-mcp.responses :as responses]))
 
-(defn- settings-map [options]
-  (let [{:mcp/keys [provide-bd-skill? provide-edit-skill? repl-enabled?]} options]
-    {"config.calva-backseat-driver.provideBdSkill" provide-bd-skill?
-     "config.calva-backseat-driver.provideEditSkill" provide-edit-skill?
-     "config.calva-backseat-driver.enableMcpReplEvaluation" (true? repl-enabled?)
-     ":calva-mcp-extension/activated?" true}))
-
 (defn- exception-message
   "Best-effort message for any thrown/rejected value, not just js/Error."
   [e]
   (or (ex-message e) (str e)))
 
 (defn- call-result-response
-  [id {:result/keys [content error?]}]
-  (responses/success-response id (cond-> {:content content}
-                                   error? (assoc :isError true))))
+  "Returns the response to the `tools/call` request `id` for a tool call's `result`."
+  [id {:result/keys [content error? refused thrown]}]
+  (cond
+    refused (responses/error-response id -32601 "Unknown tool")
+    thrown (responses/error-response id -32603 thrown)
+    :else (responses/success-response id (cond-> {:content content}
+                                           error? (assoc :isError true)))))
 
-(defn- handle-tools-call [{:keys [id params] :as _request} options]
-  (let [{:keys [arguments] tool :name} params
-        allowed (manifest/tool-call-allowed? (:vscode/extension-context options) tool {:settings (settings-map options)})]
-    (if (or (= :disabled allowed) (= :unknown allowed))
-      (responses/error-response id -32601 "Unknown tool")
-      ;; vscode-mcp's socket code recognizes promesa promises, so the response is one
-      (p/create
-       (fn [resolve _reject]
-         (-> (tools/call-tool+ (:ex/dispatch! options) tool arguments)
-             (.then (fn [result]
-                      (resolve (call-result-response id result))))
-             (.catch (fn [e]
-                       (resolve (responses/error-response id -32603 (exception-message e)))))))))))
+(defn- handle-tools-call
+  "Dispatches the tool call of a `tools/call` request. Returns a promise of the response."
+  [dispatch! {:keys [id params]}]
+  (let [{:keys [arguments] tool :name} params]
+    (.then (dispatch! [[:tool/ax.call {:call/tool tool
+                                       :call/arguments arguments}]])
+           (fn [result]
+             (call-result-response id result))
+           (fn [e]
+             (responses/error-response id -32603 (exception-message e))))))
 
 (defn- bd-read-dynamic-resource [uri options]
   (cond
@@ -61,7 +54,7 @@
     nil))
 
 (defn- bd-resource-templates [options]
-  (let [all-tools (manifest/get-tools (:vscode/extension-context options) {:settings (settings-map options)})
+  (let [all-tools (manifest/get-tools (:vscode/extension-context options) {:settings (:mcp/when-clause-settings options)})
         tool-desc (fn [t-name] (:description (first (filter #(= (:name %) t-name) all-tools))))]
     [{:uriTemplate "/symbol-info/{symbol}@{session-key}@{namespace}"
       :name "symbol-info"
@@ -79,23 +72,23 @@
           (when repl-enabled?
             " You can evaluate Clojure/ClojureScript code via the `clojure_evaluate_code` tool, load entire files into the REPL with `clojure_load_file`, check REPL output with `clojure_repl_output_log`, look up symbol info, and query clojuredocs.org."))))
 
-(defn- request-opts [options]
-  {:settings (settings-map options)
+(defn- request-opts [{:mcp/keys [when-clause-settings] :as options}]
+  {:settings when-clause-settings
    :initialize-opts {:base-text (initialize-base-text options)
                      :name "calva-backseat-driver"
-                     :settings (settings-map options)}
+                     :settings when-clause-settings}
    :initialize-merge {:capabilities {:tools {:listChanged true}
                                      :resources {:listChanged true}}
                       :description "Gives access to the Calva API, including Calva REPL output, the Clojure REPL connection (unless disabled in settings), Clojure symbol info, clojuredocs.org lookup, and structural editing tools for Clojure code. Effectively turning the AI Agent into a Clojure Interactive Programmer."}
    :resource-templates+ (fn [_ctx _opts] (bd-resource-templates options))
    :read-resource+ (fn [_ctx uri _opts] (bd-read-dynamic-resource uri options))})
 
-(defn handle-request-fn [{:ex/keys [dispatch!] :as options}
+(defn handle-request-fn [{:uf/keys [dispatch!] :as options}
                          {:keys [method] :as request}]
   (dispatch! [[:app/ax.log :debug "[Server] handle-request " (pr-str request)]])
   (let [opts (request-opts options)
         ctx (:vscode/extension-context options)]
     (case method
-      "tools/call" (handle-tools-call request options)
+      "tools/call" (handle-tools-call dispatch! request)
       (mcp-requests/handle-manifest-request ctx request opts))))
 

@@ -2,9 +2,7 @@
   (:require [cognitect.transit :as transit]
             [datascript.core :as d]))
 
-(def init-db {:vscode/extension-context nil
-              :extension/disposables []
-              :extension/when-contexts {:calva-mcp-extension/activated? false}
+(def init-db {:extension/when-contexts {:calva-mcp-extension/activated? false}
               :calva/output-line-counter 0})
 
 (defonce !app-db (atom init-db))

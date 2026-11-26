@@ -38,16 +38,11 @@
 
     :else nil))
 
-(defn- get-eval-config []
-  (let [config (vscode/workspace.getConfiguration "calva-backseat-driver.evaluation")]
-    {:max-length (.get config "maxLength")
-     :max-depth (.get config "maxDepth")}))
-
 ;; Session listing and validation
 
 (defn list-sessions+
   "Returns a promise that resolves to a list of available REPL sessions."
-  [{:ex/keys [dispatch!]
+  [{:uf/keys [dispatch!]
     :calva/keys [include-all-runtimes?]}]
   (dispatch! [[:app/ax.log :debug "[Server] Listing REPL sessions"]])
   (p/let [sessions-js ((get-in calva/calva-api [:repl :listSessionsAndRuntimes]))
@@ -104,14 +99,13 @@
 (defn evaluate-code+
   "Returns a promise that resolves to the result of evaluating Clojure/ClojureScript code.
    Pre-validates session key against available sessions before evaluation."
-  [{:ex/keys [dispatch!]
-    :calva/keys [code repl-session-key ns who description target-runtime-id]}]
+  [{:uf/keys [dispatch!]
+    :calva/keys [code repl-session-key ns who description target-runtime-id max-length max-depth]}]
   (p/let [input-validation (validate-eval-inputs+ code repl-session-key dispatch!)]
     (if (:error input-validation)
       (:error input-validation)
       (let [evaluate-fn (get-in calva/calva-api [:repl :evaluate])]
-        (p/let [{:keys [max-length max-depth]} (get-eval-config)
-                nrepl-eval-options (get-nrepl-eval-options max-length max-depth)
+        (p/let [nrepl-eval-options (get-nrepl-eval-options max-length max-depth)
                 result (-> (p/let [options-js (clj->js
                                                (cond-> {:sessionKey repl-session-key}
                                                  ns (assoc :ns ns)
@@ -162,23 +156,17 @@
           result)))))
 
 
-(defn get-clojuredocs+ [{:ex/keys [dispatch!]
+(defn get-clojuredocs+ [{:uf/keys [dispatch!]
                          :calva/keys [clojure-symbol]}]
   (dispatch! [[:app/ax.log :debug "[Server] Getting clojuredocs for:" clojure-symbol]])
   ((get-in calva/calva-api [:info :getClojureDocsDotOrg]) clojure-symbol "user"))
 
-(defn get-symbol-info+ [{:ex/keys [dispatch!]
+(defn get-symbol-info+ [{:uf/keys [dispatch!]
                          :calva/keys [clojure-symbol ns repl-session-key]}]
   (dispatch! [[:app/ax.log :debug "[Server] Getting symbol info for:" clojure-symbol]])
   ((get-in calva/calva-api [:info :getSymbolInfo]) clojure-symbol repl-session-key ns))
 
-(defn subscribe-to-output [{:ex/keys [dispatch!]
-                            :calva/keys [on-output]}]
-  ((get-in calva/calva-api [:repl :onOutputLogged])
-   (fn [message]
-     (dispatch! (conj on-output (js->clj message :keywordize-keys true))))))
-
-(defn query-output [{:ex/keys [dispatch!]
+(defn query-output [{:uf/keys [dispatch!]
                      :calva/keys [query-edn-str inputs]}]
   (dispatch! [[:app/ax.log :debug "[Server] Querying output log with:" query-edn-str]
               [:calva/ax.query-output query-edn-str inputs]]))
@@ -186,7 +174,7 @@
 (defn load-file+
   "Loads/evaluates a Clojure file through Calva's connected REPL.
    Returns a promise resolving to the string result of the last evaluated form."
-  [{:ex/keys [dispatch!]
+  [{:uf/keys [dispatch!]
     :calva/keys [file-path repl-session-key who]}]
   (dispatch! [[:app/ax.log :debug "[Server] Loading file:" file-path]])
   (-> (p/let [result (vscode/commands.executeCommand
@@ -198,11 +186,6 @@
       (p/catch (fn [err]
                  (dispatch! [[:app/ax.log :debug "[Server] Load file failed:" err]])
                  {:error (.-message err)}))))
-
-(defn- get-editor-config []
-  (let [config (vscode/workspace.getConfiguration "calva-backseat-driver.editor")]
-    {:search-padding (.get config "fuzzyLineTargetingPadding")
-     :context-padding (.get config "lineContextResponsePadding")}))
 
 (defn- apply-single-edit+
   "Apply a single edit operation. Returns {:success true ...} or {:success false ...}"
@@ -256,14 +239,13 @@
   "Execute a batch of structural edits across one or more files.
    Pre-validates schema, groups by file, sorts within each file,
    applies sequentially (continues on failure), and reports per-file diagnostics."
-  [{:calva/keys [edits]}]
+  [{:calva/keys [edits search-padding context-padding]}]
   (let [validation-errors (batch-edit/validate-edit-schema edits)]
     (if validation-errors
       (p/resolved {:error "Schema validation failed — no edits were applied"
                    :validation-errors validation-errors})
       (let [indexed-edits (map-indexed (fn [idx edit] (assoc edit :index idx)) edits)
             grouped (group-by :filePath indexed-edits)
-            {:keys [search-padding context-padding]} (get-editor-config)
             file-paths (keys grouped)]
         (p/let [file-results (p/loop [remaining file-paths
                                       acc {}]
@@ -284,14 +266,14 @@
 
 (comment
   (.-line (vscode/Position. 0))
-  (p/let [info (get-symbol-info+ {:ex/dispatch! (comp pr-str println)
+  (p/let [info (get-symbol-info+ {:uf/dispatch! (comp pr-str println)
                                   :calva/clojure-symbol "clojure.core/reductions"
                                   :calva/repl-session-key "clj"
                                   :calva/ns "user"})]
     (def info info))
   (js->clj info :keywordize-keys true)
 
-  (p/let [docs (get-clojuredocs+ {:ex/dispatch! (comp pr-str println)
+  (p/let [docs (get-clojuredocs+ {:uf/dispatch! (comp pr-str println)
                                   :calva/clojure-symbol "clojure.core/reductions"})]
     (def docs docs))
   (js->clj docs :keywordize-keys true)

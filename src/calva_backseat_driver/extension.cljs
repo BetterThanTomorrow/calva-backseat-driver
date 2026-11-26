@@ -3,29 +3,34 @@
    ["os" :as os]
    ["path" :as path]
    ["vscode" :as vscode]
-   [calva-backseat-driver.ex.ex :as ex]
-   [calva-backseat-driver.app.db :as db]
+   [calva-backseat-driver.app.dispatch :as dispatch]
+   [calva-backseat-driver.app.live-objects :as live-objects]
    [calva-backseat-driver.integrations.calva.api :as calva-api]
    [calva-backseat-driver.integrations.calva.version :as version]
+   [calva-backseat-driver.integrations.vscode.settings :as settings]
    [vscode-mcp.core :as vscode-mcp]
    [vscode-mcp.cursor :as vscode-mcp-cursor]
    [vscode-mcp.eca :as vscode-mcp-eca]))
 
-(defn- extension-context []
-  (:vscode/extension-context @db/!app-db))
-
-(defn- initial-state [^js context]
-  {:app/log-file-uri
-   (vscode/Uri.joinPath
-    (.-logUri context) "mcp-server.log")
-   :app/min-log-level :debug
-   :mcp/wrapper-config-path (path/join (os/homedir) ".config" "calva" "backseat-driver")
-   :mcp/cursor-mcp-available? (vscode-mcp-cursor/cursor-mcp-available?)
+(defn- mcp-availability
+  "What the MCP server's start by itself depends on: the editors and extensions it can
+   register with, and an open workspace folder."
+  []
+  {:mcp/cursor-mcp-available? (vscode-mcp-cursor/cursor-mcp-available?)
    :mcp/eca-available? (vscode-mcp-eca/eca-available?)
-   :mcp/workspace-root-present? (vscode-mcp-eca/workspace-root-present?)
-   :mcp/lifecycle-state (vscode-mcp/init-state)
-   :calva/history-storage-uri (some-> (.-storageUri context)
-                                      (vscode/Uri.joinPath "eval-history.transit.json"))})
+   :mcp/workspace-root-present? (vscode-mcp-eca/workspace-root-present?)})
+
+(defn- initial-state
+  "The state the extension starts with: the settings, what is available, and its paths."
+  [^js context]
+  (merge (settings/settings context)
+         (mcp-availability)
+         {:app/log-file-uri (vscode/Uri.joinPath (.-logUri context) "mcp-server.log")
+          :app/min-log-level :debug
+          :mcp/wrapper-config-path (path/join (os/homedir) ".config" "calva" "backseat-driver")
+          :mcp/lifecycle-state (vscode-mcp/init-state)
+          :calva/history-storage-uri (some-> (.-storageUri context)
+                                             (vscode/Uri.joinPath "eval-history.transit.json"))}))
 
 (def ^:private min-backseat-driver-version "0.0.33")
 (def ^:private min-calva-version "2.0.592")
@@ -41,11 +46,8 @@
                              " requires Calva >= " min-calva-version
                              ". Found: " (or calva-version "unknown"))))))
 
-  (when-not (extension-context)
-    (swap! db/!app-db assoc
-           :vscode/extension-context context
-           :app/getConfiguration vscode/workspace.getConfiguration))
-  (ex/dispatch! context [[:app/ax.activate (initial-state context)]])
+  (live-objects/put! :vscode/extension-context context)
+  (dispatch/dispatch! [[:app/ax.activate (initial-state context)]])
 
   (js/console.timeLog "activation" "Calva Backseat Driver activate END")
   (js/console.timeEnd "activation")
@@ -58,12 +60,15 @@
           (.get "enableMcpREPLEvaluation"))
   :rcf)
 
-(defn ^:export deactivate []
-  (ex/dispatch! (extension-context) [[:app/ax.deactivate]]))
+(defn ^:export deactivate
+  "Returns a promise that resolves when the history is saved and the MCP server has stopped."
+  []
+  (dispatch/dispatch! [[:app/ax.deactivate]]))
 
 (comment
-  (ex/dispatch! (extension-context) [[:app/ax.cleanup]])
-  (activate (extension-context))
+  (dispatch/dispatch! [[:app/ax.cleanup]])
+  (activate (live-objects/extension-context))
+  @dispatch/!dispatch-log
   :rcf)
 
 ;;;;; shadow-cljs hot reload hooks
@@ -74,22 +79,9 @@
   before-load []
   (println "shadow-cljs reloading..."))
 
-(defn- maybe-init-mcp! [ctx]
-  (when-not (get-in @db/!app-db [:extension/when-contexts :calva-mcp-extension/activated?])
-    (ex/dispatch! ctx [[:app/ax.init {:auto-start-mcp? :vscode/config.autoStartMCPServer
-                                      :auto-register-cursor-mcp? :vscode/config.autoRegisterCursorMcp
-                                      :auto-register-eca? :vscode/config.autoRegisterEcaMcp}]])))
-
-(defn- ensure-cursor-mcp-ready! []
-  (when-let [ctx (extension-context)]
-    (swap! db/!app-db assoc
-           :mcp/cursor-mcp-available? (vscode-mcp-cursor/cursor-mcp-available?)
-           :mcp/eca-available? (vscode-mcp-eca/eca-available?)
-           :mcp/workspace-root-present? (vscode-mcp-eca/workspace-root-present?))
-    (maybe-init-mcp! ctx)))
-
 (defn ^{:dev/after-load true
         :export true}
   after-load []
   (println "shadow-cljs reload complete")
-  (ensure-cursor-mcp-ready!))
+  (when (live-objects/extension-context)
+    (dispatch/dispatch! [[:app/ax.hot-reloaded (mcp-availability)]])))

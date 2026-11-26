@@ -1,70 +1,60 @@
 (ns calva-backseat-driver.mcp.fxs
   (:require
-   [calva-backseat-driver.ex.ax :as ax]
+   [calva-backseat-driver.app.live-objects :as live-objects]
    [calva-backseat-driver.mcp.requests :as requests]
    [calva-backseat-driver.mcp.server :as server]
-   [cljs.core.match :refer [match]]
-   [promesa.core :as p]
-   [vscode-mcp.core :as vscode-mcp]
-   [vscode-mcp.server :as mcp-server]))
+   [vscode-mcp.core :as vscode-mcp]))
 
-(defn- update-registry!
-  [dispatch! context options]
-  (vscode-mcp/update-registry!+
-   (server/build-lifecycle-config dispatch! context (:mcp/wrapper-config-path options))))
+(defn- lifecycle-config
+  [dispatch! {:mcp/keys [wrapper-config-path settings]}]
+  (server/build-lifecycle-config dispatch! (live-objects/extension-context) wrapper-config-path settings))
 
-(defn perform-effect! [dispatch! ^js context effect]
-  (match effect
-    [:mcp/fx.lifecycle-start options]
-    (let [{:ex/keys [on-success]
-           :lifecycle/keys [silent?]
-           :mcp/keys [wrapper-config-path lifecycle-state]} options
-          config (server/build-lifecycle-config dispatch! context wrapper-config-path)
-          start!+ (if silent? vscode-mcp/maybe-start!+ vscode-mcp/start!+)]
-      (p/then (start!+ config lifecycle-state silent?)
-              (fn [new-lifecycle-state]
-                (dispatch! context (ax/enrich-with-args on-success new-lifecycle-state)))))
+(defn- lifecycle-start
+  "Starts the MCP server. Returns a promise of the new lifecycle state."
+  [dispatch! {:lifecycle/keys [silent?]
+              :mcp/keys [lifecycle-state]
+              :as options}]
+  (let [start!+ (if silent? vscode-mcp/maybe-start!+ vscode-mcp/start!+)]
+    (start!+ (lifecycle-config dispatch! options) lifecycle-state silent?)))
 
-    [:mcp/fx.lifecycle-stop options]
-    (let [{:ex/keys [on-success]
-           :mcp/keys [wrapper-config-path lifecycle-state]
-           :lifecycle/keys [silent?]
-           :or {silent? false}} options
-          config (server/build-lifecycle-config dispatch! context wrapper-config-path)]
-      (-> (vscode-mcp/stop!+ config lifecycle-state {:lifecycle/silent? silent?})
-          (p/then (fn [new-lifecycle-state]
-                    (dispatch! context (ax/enrich-with-args on-success new-lifecycle-state))))
-          (p/catch (fn [e]
-                     (dispatch! context [[:mcp/ax.server-error e]])
-                     (dispatch! context (ax/enrich-with-args on-success (vscode-mcp/init-state)))))))
+(defn- lifecycle-stop
+  "Stops the MCP server. Returns a promise of the new lifecycle state."
+  [dispatch! {:lifecycle/keys [silent?]
+              :mcp/keys [lifecycle-state]
+              :as options}]
+  (-> (js/Promise.resolve
+       (vscode-mcp/stop!+ (lifecycle-config dispatch! options) lifecycle-state {:lifecycle/silent? (boolean silent?)}))
+      (.catch (fn [e]
+                (dispatch! [[:mcp/ax.server-error (str e)]])
+                (vscode-mcp/init-state)))))
 
-    [:mcp/fx.register-with-cursor options]
-    (let [{:ex/keys [on-success on-error]
-           :mcp/keys [wrapper-config-path lifecycle-state]} options
-          config (server/build-lifecycle-config dispatch! context wrapper-config-path)]
-      (-> (vscode-mcp/register-with-cursor!+ config lifecycle-state)
-          (p/then (fn [result]
-                    (if (:ok result)
-                      (dispatch! context (ax/enrich-with-args on-success (:state result)))
-                      (do
-                        (dispatch! context [[:vscode/ax.show-information-message
-                                             (case (:reason result)
-                                               :cursor-api-unavailable "Cursor MCP registration API is not available in this editor."
-                                               "Could not register Backseat Driver MCP server with Cursor.")]])
-                        (dispatch! context (ax/enrich-with-args on-error result))))))
-          (p/catch (fn [e]
-                     (dispatch! context [[:app/ax.log :error "[Cursor MCP] register-with-cursor error:" e]])
-                     (dispatch! context (ax/enrich-with-args on-error e))))))
+(defn- register-with-cursor
+  "Registers the MCP server with Cursor, starting it when needed. Returns a promise of
+   what the registration gave: `:ok` and the new lifecycle `:state`, a `:reason`, or the
+   `:error` message when it threw."
+  [dispatch! {:mcp/keys [lifecycle-state] :as options}]
+  (-> (js/Promise.resolve
+       (vscode-mcp/register-with-cursor!+ (lifecycle-config dispatch! options) lifecycle-state))
+      (.catch (fn [e]
+                {:ok false
+                 :error (ex-message e)}))))
 
-    [:mcp/fx.send-notification server-info notification]
-    (mcp-server/send-notification-params server-info notification)
+(defn- handle-request
+  "Answers the MCP `request`. Returns the response, or a promise of it."
+  [dispatch! options request]
+  (requests/handle-request-fn (assoc options
+                                     :uf/dispatch! dispatch!
+                                     :vscode/extension-context (live-objects/extension-context))
+                              request))
 
-    [:mcp/fx.handle-request options request]
-    (requests/handle-request-fn (assoc options :ex/dispatch! (partial dispatch! context)
-                                       :vscode/extension-context context) request)
+(defn- update-registry
+  "Refreshes the window's registry entry."
+  [dispatch! options]
+  (vscode-mcp/update-registry!+ (lifecycle-config dispatch! options)))
 
-    [:mcp/fx.update-registry options]
-    (update-registry! dispatch! context options)
-
-    :else
-    (js/console.warn "Unknown MCP effect:" (pr-str effect))))
+(def effects
+  {:mcp/fx.lifecycle-start #'lifecycle-start
+   :mcp/fx.lifecycle-stop #'lifecycle-stop
+   :mcp/fx.register-with-cursor #'register-with-cursor
+   :mcp/fx.handle-request #'handle-request
+   :mcp/fx.update-registry #'update-registry})

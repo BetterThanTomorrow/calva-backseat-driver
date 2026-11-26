@@ -118,16 +118,14 @@
   "Performs `fxs` in order. Returns the last awaited result, starting from `prev`, as a
    value when no effect was awaited and as a promise otherwise."
   [effect-table dispatch! fxs prev]
-  (loop [remaining fxs
-         prev prev]
-    (if-let [raw-fx (first remaining)]
-      (if (await-fx? raw-fx)
-        (let [fx (replace-prev-result (vec (rest raw-fx)) prev)]
-          (.then (js/Promise.resolve (perform-effect! effect-table dispatch! fx))
-                 (fn [result]
-                   (execute-effects effect-table dispatch! (rest remaining) result))))
-        (do (perform-and-forget! effect-table dispatch! (replace-prev-result raw-fx prev))
-            (recur (rest remaining) prev)))
+  (let [[not-awaited [awaited & remaining]] (split-with (complement await-fx?) fxs)]
+    (doseq [fx not-awaited]
+      (perform-and-forget! effect-table dispatch! (replace-prev-result fx prev)))
+    (if awaited
+      (.then (js/Promise.resolve
+              (perform-effect! effect-table dispatch! (replace-prev-result (vec (rest awaited)) prev)))
+             (fn [result]
+               (execute-effects effect-table dispatch! remaining result)))
       prev)))
 
 (defn- check-awaiting!

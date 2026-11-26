@@ -1,41 +1,38 @@
 (ns calva-backseat-driver.mcp.logging
   (:require
    ["fs" :as fs]
-   ["vscode" :as vscode]
-   [promesa.core :as p]
+   ["path" :as path]
    [clojure.string :as string]))
 
-(defn init!+ [{:app/keys [log-file-uri]
-               :ex/keys [dispatch! uri-action then]}]
-  (let [dir-uri (vscode/Uri.joinPath log-file-uri "..")
-        init-promise (-> (vscode/workspace.fs.createDirectory dir-uri)
-                         (p/then (fn [] dir-uri))
-                         (p/catch (fn [err]
-                                    (js/console.error
-                                     "logging/init+ failed creating log file directory:" err)
-                                    (p/rejected err))))]
-    (dispatch! [(conj uri-action init-promise)])
-    (when (seq then)
-      (-> init-promise
-          (p/finally (fn [_]
-                       (dispatch! then)))
-          (p/catch (fn [_]))))))
+(defonce ^:private !ensured-directories (atom #{}))
 
-(defn append-file+ [path data]
-  (p/create
+(defn- ensure-directory!
+  "Creates `directory` when this is the first log line for it."
+  [directory]
+  (when-not (contains? @!ensured-directories directory)
+    (fs/mkdirSync directory #js {:recursive true})
+    (swap! !ensured-directories conj directory)))
+
+(defn- append-file+ [file-path data]
+  (js/Promise.
    (fn [resolve-fn reject]
-     (fs/appendFile path data
+     (fs/appendFile file-path data
                     (fn [err]
                       (if err
                         (reject err)
                         (resolve-fn)))))))
 
-(defn log! [{:app/keys [^js log-file-uri ^js log-dir-initialized+]} level & messages]
+(defn log!
+  "Appends a line with `level` and `messages` to the log file."
+  [{:app/keys [^js log-file-uri]} level & messages]
   (let [timestamp (.toISOString (js/Date.))
-        formatted-message (str timestamp " [" (name level) "] "
-                               (string/join " " (map pr-str messages)))
-        log-entry (str formatted-message "\n")]
-    (-> (p/let [_ log-dir-initialized+]
-          (append-file+ (.-fsPath log-file-uri) log-entry))
-        (p/catch (fn [err]
-                   (js/console.error "Failed to write to MCP server log:" err))))))
+        log-entry (str timestamp " [" (name level) "] "
+                       (string/join " " (map pr-str messages))
+                       "\n")
+        file-path (.-fsPath log-file-uri)]
+    (-> (js/Promise.resolve nil)
+        (.then (fn [_]
+                 (ensure-directory! (path/dirname file-path))
+                 (append-file+ file-path log-entry)))
+        (.catch (fn [err]
+                  (js/console.error "Failed to write to MCP server log:" err))))))

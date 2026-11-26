@@ -20,10 +20,14 @@
   (when-let [subscribe (get-in calva-api [:repl :onSessionsChanged])]
     (subscribe listener)))
 
-(defn when-calva-activated [{:ex/keys [dispatch! then]}]
-  (let [!interval-id (atom nil)]
-    (reset! !interval-id (js/setInterval (fn []
-                                           (when (.-isActive calvaExt)
-                                             (js/clearInterval @!interval-id)
-                                             (dispatch! then)))
-                                         100))))
+(defn calva-activated+
+  "Returns a promise that resolves when Calva is active."
+  []
+  (js/Promise.
+   (fn [resolve _reject]
+     (let [!interval-id (atom nil)]
+       (reset! !interval-id (js/setInterval (fn []
+                                              (when (.-isActive calvaExt)
+                                                (js/clearInterval @!interval-id)
+                                                (resolve true)))
+                                            100))))))

@@ -3,7 +3,15 @@
             [cognitect.transit :as transit]
             [datascript.core :as d]
             [calva-backseat-driver.app.db :as db]
+            [calva-backseat-driver.event-handler :as event-handler]
             [calva-backseat-driver.integrations.calva.axs :as calva-axs]))
+
+(def ^:private now 1795517607133)
+
+(defn- handle
+  "Returns what the Calva handlers give for `action` on `state`."
+  [state action]
+  (event-handler/handle-actions calva-axs/actions state {:system/now now} [action]))
 
 (use-fixtures :each
   {:before (fn []
@@ -50,9 +58,8 @@
 
 (deftest add-output-shadow-fields
   (testing "Persists shadow build and runtime from Calva output messages"
-    (let [result (calva-axs/handle-action
+    (let [result (handle
                   {:calva/output-line-counter 0}
-                  nil
                   [:calva/ax.add-output
                    {:category "evaluatedCode"
                     :text "(+ 1 1)"
@@ -61,30 +68,28 @@
                     :replSessionKey "shadow-cljs"
                     :shadowBuild ":app"
                     :shadowRuntimeId 42}])
-          entity (get-in result [:ex/fxs 0 1])]
+          entity (get-in result [:uf/fxs 0 1])]
       (is (= ":app" (:output/shadow-build entity)))
       (is (= 42 (:output/shadow-runtime-id entity))))))
 
 (deftest add-output-omits-absent-shadow-fields
   (testing "No shadow keys on entity when Calva message omits them"
-    (let [result (calva-axs/handle-action
+    (let [result (handle
                   {:calva/output-line-counter 0}
-                  nil
                   [:calva/ax.add-output
                    {:category "evaluatedCode"
                     :text "(+ 1 1)"
                     :who "tester"
                     :ns "user"
                     :replSessionKey "clj"}])
-          entity (get-in result [:ex/fxs 0 1])]
+          entity (get-in result [:uf/fxs 0 1])]
       (is (not (contains? entity :output/shadow-build)))
       (is (not (contains? entity :output/shadow-runtime-id))))))
 
 (deftest add-output-omits-undefined-shadow-fields
   (testing "No shadow keys when Calva sent undefined values"
-    (let [result (calva-axs/handle-action
+    (let [result (handle
                   {:calva/output-line-counter 0}
-                  nil
                   [:calva/ax.add-output
                    {:category "evaluatedCode"
                     :text "(+ 1 1)"
@@ -92,19 +97,19 @@
                     :replSessionKey "clj"
                     :shadowBuild js/undefined
                     :shadowRuntimeId js/undefined}])
-          entity (get-in result [:ex/fxs 0 1])]
+          entity (get-in result [:uf/fxs 0 1])]
       (is (not (contains? entity :output/shadow-build)))
       (is (not (contains? entity :output/shadow-runtime-id))))))
 
 (deftest history-loaded-action
   (testing "Sets output-line-counter from loaded max-line"
     (let [state {:calva/output-line-counter 0}
-          result (calva-axs/handle-action state nil [:calva/ax.history-loaded 42])]
-      (is (= 42 (:calva/output-line-counter (:ex/db result))))))
+          result (handle state [:calva/ax.history-loaded 42])]
+      (is (= 42 (:calva/output-line-counter (:uf/db result))))))
   (testing "Sets counter to 0 when no history"
     (let [state {:calva/output-line-counter 5}
-          result (calva-axs/handle-action state nil [:calva/ax.history-loaded 0])]
-      (is (= 0 (:calva/output-line-counter (:ex/db result)))))))
+          result (handle state [:calva/ax.history-loaded 0])]
+      (is (= 0 (:calva/output-line-counter (:uf/db result)))))))
 
 (deftest query-output-returns-pulled-rows-filtered-by-since-and-who
   (testing "Supported output-log query via :calva/ax.query-output"
@@ -125,13 +130,12 @@
                      :output/who "tester"}]]
       (d/transact! local-conn entities)
       (with-redefs [db/!output-conn local-conn]
-        (let [returned-rows (-> (calva-axs/handle-action
+        (let [returned-rows (-> (handle
                                  {}
-                                 nil
                                  [:calva/ax.query-output (pr-str query) [1 "tester"]])
-                                :ex/fxs
+                                :uf/fxs
                                 first
-                                second)]
+                                (nth 2))]
           (is (= [{:output/line 3
                    :output/text "third"
                    :output/who "tester"}]

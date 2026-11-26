@@ -1,13 +1,15 @@
-(ns calva-backseat-driver.integrations.node.fxs
-  (:require [clojure.core.match :refer [match]]))
+(ns calva-backseat-driver.integrations.node.fxs)
 
-(defn perform-effect! [_dispatch! _context effect]
-  (match effect
-    [:node/fx.log & args]
-    (apply js/console.log args)
+(defn- log
+  "Writes `args` to the console."
+  [_dispatch! & args]
+  (apply js/console.log args))
 
-    [:node/fx.log-error & args]
-    (apply js/console.error args)
+(defn- log-error
+  "Writes `args` to the console as an error."
+  [_dispatch! & args]
+  (apply js/console.error args))
 
-    :else
-    (js/console.error "Unknown effect:" (pr-str effect))))
+(def effects
+  {:node/fx.log #'log
+   :node/fx.log-error #'log-error})
