@@ -89,13 +89,25 @@ function init() {
   });
 }
 
-async function main(vsixPathOrLabel, testWorkspace, calvaVsix) {
+// An editor that isn't the downloaded VS Code gets extensions and user data directories
+// of its own, named by its executable, so it doesn't share them with the VS Code runs.
+function profileArgsForEditor(vscodeExecutablePath, args) {
+  const editorName = path.basename(vscodeExecutablePath).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return args.map((arg) =>
+    arg.replace(/^(--(?:extensions-dir|user-data-dir)=.*)$/, `$1-${editorName}`)
+  );
+}
+
+async function main(vsixPathOrLabel, testWorkspace, calvaVsix, vscodeExecutable) {
   try {
     const extensionTestsPath = path.resolve(__dirname, 'runTests');
-    const vscodeExecutablePath = resolveDarwinVSCodeExecutable(
-      await downloadAndUnzipVSCode('insiders')
-    );
-    const [cliPath, ...args] = resolveCliArgsFromVSCodeExecutablePath(vscodeExecutablePath);
+    const vscodeExecutablePath = vscodeExecutable
+      ? vscodeExecutable
+      : resolveDarwinVSCodeExecutable(await downloadAndUnzipVSCode('insiders'));
+    const [cliPath, ...defaultArgs] = resolveCliArgsFromVSCodeExecutablePath(vscodeExecutablePath);
+    const args = vscodeExecutable
+      ? profileArgsForEditor(vscodeExecutablePath, defaultArgs)
+      : defaultArgs;
     disableExtensionAutoUpdate(args);
 
     const calvaExtension = calvaVsix
@@ -143,7 +155,8 @@ async function main(vsixPathOrLabel, testWorkspace, calvaVsix) {
       // extensionDevelopmentPath: '/Users/pez/Projects/joyride',
       vscodeExecutablePath,
       extensionTestsPath,
-      launchArgs: [testWorkspace, ...traceArgs],
+      // With an editor of our own choosing, its directories go to the test run too
+      launchArgs: [testWorkspace, ...(vscodeExecutable ? args : []), ...traceArgs],
     };
     if (vsixPathOrLabel === 'extension-development') {
       runOptions.extensionDevelopmentPath = path.resolve(__dirname, '..');
@@ -168,10 +181,12 @@ const calvaVsix = args['calva-vsix'] ? path.resolve(args['calva-vsix']) : undefi
 const testWorkspace = args['test-workspace']
   ? path.resolve(args['test-workspace'])
   : path.resolve(__dirname);
-console.info(`Using:\n  ${vsix}\n  Calva: ${calvaVsix || `marketplace@${minCalvaVersion}`}\n  Test workspace: ${testWorkspace}`);
+// The editor to run the tests in, such as Cursor, in place of the VS Code Insiders that is downloaded
+const vscodeExecutable = args['vscode-executable'] ? path.resolve(args['vscode-executable']) : undefined;
+console.info(`Using:\n  ${vsix}\n  Calva: ${calvaVsix || `marketplace@${minCalvaVersion}`}\n  Test workspace: ${testWorkspace}\n  Editor: ${vscodeExecutable || 'VS Code Insiders, downloaded'}`);
 
 void init()
-  .then(() => main(vsix, testWorkspace, calvaVsix))
+  .then(() => main(vsix, testWorkspace, calvaVsix, vscodeExecutable))
   .catch((error) => {
     console.error('Failed to initialize test running environment:', error);
     process.exit(1);

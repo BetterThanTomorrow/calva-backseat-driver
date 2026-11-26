@@ -146,15 +146,21 @@
         (fs/copy src (fs/path e2e-tmp-dir item)))))
   e2e-tmp-dir)
 
-(defn ^:export run-e2e-tests-from-working-dir! [{:keys [is-ci local calva-vsix]}]
+(defn ^:export run-e2e-tests-from-working-dir! [{:keys [is-ci local calva-vsix vscode-executable]}]
   (println "Running end-to-end tests using working directory")
+  (when (and vscode-executable
+             (not local))
+    (throw (ex-info "--vscode-executable needs --local: the container runs the VS Code it downloads"
+                    {:babashka/exit 1})))
   (if is-ci
     (util/shell false "node" "./e2e-test-ws/launch.js")
     (let [tmp-ws (prepare-tmp-test-workspace!)]
       (println "Using temporary test workspace:" tmp-ws)
       (apply run-e2e-launch! (e2e-launchers (if local :local :container))
              (str "--test-workspace=" tmp-ws)
-             (when calva-vsix [(str "--calva-vsix=" calva-vsix)])))))
+             (cond-> []
+               calva-vsix (conj (str "--calva-vsix=" calva-vsix))
+               vscode-executable (conj (str "--vscode-executable=" vscode-executable)))))))
 
 (defn package-pre-release! [{:keys [slug dry]}]
   (let [current-version (-> (util/sh false "node" "-p" "require('./package').version")
