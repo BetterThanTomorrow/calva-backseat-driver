@@ -4,6 +4,12 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- Fix: A failed MCP server start shows no error message
+- Fix: A failed Cursor registration from the command shows no message
+- Fix: Cursor registrations are not written to the MCP server log
+- Tools called through the Language Model API now refuse a blank session key for load file matching the MCP server's behaviour
+- Tools called through the Language Model API now refuse a tool whose setting is off, matching the MCP server's behaviour
+
 ## [v0.0.47] - 2026-11-25
 
 - Fix: [Generated ECA config fails on Windows: ${env:HOME} is unset](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/74)
