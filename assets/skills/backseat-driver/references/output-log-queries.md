@@ -114,13 +114,16 @@ inputs:  ["coder"]
 
 ### Text search with regex
 
-Use `re-find` in a predicate clause. Supports `(?i)` for case-insensitive matching:
+The query is read as EDN, and EDN has no regex literal: a `#"…"` in a query fails with "Invalid reader tag". Make the regex with `re-pattern` from a string, bind it, and use it in `re-find`. `(?i)` makes the match case-insensitive:
 
 ```
 query:   [:find [(pull ?e [*]) ...]
           :where [?e :output/text ?t]
-                 [(re-find #"(?i)exception" ?t)]]
+                 [(re-pattern "(?i)exception") ?re]
+                 [(re-find ?re ?t)]]
 ```
+
+The pattern is a string in the query text, so a regex escape such as `\d` is written with two backslashes, as in a Clojure string: `(re-pattern "\\d{4}")`. A single `\d` fails with "Unsupported escape character". The query text then gets ordinary JSON escaping in the tool call, like any other string parameter.
 
 `clojure.string/includes?` also works for exact substring matches but `re-find` is more versatile.
 
@@ -131,7 +134,8 @@ Scan output without pulling full message bodies into your context window:
 ```
 query:   [:find ?l ?cat ?snippet
           :where [?e :output/text ?t]
-                 [(re-find #"(?i)error" ?t)]
+                 [(re-pattern "(?i)error") ?re]
+                 [(re-find ?re ?t)]
                  [?e :output/line ?l]
                  [?e :output/category ?cat]
                  [(count ?t) ?len]
@@ -168,4 +172,4 @@ Datascript whitelists a specific set of functions for use in predicate clauses (
 
 **Other:** `type` `meta` `keyword` `rand` `rand-int` `min` `max`
 
-Notable absences: `clojure.string/split`, `clojure.string/lower-case`, `clojure.string/upper-case`, and all higher-order functions (`map`, `filter`, `reduce`). For case-insensitive matching, use `re-find` with the `(?i)` flag.
+Notable absences: `clojure.string/split`, `clojure.string/lower-case`, `clojure.string/upper-case`, and all higher-order functions (`map`, `filter`, `reduce`). For case-insensitive matching, use `re-find` with a `re-pattern` that starts with the `(?i)` flag.

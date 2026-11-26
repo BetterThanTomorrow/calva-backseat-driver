@@ -178,11 +178,12 @@ inputs:  ["reviewer"]
 
 `(pull ?e [*])` returns all attributes. Since the `:where` clauses already narrow the result set, pulling everything is usually the right default. When you need a lightweight scan first — e.g. checking which evaluators are present before pulling full messages — use `(pull ?e [:output/line :output/who])` to keep the response compact, then follow up with `[*]` on the subset you care about.
 
-Search text with truncated previews (context-window friendly):
+Search text with truncated previews (context-window friendly). The query is read as EDN, which has no regex literal, so a `#"…"` in a query fails with "Invalid reader tag". Make the regex with `re-pattern` from a string:
 ```
 query:   [:find ?l ?cat ?snippet
           :where [?e :output/text ?t]
-                 [(re-find #"(?i)error" ?t)]
+                 [(re-pattern "(?i)error") ?re]
+                 [(re-find ?re ?t)]
                  [?e :output/line ?l]
                  [?e :output/category ?cat]
                  [(count ?t) ?len]
