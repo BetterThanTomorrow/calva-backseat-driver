@@ -27,7 +27,7 @@ Call `clojure_list_sessions` immediately. The test project starts its REPLs when
 | `shadow-clj` | shadow-cljs JVM side | `deps.edn`, `shadow-cljs.edn` |
 | `shadow-cljs` | shadow-cljs, builds `:app` and `:tui` | `**/app.cljs`, `**/tui.cljs` |
 
-`:app` is expected to have two browser runtimes, and `:tui` two node runtimes, each tui in its own split terminal. If something is missing, run the VS Code task **test project: start**, which starts only what is missing, and list the sessions again. If it is still missing, use `#askQuestions` to tell the user what is absent before continuing. Do not proceed with REPL-dependent tests without these sessions unless the user responds that it is okay to continue without them.
+`:app` is expected to have two browser runtimes, and `:tui` two node runtimes, each tui in its own split terminal. A full run uses all five sessions and all four runtimes. If something is missing, run the VS Code task **test project: start**, which starts only what is missing, and list the sessions again. If it is still missing, use `#askQuestions` to tell the user what is absent before continuing. Do not proceed with REPL-dependent tests without these sessions unless the user responds that it is okay to continue without them.
 
 ## Test Scope
 
@@ -107,7 +107,7 @@ Call `clojure_list_sessions` with no parameters.
 
 **Verify on the shadow session** (`supportsRuntimes: true`):
 - `builds` is a vector with entries for configured builds (e.g. `app`, infrastructure builds like `browser-repl`)
-- Each build has `runtimeCount` ≥ 1 when a tab/process is connected
+- `:app` and `:tui` each have `runtimeCount` 2
 - `mostRecentRuntime` is present when `runtimeCount` > 0
 - No `runtimes` array on builds (compact mode)
 
@@ -126,7 +126,9 @@ Call `clojure_list_sessions` with `includeAllRuntimes: true`.
 
 ### 3. Targeted evaluation (`targetRuntimeId`)
 
-Pick a shadow session key (e.g. `"shadow-cljs"`) and two distinct `runtimeId` values from `clojure_list_sessions` — ideally on the same build when testing tab vs tab, or browser vs node.
+Use the `"shadow-cljs"` session and the `runtimeId` values from a `includeAllRuntimes: true` listing. Test two pairs:
+- **Tab vs tab**: the two `:app` runtimes, in the `mini.app` namespace
+- **Browser vs node**: one `:app` runtime and one `:tui` runtime, in the `cljs.user` namespace. Evaluate `(exists? js/window)` on each: `true` on the browser runtime, `false` on the node runtime
 
 **Record baseline**: Note `currentlyConnectedRuntimeId` and `currentlyConnectedCljsBuild` from the session listing (editor-selected runtime).
 
@@ -219,7 +221,9 @@ The `clojure_evaluate_code` tool supports evaluator identity tracking.
 
 2. **Description parameter**: Evaluate with a `description` value. Then query the output log to verify the description appears as an `"otherOutput"` entry tagged with the same `who`.
 
-3. **Babashka eval** (when bb REPL connected): Evaluate `(+ 1 1)` via `bb` session. Verify result and session key.
+3. **Babashka eval**: Evaluate `(+ 1 1)` via `bb` session. Verify result and session key.
+
+4. **Mini project eval**: Evaluate `(+ 1 1)` via `mini-clj` session. Verify result and session key.
 
 #### Basic Who-Tracking (No Joyride)
 
@@ -299,7 +303,7 @@ The `clojure_load_file` tool loads and evaluates an entire Clojure file through 
 
 1. **Load file in clj session**: Call `clojure_load_file` with a file containing a namespace and definitions (e.g., a file whose last form evaluates to a known value). Provide `replSessionKey: "clj"`. Verify `result` matches the expected last-form value.
 
-2. **Load file in bb session** (when bb REPL connected): Call `clojure_load_file` with a simple file via `replSessionKey: "bb"`. Verify `result` is returned correctly.
+2. **Load file in bb session**: Call `clojure_load_file` with a simple file via `replSessionKey: "bb"`. Verify `result` is returned correctly.
 
 3. **Post-load usability**: After loading, evaluate a function from the loaded namespace via `clojure_evaluate_code`. Verify the function is callable and returns the expected result.
 
@@ -464,8 +468,8 @@ Use `pull` to select only the attributes you need — this protects the context 
 
    **Setup** — evaluate in at least two distinct combinations:
    - Evaluate `(+ 1 1)` in `user` namespace via `clj` session
-   - Evaluate `(+ 2 2)` in `user` namespace via `bb` session (when connected)
-   - Evaluate `(ns mini.playground) :ok` in `mini.playground` namespace via `clj` session
+   - Evaluate `(+ 2 2)` in `user` namespace via `bb` session
+   - Evaluate `(ns mini.playground) :ok` in `mini.playground` namespace via `mini-clj` session
 
    **Query** — pull `:output/ns` and `:output/repl-session-key` from `evaluatedCode` entries:
    ```edn
@@ -475,7 +479,7 @@ Use `pull` to select only the attributes you need — this protects the context 
 
    **Verify**:
    - Each entry's `:output/ns` matches the namespace that evaluation was performed in
-   - Each entry's `:output/repl-session-key` matches the session key used (`"clj"` or `"bb"`)
+   - Each entry's `:output/repl-session-key` matches the session key used (`"clj"`, `"bb"` or `"mini-clj"`)
    - Entries from different sessions have different `:output/repl-session-key` values
    - Entries from different namespaces have different `:output/ns` values
 
@@ -628,11 +632,11 @@ This verifies that BD's conditional skill injection works correctly.
 
 When reporting results, cover only the sections that were tested.
 
-**Session Listing**: Sessions discovered with expected keys and `currentRoutedTarget` field. Shadow sessions expose compact `builds[]`; non-shadow sessions omit `builds`.
+**Session Listing**: The five expected sessions discovered, with the `currentRoutedTarget` field. `:app` and `:tui` have two runtimes each. Shadow sessions expose compact `builds[]`; non-shadow sessions omit `builds`.
 
-**Shadow-cljs Runtime Targeting**: Compact vs `includeAllRuntimes: true` listing shapes correct. `targetRuntimeId` evaluates on the chosen runtime without changing `currentlyConnectedRuntimeId`. Unknown/stale `targetRuntimeId` succeeds on the editor-connected runtime (shadow-cljs behavior — not an error). Non-shadow sessions unchanged.
+**Shadow-cljs Runtime Targeting**: Compact vs `includeAllRuntimes: true` listing shapes correct. `targetRuntimeId` evaluates on the chosen runtime without changing `currentlyConnectedRuntimeId`, for two tabs on `:app` and for a browser and a node runtime. Unknown/stale `targetRuntimeId` succeeds on the editor-connected runtime (shadow-cljs behavior — not an error). Non-shadow sessions unchanged.
 
-**REPL Evaluation**: `who` echoed, result correct, `description` appears in output log. Babashka eval returns correct session key (when bb REPL connected).
+**REPL Evaluation**: `who` echoed, result correct, `description` appears in output log. Babashka and `mini-clj` evals return the correct session key.
 
 **Who-Tracking**: `other-whos-since-last` correctly tracks API-to-API interleaving. Parallel subagent contention produces non-empty tracking arrays.
 
