@@ -388,14 +388,23 @@
                          :message "Target editor did not become active within 5s")]
       nil)))
 
-(def ^:private active-file-name "structural_edit_active_target.clj")
+(def ^:private !active-file-paths
+  "The target files that the active editor tests have created."
+  (atom #{}))
 
-(defn- active-file-path []
-  (path/join (.-fsPath mcp/workspace-uri) active-file-name))
+(defn- active-file-path
+  "The path of an active editor test's own target file, named by the id of the request
+   that creates it. With one file for every test, each test removed a file that VS Code
+   still had a model of and created it again, and VS Code then ignored the edit that
+   came while it loaded the model anew."
+  [create-id]
+  (path/join (.-fsPath mcp/workspace-uri) (str "structural_edit_active_target_" create-id ".clj")))
 
-(defn- delete-active-file! []
-  (when (fs/existsSync (active-file-path))
-    (fs/unlinkSync (active-file-path))))
+(defn- delete-active-files! []
+  (doseq [file-path @!active-file-paths]
+    (when (fs/existsSync file-path)
+      (fs/unlinkSync file-path)))
+  (reset! !active-file-paths #{}))
 
 (defn- active-document-dirty? []
   (boolean (some-> vscode/window .-activeTextEditor .-document .-isDirty)))
@@ -474,9 +483,11 @@
     nil))
 
 (defn- setup-active-target-file+ [socket create-id]
-  (let [file-path (active-file-path)]
-    (p/let [_ (discard-active-file-editor+ file-path)
-            _ (delete-active-file!)
+  (let [file-path (active-file-path create-id)
+        previous-file-path (some #{(active-editor-path)} @!active-file-paths)]
+    (swap! !active-file-paths conj file-path)
+    (p/let [_ (when previous-file-path
+                (discard-active-file-editor+ previous-file-path))
             _ (mcp/call-tool socket create-id "clojure_edit_files"
                              {:edits [{:type "create"
                                        :filePath file-path
@@ -637,4 +648,4 @@
                    (delete-test-file!)
                    (delete-tiny-file!)
                    (delete-continue-files!)
-                   (delete-active-file!)))))
+                   (delete-active-files!)))))
