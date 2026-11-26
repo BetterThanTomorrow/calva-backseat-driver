@@ -41,19 +41,20 @@ User ↔ AI Agent ↔ [VS Code LM API | MCP Server] ↔ Calva ↔ REPL ↔ Runni
    - Main activation/deactivation lifecycle
    - Exposes `activate` and `deactivate` functions to VS Code
 
-2. **Action/Effect System** (`src/calva_backseat_driver/ex/`)
-   - **Actions** (`ax.cljs`): Pure state transformations that return effects and new state
-   - **Effects** (`fx.cljs`): Side effect handlers that perform async operations
-   - **Dispatcher** (`ex.cljs`): Coordinates action processing and effect execution
+2. **The Loop** (`src/calva_backseat_driver/event_handler.cljs`, following the Uniflow idea; see [EX_ARCHITECTURE.md](EX_ARCHITECTURE.md))
+   - **Actions** (`*/axs.cljs`): Pure handlers that return the next state, effects and deferred actions, listed in each namespace's `actions` table
+   - **Effects** (`*/fxs.cljs`): Side effect handlers, listed in each namespace's `effects` table
+   - **Dispatch** (`app/dispatch.cljs`): Merges the tables and holds `dispatch!`
+   - **State** (`app/db.cljs`): Plain values; live objects are beside it in `app/live_objects.cljs`
 
-3. **MCP Server Implementation** (`src/calva_backseat_driver/mcp/`)
-   - **Server** (`server.cljs`): Socket server implementation with port file management
-   - **Request Handlers** (`requests.cljs`): MCP protocol message processing
-   - **Tool Definitions**: Expose evaluation, symbol lookup, and utility functions
+3. **MCP Server Wiring** (`src/calva_backseat_driver/mcp/`)
+   - **Lifecycle** (`axs.cljs`, `fxs.cljs`): The config vscode-mcp runs the server from, and the server's state it reports
+   - **Request Handlers** (`requests.cljs`): `tools/call`, and the rest through `vscode-mcp.requests`
 
-4. **VS Code Integration** (`src/calva_backseat_driver/integrations/vscode/`)
-   - **Language Model Tools** (`tools.cljs`): Copilot tool implementations
-   - **VS Code API Wrappers**: Commands, configuration, and UI integration
+4. **Tools** (`src/calva_backseat_driver/tools.cljs`, `src/calva_backseat_driver/tools/`)
+   - **Tool table** (`tools/tools`): One row per tool, for both the Language Model API and MCP
+   - **Tool call** (`tools/axs.cljs`, `tools/fxs.cljs`): Checks a call against the manifest and the settings, and runs it
+   - **VS Code Integration** (`integrations/vscode/`): Settings, when-contexts and messages
 
 5. **Calva Integration** (`src/calva_backseat_driver/integrations/calva/`)
    - REPL evaluation API calls
@@ -64,12 +65,13 @@ User ↔ AI Agent ↔ [VS Code LM API | MCP Server] ↔ Calva ↔ REPL ↔ Runni
 
 ### Core Implementation
 - `src/calva_backseat_driver/extension.cljs` - Main extension entry point
-- `src/calva_backseat_driver/ex/ex.cljs` - Action/effect dispatcher
+- `src/calva_backseat_driver/event_handler.cljs` - The loop
+- `src/calva_backseat_driver/app/dispatch.cljs` - The action and effect tables, `dispatch!`
+- `src/calva_backseat_driver/app/db.cljs` - The state
 - `src/calva_backseat_driver/app/axs.cljs` - Application action handlers
 - `src/calva_backseat_driver/app/fxs.cljs` - Application effect handlers
 
 ### MCP Server
-- `src/calva_backseat_driver/mcp/server.cljs` - Socket server and connection management
 - `src/calva_backseat_driver/mcp/requests.cljs` - MCP protocol request/response handling
 - `src/calva_backseat_driver/mcp/axs.cljs` - MCP-specific actions
 - `src/calva_backseat_driver/mcp/fxs.cljs` - MCP-specific effects
@@ -78,8 +80,7 @@ User ↔ AI Agent ↔ [VS Code LM API | MCP Server] ↔ Calva ↔ REPL ↔ Runni
 - `src/calva_backseat_driver/integrations/calva/api.cljs` - Calva API integration
 - `src/calva_backseat_driver/integrations/calva/editor.cljs` - Editor integration utilities
 - `src/calva_backseat_driver/integrations/calva/features.cljs` - Feature detection and capabilities
-- `src/calva_backseat_driver/integrations/vscode/tools.cljs` - VS Code Language Model tools
-- `src/calva_backseat_driver/stdio/wrapper.cljs` - MCP stdio wrapper for external clients
+- `src/calva_backseat_driver/tools.cljs` - The tool table and the Language Model API's entry point
 
 ### Supporting Files
 - `src/calva_backseat_driver/bracket_balance.cljs` - Parinfer integration for bracket balancing
@@ -104,7 +105,6 @@ User ↔ AI Agent ↔ [VS Code LM API | MCP Server] ↔ Calva ↔ REPL ↔ Runni
 - **ClojureScript 1.11.132** - Client-side compilation
 - **Shadow-CLJS 2.28.23** - Build tooling and hot reload
 - **Promesa 11.0.678** - Promise handling and async coordination
-- **Core.match 1.1.0** - Pattern matching for action/effect dispatch
 - **Baldr 1.0.9** - Updates test output to do positive reporting
 
 ### VS Code Integration
@@ -160,31 +160,35 @@ The tools are exposed as VS Code Language Model API (for Copilot) and MCP (for e
 ### Action/Effect Pattern
 ```clojure
 ;; Actions are pure functions that return effects
-[:app/ax.register-command command-id actions]
-{:ex/fxs [[:app/fx.register-command command-id actions]]}
+(defn- init [state _uf-data]
+  {:uf/db (assoc state :app/activated? true)
+   :uf/fxs [[:app/fx.register-command command-id actions] …]})
 
 ;; Effects perform side effects and can dispatch new actions
-[:app/fx.register-command command-id actions]
-(vscode/commands.registerCommand command-id handler)
+(defn- register-command [dispatch! command-id actions]
+  (live-objects/add-disposables!
+   [(vscode/commands.registerCommand command-id
+                                     (fn [& _args]
+                                       (.then (dispatch! actions) clj->js)))]))
 ```
 
 ### Configuration Access
 ```clojure
-;; Access VS Code configuration through explicit context passing
-:vscode/config.enableMcpReplEvaluation  ; -> boolean value from settings
-:vscode/config.mcpSocketServerPort   ; -> port number from settings
+;; The settings are in the state; read one with a plain lookup
+(:vscode/config.enableMcpReplEvaluation state)  ; -> boolean value from settings
+(:vscode/config.mcpSocketServerPort state)      ; -> port number from settings
 ```
 
 ### Async Coordination
 ```clojure
-;; Promises with explicit success/error handling
-{:ex/on-success [[:mcp/ax.server-started :ex/action-args]]
- :ex/on-error [[:mcp/ax.server-error :ex/action-args]]}
+;; An awaited effect's result replaces :uf/prev-result in what follows
+{:uf/fxs [[:uf/await :mcp/fx.lifecycle-start options]]
+ :uf/dxs [[:mcp/ax.lifecycle-updated :uf/prev-result]]}
 ```
 
 ### State Management
-- Central app-db atom for all application state
-- State changes flow through action/effect cycle
+- Central app-db atom for all application state, as plain values
+- State changes flow through the loop
 - No direct state mutation from business logic
 
 ## Development Workflow
@@ -222,13 +226,13 @@ The tools are exposed as VS Code Language Model API (for Copilot) and MCP (for e
 
 ### Adding New Tools
 1. **Define tool manifest** in `package.json` under `languageModelTools`
-2. **Implement MCP handler** in `src/calva_backseat_driver/mcp/requests.cljs`
-3. **Add VS Code tool** in `src/calva_backseat_driver/integrations/vscode/tools.cljs`
-4. **Register tool** in both registration functions
+2. **Add a row** to the tool table, `tools/tools` in `src/calva_backseat_driver/tools.cljs`
+3. **Add a confirmation** function in `src/calva_backseat_driver/tools/confirmation.cljs`
+4. **Add unit tests**; a test checks the tool table against the manifest
 
 ### Integration Points
 - **Calva API Extensions**: Add new Calva integration points in `integrations/calva/api.cljs`
-- **Custom Effects**: Extend effect system in namespace-specific effect handlers
+- **Custom Effects**: Add an effect to a namespace's `effects` table
 - **Protocol Extensions**: Add new MCP capabilities in `mcp/requests.cljs`
 
 ### Testing Extensions

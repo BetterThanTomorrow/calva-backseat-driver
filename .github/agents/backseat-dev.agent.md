@@ -1,6 +1,6 @@
 ---
 name: backseat-dev
-description: 'Backseat Driver VS Code extension development — ClojureScript shadow-cljs, Ex action/effect framework, MCP socket server, Calva REPL integration, structural editing tools, Datascript output log, skill authoring, REPL-driven interactive programming. Use when: developing Backseat Driver features, debugging extension issues, working with the Ex framework, modifying MCP server behavior, adding tools or skills, investigating state management, writing tests.'
+description: 'Backseat Driver VS Code extension development — ClojureScript shadow-cljs, Uniflow action/effect loop, MCP server through vscode-mcp, Calva REPL integration, structural editing tools, output log and eval history, skill authoring, REPL-driven interactive programming. Use when: developing Backseat Driver features, debugging extension issues, working with the action/effect loop, modifying MCP server behavior, adding tools or skills, investigating state management, writing tests.'
 argument-hint: Describe the Backseat Driver development task or issue
 target: vscode
 ---
@@ -26,10 +26,12 @@ For subsystem contracts and architecture reference, load the `backseat-driver-in
   | ¬clojure_tutorial | ¬code_generator | ¬autonomous | human_always_in_loop
 
 λ architectural_soul.
-  ex_framework: actions_as_data ∧ effects_as_declarations | ~50_LOC
+  uniflow_loop: actions_as_data ∧ effects_as_declarations | event_handler.cljs
   | pure_core ∧ imperative_shell | unidirectional_data_flow
-  | enrichment_over_access: actions_never_reach_outside | postwalk_resolves_placeholders
-  | single_source_of_truth: one_app_db_atom | tool_descriptions_once_in_package_json
+  | tables: ∀namespace ends_with(actions ∨ effects table) | app/dispatch.cljs merges
+  | state_holds_what_actions_need: settings ∧ manifest ∧ output_log ∧ server_state | plain_values
+  | live_objects ≡ beside_state | app/live_objects.cljs | effects ∧ entry_points_only
+  | single_source_of_truth: one_app_db_atom | tool_descriptions_once_in_package_json | one_tool_table
   | side_effects_never_hidden: every_impure_op_declared_as_data_first
 
 λ safety_philosophy.
@@ -73,10 +75,10 @@ For subsystem contracts and architecture reference, load the `backseat-driver-in
   new_feature → repl_prototype_first | ¬file_edit_until_validated
   | pure_logic → action_handler(axs.cljs) | returns_data_describing_changes
   | side_effects → effect_handler(fxs.cljs) | receives_dispatch! | !_suffix
-  | state_change → through_dispatch!(ex) | ¬direct_atom_swap
-  | enrichment_over_access: ¬reach_outside_for_state | use_placeholders
+  | state_change → through_dispatch!(app.dispatch) | ¬direct_atom_swap
+  | outside_data → arrives_as_action_argument | ¬reach_outside_from_actions
   | promise_returning → +_suffix | always_await
-  | new_tool → manifest(package.json) + handler(requests.cljs) + vscode_tool(tools.cljs)
+  | new_tool → manifest(package.json) + row(tools/tools) + confirmation(tools/confirmation.cljs) + unit_tests
   | new_skill → assets/skills/{name}/SKILL.md + package.json(chatSkills)
 
 λ when_to_edit_files.
@@ -89,7 +91,7 @@ For subsystem contracts and architecture reference, load the `backseat-driver-in
 λ debug_approach.
   1_context:    gather(failing_behavior ⊗ expected_behavior) | what_data_differs
   2_reproduce:  exact_conditions_in_repl | inline_def_for_inspection | ¬println
-  3_trace:      data_flow(action → enrichment → handler → effect) | inspect_app_db
+  3_trace:      data_flow(action → handler → effect → deferred_action) | !dispatch-log ∧ inspect_app_db
   4_fix:        root_cause(data_flow) | ¬symptom_patch | repl_validate_fix
   5_validate:   test_in(original_failing_conditions) | watcher_confirms
   | trace > guess | data > narrative | inline_def > println | repl > log_reading
@@ -115,7 +117,7 @@ For subsystem contracts and architecture reference, load the `backseat-driver-in
   1_repl_explore: evaluate_subexpressions | understand_current_behavior
   2_repl_prototype: build_solution_incrementally | inline_def_for_debugging
   3_repl_test: cljs.test_assertions | verify_behavior_interactively
-  4_repl_validate: inspect_state(dissoc_app_db_:vscode/extension-context) | confirm_data_flow
+  4_repl_validate: inspect_state(*print-length*) | confirm_data_flow
   5_human_signal: human_approves_approach | "write it" | ready_for_files
   6_edit_files: structural_editing | bottom_to_top | minimal_diff
   7_watcher_verify: shadow_cljs_compiles → check_output | zero_warnings
@@ -125,28 +127,27 @@ For subsystem contracts and architecture reference, load the `backseat-driver-in
   | skip(5) → premature_file_edit | human_not_consulted
   | skip(7) → broken_build_undetected | errors_accumulate
 
-λ ex_framework_development.
+λ loop_development.
   adding_action:
-    1_define_handler: fn(state, args) → {:ex/db, :ex/fxs, :ex/dxs} | pure
-    2_register_route: ax.cljs handle-action | namespace routing
-    3_test_in_repl: dispatch! with_known_state | verify_return_map
+    1_define_handler: (handler state uf-data & args) → {:uf/db, :uf/fxs, :uf/dxs} | pure
+    2_add_to_table: (def actions {…}) at_end_of(axs.cljs) | new_namespace → app/dispatch.cljs
+    3_test_in_repl: call_handler with_known_state | verify_return_map
   adding_effect:
-    1_define_handler: fn(dispatch!, context, fx) → side_effect | impure
-    2_register_route: fx.cljs perform-effect! | namespace routing
-    3_async_pattern: return_promise → :ex/then continuation_actions
-  enrichment_flow:
-    :context/x.y.z → js-get-in(context)
-    [:db/get k] → get(state, k)
-    :vscode/config.name → VS_Code_configuration_API
-    :ex/action-args → full_result | :ex/action-args%N → nth_element
+    1_define_handler: (effect dispatch! & args) → side_effect ∧ result | impure
+    2_add_to_table: (def effects {…}) at_end_of(fxs.cljs)
+    3_async_pattern: [:uf/await :ns/fx.name & args] → :uf/prev-result in later_fxs ∨ dxs
+  dispatch_result: last_awaited_result | [:uf/await :app/fx.return v] gives_value
+  failures: unknown_name ∨ unknown_result_key ∨ wrong_arity ∨ two_awaiting_actions_in_batch
+    | throw in(development_build) | logged in(release_build)
+  listings: (keys (dispatch/actions)) ∧ (keys (dispatch/effects)) ∧ (keys tools/tools)
 
 λ mcp_tool_development.
   1_manifest: package.json → languageModelTools | name ∧ modelDescription ∧ inputSchema
-  2_mcp_handler: requests.cljs → handle-tool-call multimethod | return {:content [{:type :text}]}
-  3_vscode_tool: tools.cljs → register with_Language_Model_API
-  4_test: bb_run-mcp-inspector → invoke_tool | verify_response
+  2_tool_row: tools/tools → :tool/function ∧ :tool/reads ∧ :tool/log-line ∧ :tool/confirmation
+  3_function: (f perform-effect! tool-call) → promise{:result/data} | effects from calva.fxs/tool-effects
+  4_test: unit_tests(table ≡ manifest) ∧ bb_run-mcp-inspector → invoke_tool | verify_response
   5_skill_update: update(assets/skills/) if_usage_guidance_needed
-  | tool_descriptions_live_once_in_package_json | read_at_runtime_by_both_mcp_and_vscode
+  | tool_descriptions_live_once_in_package_json | both_entry_points_dispatch [:tool/ax.call …]
 
 λ issue_workflow_sequence.
   1_create_branch: git_checkout -b descriptive-name
@@ -188,21 +189,21 @@ For subsystem contracts and architecture reference, load the `backseat-driver-in
 
 λ state_access.
   ¬direct_deref_in_helpers | pass_data_explicitly
-  | inspection: always(dissoc :vscode/extension-context) | circular_refs
+  | inspection: state ≡ plain_data | print_with(*print-length*) | output_log ∧ history ≡ long
   | ¬side_effects_in_action_handlers | return_effects_instead
   | ¬forget_namespace_reloads after_file_edits
 
 λ naming_as_contract.
   function! ≡ side_effects | function+ ≡ promise | function!+ ≡ both
   | ax. ≡ pure_action_handler | fx. ≡ impure_effect_handler
-  | ex/ ≡ framework_plumbing | ¬domain_logic
+  | uf/ ≡ loop_plumbing | ¬domain_logic
   | !atom ≡ mutable_state | convention ≡ guarantee
 
 λ dev_validation.
   ladder(ascending_confidence):
     1_repl_eval:        evaluate_subexpressions | inline_def | ¬println
     2_cljs_test:        write_tests_interactively | run_in_repl
-    3_state_inspection: dissoc(:vscode/extension-context) | verify_data_flow
+    3_state_inspection: *print-length* ∧ !dispatch-log | verify_data_flow
     4_watcher_verify:   shadow_cljs_output ∧ test_output | after_save
     5_mcp_inspector:    bb_run-mcp-inspector | mcp_protocol_verification
     6_e2e_tests:        bb_run-e2e-tests-ws | full_integration
@@ -214,8 +215,8 @@ For subsystem contracts and architecture reference, load the `backseat-driver-in
 ```
 λ remember.
   backseat_driver ≡ ai_bridge_to_interactive_programming | repl ≡ ground_truth
-  | ex ≡ actions_as_data ∧ effects_as_declarations | ~50_LOC | in_project_source
-  | enrichment ≡ postwalk_placeholder_resolution | actions_stay_pure
+  | uniflow ≡ actions_as_data ∧ effects_as_declarations | in_project_source
+  | state_holds_plain_data | actions_stay_pure
   | self_bootstrapping: tools_build_tools | friction ≡ signal
   | cljs_on_nodejs | extension_host ≡ runtime | ¬clj
 ```

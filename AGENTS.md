@@ -6,32 +6,32 @@ When authoring code and test, ask yourself: Will this and the tests work on Wind
 
 ## Essential Architecture
 
-### Action/Effect System ("Ex")
-Functional core with unidirectional flow:
+### The Loop (Uniflow)
+Functional core with unidirectional flow, following the Uniflow idea (see [dev/EX_ARCHITECTURE.md](dev/EX_ARCHITECTURE.md)):
 ```
-dispatch! → handle-actions → [enrich → route] → {:ex/db, :ex/fxs, :ex/dxs} → update state → execute effects
+dispatch! [[action & args] …] → handlers → {:uf/db, :uf/fxs, :uf/dxs} → update state → perform effects → dispatch :uf/dxs
 ```
 
-**Actions** (`*/axs.cljs`): Pure functions returning state changes and effects
-**Effects** (`*/fxs.cljs`): Side effect handlers with dispatch access
-**State**: Single `app-db` atom in `src/calva_backseat_driver/app/db.cljs`
+**Actions** (`*/axs.cljs`): named pure functions `(handler state uf-data & args)`, where `uf-data` is `{:system/now ms}`. Each namespace ends with its table: `(def actions {:calva/ax.add-output #'add-output …})`
+**Effects** (`*/fxs.cljs`): `(effect dispatch! & args)`, listed the same way in `(def effects {…})`
+**Dispatch**: `src/calva_backseat_driver/app/dispatch.cljs` merges the tables and holds `dispatch!`, which takes a vector of actions and returns a native promise
+**State**: one `!app-db` atom in `src/calva_backseat_driver/app/db.cljs`, written only by the loop
 
 ### Runtime State Structure
-The `app-db` atom contains:
-```clojure
-{:vscode/extension-context    ; VS Code extension API access
- :app/log-file-uri            ; Logging location
- :app/min-log-level           ; :debug/:info/:warn/:error
- :mcp/wrapper-config-path     ; ~/.config/calva/backseat-driver
- :calva/output-line-counter   ; Monotonic line counter for output entities
- :calva/history-storage-uri   ; Workspace-scoped Transit file for persistent history
- :extension/disposables       ; VS Code subscriptions
- :extension/when-contexts}    ; Context keys for enablement
-```
+The state holds plain values only, so it prints. List its keys with `(keys @calva-backseat-driver.app.db/!app-db)`. Among them:
+- `:vscode/config.<name>`: every setting the manifest declares, read at activation and on `onDidChangeConfiguration` (`integrations/vscode/settings.cljs`)
+- `:extension/manifest`: the manifest as data
+- `:calva/output-log` and `:calva/history`: sorted maps from line to entity (see below)
+- `:calva/sessions`: Calva's sessions, for the window's registry entry
+- `:server/running?`, `:server/assigned-port`, `:server/port-file-path`, `:server/error`, `:lifecycle/registered-name` and the rest of the MCP server's state, as vscode-mcp reports it
+- `:app/log-file-uri` and `:calva/history-storage-uri`, as URI strings
 
-### Datascript Connections
-- `!output-conn` — Session-scoped, schemaless. All REPL output categories. Cap: 1000 entities.
-- `!history-conn` — Persistent, `:output/line` unique identity schema. `evaluatedCode` only. Cap: 10000 entities. Persisted to `eval-history.transit.json` under `context.storageUri`.
+The extension context, the disposables and the timers are live objects, kept in one map beside the state by `app/live_objects.cljs`. Only effects and entry points touch them. The when-contexts are computed from the state by `app/when_contexts.cljs`, and set when a state change gives them other values.
+
+### Output Log and Eval History
+- `:calva/output-log`: all REPL output categories. Cap: 1000 entities. An output log query builds a Datascript db from it when it runs.
+- `:calva/history`: `evaluatedCode` only. Cap: 10000 entities. Saved to `eval-history.transit.json` under `context.storageUri`.
+- The pure functions for both are in `integrations/calva/output.cljs`.
 
 ### Calva API Integration
 Available at `calva-backseat-driver.integrations.calva.api/calva-api`:
@@ -63,9 +63,10 @@ Day-to-day co-development: run the default **Watch** task (`watch:local`), not `
 
 ### Interactive Development Pattern
 ```clojure
-;; Explore runtime state
+;; Explore runtime state (the output log and the history are long)
 (in-ns 'calva-backseat-driver.app.db)
-@!app-db
+(binding [*print-length* 5]
+  (pr-str @!app-db))
 
 ;; Test Calva API
 (in-ns 'calva-backseat-driver.integrations.calva.api)
@@ -99,17 +100,18 @@ Key rule: always use `wait-for+` polling instead of `p/delay`/`setTimeout` for a
 
 ## Key Implementation Patterns
 
-### Enrichment System
-Actions use keyword placeholders enriched at runtime:
+### Awaited Effects
+An effect written as `[:uf/await :some/fx.name & args]` is awaited before the next one runs. Its result replaces `:uf/prev-result` where that is an element of a later effect vector or of a deferred action:
 ```clojure
-;; In action:
-[:vscode/fx.show-input-box {:title "Name" :ex/then [[:handler :ex/action-args]]}]
+;; In an action handler:
+{:uf/fxs [[:uf/await :calva/fx.read-sessions]]
+ :uf/dxs [[:calva/ax.sessions-read :uf/prev-result]]}
 
-;; Effect enriches and dispatches:
-(dispatch! context (ax/enrich-with-args then-actions result))
-
-;; Placeholders: :ex/action-args (entire result), :ex/action-args%1 (first element), etc.
+;; A dispatch resolves to the chain's last awaited result. To give it a value:
+{:uf/fxs [[:uf/await :app/fx.return v]]}
 ```
+
+A name that is in no table, a handler result with an unknown key, a vector with the wrong number of arguments, and two awaiting actions in one batch each fail: they throw in a development build and are logged in a release build. `:uf/fx.dispatch`, `:uf/fx.defer-dispatch` (with a key; a later one with the same key replaces the one waiting) and `:uf/fx.cancel-deferred-dispatch` are in `app/fxs.cljs`.
 
 ### File Context Feature
 When structural editing fails, returns diagnostic context:
@@ -161,16 +163,17 @@ When making multiple edits, work from highest line number to lowest (line number
 
 ### Socket Server Pattern
 - Backend server runs in Extension Host (TCP socket)
-- stdio wrapper (`dist/calva-mcp-server.js`) relays stdio ↔ socket — built from `vscode-mcp` via shadow-cljs `:stdio-wrapper` (`vscode-mcp.stdio.wrapper/main`). Connect-retry: waits up to 60 s for port file + TCP connect, re-reading the port file each attempt; stdin is buffered during the wait and flushed on connect. Conditional reload: silent activations skip `mcp.reloadClient` when config is unchanged (via `vscode-mcp`); the dev hot-reload path passes `:lifecycle/silent? true` in `integrations/vscode/cursor.cljs`
+- stdio wrapper (`dist/calva-mcp-server.js`) relays stdio ↔ socket — built from `vscode-mcp` via shadow-cljs `:stdio-wrapper` (`vscode-mcp.stdio.wrapper/main`). Connect-retry: waits up to 60 s for port file + TCP connect, re-reading the port file each attempt; stdin is buffered during the wait and flushed on connect. The wrapper's decisions are in `vscode-mcp.stdio.wrapper-axs/handle-action`, with `vscode-mcp.stdio.wrapper` as its shell
+- vscode-mcp keeps the server. `mcp/fxs.cljs` builds the config it runs from: `:server/name`, `:wrapper/script-relative-path`, `:server/request-port`, `:registry/custom-data` (Calva's sessions from the state), and three functions, `:mcp/on-request`, `:mcp/on-log` and `:mcp/on-server-changed`. `start!+`, `maybe-start!+`, `stop!+`, `register-with-cursor!+` and `update-registry!+` take the config and resolve to the server's state, and `[:mcp/ax.server-changed server-state]` stores it. vscode-mcp's own contract is in `../vscode-mcp/AGENTS.md`
 - One server per window
 - Port file: `~/.config/vscode-mcp/port-files/calva-backseat-driver-<window-id>.port`. The window id comes from vscode-mcp `instance-slug`, computed once at server start: `ws-<hash>` of the editor `uriScheme` plus the `.code-workspace` file, or plus the first folder when there is no workspace file. A window with nothing open gets `win-<hash>` of `uriScheme` plus the Extension Host pid. So the same folder gets a different id in Cursor and in VS Code, and a different one again when it's opened through another workspace file. A port-file path written down once (a project `.mcp.json`, `~/.claude.json`, `.eca/config.json` with the registry off) only works for the window that wrote it
-- Window registry: `:registry/enabled?` from setting `enableMcpRegistry` (default true) in `mcp/server.cljs` `build-lifecycle-config`; `:registry/custom-data+` queries Calva `listSessionsAndRuntimes` and writes compact sessions. Entry path: `~/.config/vscode-mcp/registry/windows/calva-backseat-driver-<window-id>.json`. Session changes go through `[:calva/ax.sessions-changed]` → `[:mcp/ax.update-registry]` → `(vscode-mcp.core/update-registry!+ config)`
+- Window registry: `:registry/enabled?` from setting `enableMcpRegistry` (default true) in `mcp/fxs.cljs` `lifecycle-config`; `:registry/custom-data` carries the compact sessions made from `:calva/sessions`. Entry path: `~/.config/vscode-mcp/registry/windows/calva-backseat-driver-<window-id>.json`. Session changes go through `[:calva/ax.sessions-changed]` → `:calva/fx.read-sessions` → `[:calva/ax.sessions-read sessions]` → `[:mcp/ax.update-registry]` → `(vscode-mcp.core/update-registry!+ config)`
 
 ### Cursor registration lifecycle
-- Manual stop unregisters from Cursor and sets `:lifecycle/needs-cursor-reregister?`; next start waits for socket readiness then forces client reload (`vscode-mcp.server-readiness`, `policy/should-reload-client?`)
-- Deactivate uses silent `stop!+` (`{:lifecycle/silent? true}`) — same Cursor teardown as manual stop (always unregister, then stop socket)
-- Register command: `calva-backseat-driver.registerMcpServerWithCursor` via `register-or-start-with-cursor!+` (Option C: start+register when auto-register off; repair when on). Enablement: `:calva-backseat-driver/cursor-mcp-available? && !:calva-backseat-driver/mcp-server-registered-with-cursor?`
-- When-context sync: `[:mcp/ax.sync-cursor-mcp-when-contexts]` sets `:calva-backseat-driver/cursor-mcp-available?` and `:calva-backseat-driver/mcp-server-registered-with-cursor?` (registered only while server is running)
+- Stop unregisters from Cursor (best-effort), then stops the socket. The next registration gets a new name (vscode-mcp's Cursor registration)
+- Deactivate dispatches `[:mcp/ax.stop-server {:lifecycle/silent? true}]`, the same teardown without a message
+- Register command: `calva-backseat-driver.registerMcpServerWithCursor` dispatches `[:mcp/ax.register-with-cursor]`, which awaits `register-with-cursor!+` (starts the server when it doesn't run, then registers). Enablement: `:calva-backseat-driver/cursor-mcp-available? && !:calva-backseat-driver/mcp-server-registered-with-cursor?`
+- When-contexts: `app/when_contexts.cljs` computes `:calva-backseat-driver/cursor-mcp-available?` and `:calva-backseat-driver/mcp-server-registered-with-cursor?` (registered only while the server is running) from the state
 
 ### ECA registration
 - Project-local `.eca/config.json` only
@@ -188,11 +191,10 @@ When making multiple edits, work from highest line number to lowest (line number
 - Implementation: `vscode-mcp.manifest` (`get-resources`, `build-server-instructions`, index builder, sibling reads, skills extension capability) — wired from BD via `mcp/requests.cljs` and the vscode-mcp dependency pin
 
 ### Configuration Access
-Settings read via enrichment:
+The settings are in the state under `:vscode/config.<name>` keys. A handler reads one with a plain lookup, `(:vscode/config.mcpHost state)`, since a dotted key can't be destructured:
 ```clojure
-;; In action/effect context:
 :vscode/config.enableMcpReplEvaluation  ; boolean (default true — set false to disable MCP eval)
-:vscode/config.mcpSocketServerPort      ; number (default 1664, 0=random)
+:vscode/config.mcpSocketServerPort      ; number (default 0, the server picks a port)
 :vscode/config.autoStartMCPServer       ; boolean
 :vscode/config.autoRegisterCursorMcp    ; boolean (default true)
 :vscode/config.autoRegisterEcaMcp       ; boolean (default true)
@@ -209,57 +211,66 @@ Settings read via enrichment:
 3. The MCP server picks it up automatically — no code changes needed
 
 ### New Tool Implementation
+Both entry points, MCP `tools/call` in `mcp/requests.cljs` and the Language Model API in `tools.cljs`, dispatch `[:tool/ax.call {:call/tool … :call/arguments …}]` (`tools/axs.cljs`). It checks the call against the manifest and the settings, writes the log line, and awaits `:tool/fx.run`. A tool's function is `(f perform-effect! tool-call)` and returns a promise of `{:result/data …}`; `perform-effect!` takes an effect vector from `integrations.calva.fxs/tool-effects`.
 1. **Tool manifest**: `package.json` → `languageModelTools`
-2. **MCP handler**: `src/calva_backseat_driver/mcp/requests.cljs`
-3. **VS Code tool**: `src/calva_backseat_driver/integrations/vscode/tools.cljs`
-4. **Test**: `bb run-mcp-inspector`
+2. **Tool table row**: `tools/tools` in `src/calva_backseat_driver/tools.cljs` (`:tool/function`, `:tool/reads`, `:tool/log-line`, `:tool/invocation-message`, `:tool/confirmation`)
+3. **Confirmation**: a function in `src/calva_backseat_driver/tools/confirmation.cljs`
+4. **Unit tests**: a test checks the tool table against the manifest
 
 ### Action/Effect Example
 ```clojure
-;; Action (pure, in */axs.cljs)
-[:app/ax.register-command command-id actions]
-{:ex/fxs [[:app/fx.register-command command-id actions]]}
+;; Action (pure, in mcp/axs.cljs, listed in its `actions` table)
+(defn- open-server-log [state _uf-data]
+  {:uf/fxs [[:uf/await :vscode/fx.show-text-document-at (:app/log-file-uri state)]]})
 
-;; Effect (side effect, in */fxs.cljs)
-[:app/fx.register-command command-id actions]
-(vscode/commands.registerCommand command-id
-  (fn [] (dispatch! context actions)))
+;; Effect (side effect, in app/fxs.cljs, listed in its `effects` table)
+(defn- register-command [dispatch! command-id actions]
+  (live-objects/add-disposables!
+   [(vscode/commands.registerCommand command-id
+                                     (fn [& _args]
+                                       (.then (dispatch! actions) clj->js)))]))
 ```
 
 ## Common Pitfalls
 
 - **DON'T** access `@!app-db` directly from helpers (pass data explicitly)
 - **DON'T** perform side effects in action handlers (return effects instead)
+- **DON'T** put a live object (a VS Code or Node object) in the state (keep it in `app/live_objects.cljs`)
 - **DON'T** forget namespace reloads after file edits: `(require 'ns :reload)`
 - **DO** evaluate in REPL before file edits
 - **DO** use `cljs` session (this is ClojureScript, not Clojure)
-- **DO** check `:calva/output-buffer` in app-db to see REPL activity
+- **DO** check `:calva/output-log` in app-db, or `@calva-backseat-driver.app.dispatch/!dispatch-log`, to see what happened
 - **DO** work bottom-to-top when multiple structural edits
 
 ## Quick Reference
 
 **Key Namespaces**:
-- `calva-backseat-driver.ex.ex` - Dispatcher
-- `calva-backseat-driver.app.{axs,fxs,db}` - Application layer
-- `calva-backseat-driver.mcp.{server,requests,axs,fxs}` - MCP server
-- `calva-backseat-driver.integrations.calva.{api,editor,editor-util}` - Calva integration
-- `calva-backseat-driver.integrations.vscode.tools` - VS Code Language Model tools
+- `calva-backseat-driver.event-handler` - The loop
+- `calva-backseat-driver.app.dispatch` - The action and effect tables, `dispatch!`, the dispatch log
+- `calva-backseat-driver.app.{axs,fxs,db,live-objects,when-contexts}` - Application layer
+- `calva-backseat-driver.mcp.{requests,axs,fxs}` - MCP server wiring
+- `calva-backseat-driver.tools` and `calva-backseat-driver.tools.*` - The tool table and the tool call
+- `calva-backseat-driver.integrations.calva.{api,editor,edit-plan,editor-util,output}` - Calva integration
 
 **REPL Inspection Commands**:
 ```clojure
-@calva-backseat-driver.app.db/!app-db                    ; See full state
+(binding [*print-length* 5] (pr-str @calva-backseat-driver.app.db/!app-db))  ; The state
+(keys (calva-backseat-driver.app.dispatch/actions))    ; Every action
+(keys (calva-backseat-driver.app.dispatch/effects))    ; Every effect
+(keys calva-backseat-driver.tools/tools)               ; Every tool
+@calva-backseat-driver.app.dispatch/!dispatch-log      ; The last 200 dispatches (development build)
+(calva-backseat-driver.app.dispatch/dispatch! [[:app/ax.cleanup]])  ; Dispatch from the REPL
 (keys calva-backseat-driver.integrations.calva.api/calva-api)  ; Available Calva APIs
-(:calva/output-buffer @calva-backseat-driver.app.db/!app-db)   ; Recent REPL output
 ```
 
 **Build Artifacts**:
 - `out/extension.js` - Main extension bundle
 - `dist/calva-mcp-server.js` - MCP stdio wrapper
-- `out/extension-tests.js` - Unit tests
+- `out/extension-tests.js` - Unit tests (they load every namespace; `test/vscode_stub.js` stubs `vscode` with named exports)
 
 ---
 
 For deeper architecture details, see:
-- `dev/EX_ARCHITECTURE.md` - Action/effect system
+- `dev/EX_ARCHITECTURE.md` - The loop: what is particular to Backseat Driver's
 - `dev/MCP_OVERVIEW.md` - MCP protocol specifics
 - `PROJECT_SUMMARY.md` - Complete project overview

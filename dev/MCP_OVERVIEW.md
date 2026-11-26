@@ -45,25 +45,25 @@ Considerations:
 
 We solve this by implementing the server running inside the Calva MCP Extension, using TCP sockets (a backend server). Then in front of that a node script witch which the AI Agent system can start an MCP **stdio** Transport “relay”/wrapper that the AI Agent uses.
 
-* Backend server: [mcp/server.cljs](../src/calva_backseat_driver/mcp/server.cljs)
-* Relay/wrapper: [vscode-mcp stdio wrapper](https://github.com/BetterThanTomorrow/vscode-mcp) (`vscode-mcp.stdio.wrapper`), bundled via shadow-cljs `:stdio-wrapper` build to `dist/calva-mcp-server.js`. Connect-retry: waits up to 60 s for the port file and TCP connect, re-reading the port file each attempt; stdin buffered during wait, flushed on connect.
+* Backend server: kept by [vscode-mcp](https://github.com/BetterThanTomorrow/vscode-mcp) (`vscode-mcp.core`), run from the config that [mcp/fxs.cljs](../src/calva_backseat_driver/mcp/fxs.cljs) builds. Requests come back through `:mcp/on-request` as `[:mcp/ax.handle-request request]`, answered by [mcp/requests.cljs](../src/calva_backseat_driver/mcp/requests.cljs).
+* Relay/wrapper: [vscode-mcp stdio wrapper](https://github.com/BetterThanTomorrow/vscode-mcp) (`vscode-mcp.stdio.wrapper`), bundled via shadow-cljs `:stdio-wrapper` build to `dist/calva-mcp-server.js`. Connect-retry: waits up to 60 s for the port file and TCP connect, re-reading the port file each attempt; stdin buffered during wait, flushed on connect. Its decisions are in `vscode-mcp.stdio.wrapper-axs/handle-action`, with `vscode-mcp.stdio.wrapper` as its shell.
 
 ### Cursor registration and commands
 
-Lifecycle is driven by `vscode-mcp.core` via `mcp/fxs.cljs` and `mcp/server.cljs` (`build-lifecycle-config`). Manual stop and deactivate always unregister from Cursor (best-effort), then stop the socket; deactivate is silent. Manual stop sets `:lifecycle/needs-cursor-reregister?` for the next start to force client reload.
+Lifecycle is driven by `vscode-mcp.core` via `mcp/fxs.cljs` (`lifecycle-config`). The config names the server by `:server/name` and the wrapper script by `:wrapper/script-relative-path`, carries `:server/request-port` and `:registry/custom-data`, and has three functions: `:mcp/on-request`, `:mcp/on-log` and `:mcp/on-server-changed`. `start!+`, `maybe-start!+`, `stop!+`, `register-with-cursor!+` and `update-registry!+` resolve to the server's state, and `[:mcp/ax.server-changed server-state]` stores it in the app state. Manual stop and deactivate always unregister from Cursor (best-effort), then stop the socket; deactivate is silent. The next registration gets a new name. vscode-mcp's own contract is in its `AGENTS.md`.
 
-**When-contexts** (set via `[:mcp/ax.sync-cursor-mcp-when-contexts]`):
+**When-contexts** (computed from the app state by `app/when_contexts.cljs`):
 
 | Key | Meaning |
 |-----|---------|
 | `:calva-backseat-driver/cursor-mcp-available?` | Cursor MCP API available |
 | `:calva-backseat-driver/mcp-server-registered-with-cursor?` | Registered with Cursor while server is running |
 
-**Register command** (`calva-backseat-driver.registerMcpServerWithCursor`): Option C — when auto-register is off, starts the server if needed then registers; when auto-register is on, repair-only (server must be running). Enablement: `:calva-backseat-driver/cursor-mcp-available? && !:calva-backseat-driver/mcp-server-registered-with-cursor?`.
+**Register command** (`calva-backseat-driver.registerMcpServerWithCursor`): dispatches `[:mcp/ax.register-with-cursor]`, which awaits `register-with-cursor!+`: it starts the server when it doesn't run, then registers. A registration that fails is shown as a message. Enablement: `:calva-backseat-driver/cursor-mcp-available? && !:calva-backseat-driver/mcp-server-registered-with-cursor?`.
 
 See also `joyride-dev-docs/mcp-stop-start-cursor-registration-plan.md` (in-session stop→start) and `mcp-wrapper-retry-and-reload-policy-plan.md` (window reload).
 
-**ECA registration** (independent of Cursor): when `:mcp/auto-register-eca?` is on and extension `editor-code-assistant.eca` is installed, the lifecycle hook upserts project-local `.eca/config.json` (server key from `:cursor/server-name`, managed `command`/`args` only; portable args via `:lifecycle/wrapper-install-dir` → wrapper at `${env:HOME}/.config/calva/backseat-driver/calva-mcp-server.js` installed by vscode-mcp on MCP start — DEBUG symlink / release copy, port at `${env:HOME}/.config/vscode-mcp/port-files/…`, configured host). Requires a workspace folder; no deregister on stop; no command or when-contexts.
+**ECA registration** (independent of Cursor): when `:mcp/auto-register-eca?` is on and extension `editor-code-assistant.eca` is installed, the lifecycle hook upserts project-local `.eca/config.json` (server key from `:server/name`, managed `command`/`args` only; portable args via `:lifecycle/wrapper-install-dir` → wrapper at `${env:HOME}/.config/calva/backseat-driver/calva-mcp-server.js` installed by vscode-mcp on MCP start — DEBUG symlink / release copy, port at `${env:HOME}/.config/vscode-mcp/port-files/…`, configured host). Requires a workspace folder; no deregister on stop; no command or when-contexts.
 
 ### ClojureScript Implementation Approach
 

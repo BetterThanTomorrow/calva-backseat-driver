@@ -30,20 +30,17 @@ This single entry feeds **both**:
 
 ## How MCP Reuses the Manifest
 
-In `src/calva_backseat_driver/mcp/requests.cljs`:
-
-- `tool-manifest` — reads `packageJSON.contributes.languageModelTools` at runtime and finds the entry by name.
-- `tool-description` / `param-description` — extract `modelDescription` and per-property `description` values.
-- `tool-listing` — builds the MCP tool definition by merging static property shapes (defined in Clojure) with the descriptions pulled from the manifest.
+The manifest is read once at activation, as data, into the state under `:extension/manifest`. `mcp/requests.cljs` hands it to `vscode-mcp.requests/handle-manifest-request`, which answers `tools/list` with each tool's `name`, `modelDescription` and `inputSchema`, gated by the `when` clauses and the settings.
 
 Result: MCP tools stay in sync automatically. No duplicated schemas.
 
 ## Adding or Extending a Tool
 
 1. Add or modify the entry in `package.json` → `contributes.languageModelTools`.
-2. Add the corresponding handler in `mcp/requests.cljs` (e.g., `handle-list-runtimes`).
-3. Wire the handler into the `tools/call` dispatch.
-4. Both LM API and MCP surfaces receive the change on next activation.
+2. Add a row to the tool table, `tools/tools` in `tools.cljs`, with the tool's function, `(f perform-effect! tool-call)`.
+3. Add its confirmation function in `tools/confirmation.cljs`.
+4. Run the unit tests: one checks the tool table against the manifest.
+5. Both LM API and MCP surfaces receive the change on next activation. Both dispatch `[:tool/ax.call {:call/tool … :call/arguments …}]`.
 
 ## Naming & Description Guidelines
 
@@ -55,7 +52,7 @@ Result: MCP tools stay in sync automatically. No duplicated schemas.
 ## When the Pattern Does Not Apply
 
 - Skills (MCP resources + injected instructions) are declared separately under `contributes.chatSkills`.
-- Internal actions/effects (Ex framework) are not exposed as tools.
+- The loop's actions and effects are not exposed as tools.
 
 ## Runtime targeting example
 
@@ -77,7 +74,9 @@ Handlers read these optional parameters from MCP/LM tool arguments. The response
 ## Related Code
 
 - `package.json` — the single source of truth
-- `mcp/requests.cljs` — `tool-manifest`, `tool-listing`, handler dispatch
+- `tools.cljs` — the tool table, `call-tool+`, the Language Model API's entry point
+- `tools/axs.cljs` — `:tool/ax.call`, which checks a call against the manifest and the settings
+- `mcp/requests.cljs` — `tools/call`, and the rest through `vscode-mcp.requests`
 - `app.fxs` — LM tool registration during activation
 
 ## References

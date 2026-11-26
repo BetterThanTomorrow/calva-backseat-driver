@@ -1,5 +1,5 @@
 ---
-description: 'Backseat Driver extension source code conventions — Ex framework patterns, async, state management, namespace separation, and naming. Supplements universal Clojure patterns with Backseat Driver-specific rules.'
+description: 'Backseat Driver extension source code conventions — the Uniflow loop (action and effect tables, awaited effects), async, state management, live objects, namespace separation, and naming. Supplements universal Clojure patterns with Backseat Driver-specific rules.'
 applyTo: 'src/calva_backseat_driver/**,test/calva_backseat_driver/**'
 ---
 
@@ -11,98 +11,96 @@ applyTo: 'src/calva_backseat_driver/**,test/calva_backseat_driver/**'
 - `function+` — returns promise
 - `function!+` — side effects and promise
 - `function?` — predicate
-- `!atom-name` — atom (e.g., `!app-db`, `!output-conn`)
+- `!atom-name` — atom (e.g., `!app-db`, `!dispatch-log`)
 - `ax.` prefix — pure action handler
 - `fx.` prefix — impure effect handler
-- `ex/` namespace — framework plumbing, not domain logic
+- `uf/` namespace — the loop's own keys and effects, not domain logic
 
-## Ex Framework Patterns
+## The Loop
+
+The loop is `event_handler.cljs`, following the Uniflow idea. `app/dispatch.cljs` merges the domain tables and holds `dispatch!`.
 
 ### Actions (axs.cljs)
 
-Actions are pure functions. They receive immutable state and arguments, return a map of changes:
+An action is a vector, `[action-name & args]`. Its handler is a named pure function `(handler state uf-data & args)`, where `uf-data` is `{:system/now ms}`. It returns a map with any of:
 
 ```clojure
-{:ex/db  new-state        ;; state update (merged at end)
- :ex/dxs [[:ns/ax.name ...]]  ;; deferred actions (dispatched after state update)
- :ex/fxs [[:ns/fx.name ...]]} ;; effect declarations (executed after dxs)
+{:uf/db  new-state                ;; the next state
+ :uf/fxs [[:ns/fx.name ...]]      ;; effects, performed in order
+ :uf/dxs [[:ns/ax.name ...]]}     ;; actions dispatched after the effects
 ```
 
-Actions never access atoms, VS Code APIs, or external state directly. Use enrichment placeholders:
-- `:context/some.path` — resolved from VS Code extension context
-- `[:db/get :key]` — resolved from current app-db state
-- `:vscode/config.settingName` — resolved from VS Code configuration
+Actions never touch atoms, VS Code APIs or live objects. What they need is in the state: the settings under `:vscode/config.<name>` (read with a plain lookup, since a dotted key can't be destructured), the manifest under `:extension/manifest`. What comes from outside arrives as an action argument.
 
 ### Effects (fxs.cljs)
 
-Effects are impure handlers that receive `dispatch!`, `context`, and the enriched effect vector. They perform side effects and may dispatch new actions:
+An effect is `(effect dispatch! & args)`. It performs the side effect, and may dispatch new actions or return a value (or a promise of one):
 
 ```clojure
-(defn some-effect! [dispatch! context [_ args]]
-  (-> (some-async-operation!+ args)
-      (.then (fn [result]
-               (dispatch! context [[:ns/ax.handle-result result]])))))
+(defn- list-sessions-and-runtimes
+  [_dispatch!]
+  (.then (js/Promise.resolve ((get-in calva/calva-api [:repl :listSessionsAndRuntimes])))
+         (fn [sessions]
+           (or (js->clj sessions :keywordize-keys true)
+               []))))
 ```
 
 ### Async Continuation
 
-Effects return promises. Continuation actions use `:ex/then`, `:ex/on-success`, `:ex/on-error` with placeholder enrichment:
+An effect written as `[:uf/await :ns/fx.name & args]` is awaited before the next one runs. Its result replaces `:uf/prev-result` where that is an element of a later effect vector or of a deferred action:
 
 ```clojure
-;; In action — declare effect with continuation
-{:ex/fxs [[:ns/fx.do-thing {:data data
-                             :ex/then [[:ns/ax.thing-done :ex/action-args]]}]]}
-
-;; In effect — enrich continuation and dispatch
-(.then promise
-  (fn [result]
-    (dispatch! context (ax/enrich-with-args then-actions result))))
+{:uf/fxs [[:uf/await :calva/fx.read-history (:calva/history-storage-uri state)]]
+ :uf/dxs [[:calva/ax.history-read :uf/prev-result]]}
 ```
 
-### Routing
+A dispatch resolves to the chain's last awaited result; `[:uf/await :app/fx.return v]` gives it a value. Two awaiting actions in one batch fail, so dispatch each on its own. Native promises throughout the loop.
 
-Actions route by `(namespace action-keyword)`: `"app"`, `"mcp"`, `"db"`, `"vscode"`, `"node"`, `"calva"`.
-Effects route similarly. Add new routes in `ex/ax.cljs` (`handle-action`) and `ex/fx.cljs` (`perform-effect!`).
+### Tables
+
+Each namespace ends with its table: `(def actions {:calva/ax.add-output #'add-output …})` in `*/axs.cljs`, `(def effects {…})` in `*/fxs.cljs`. A new namespace's table goes into `actions` or `effects` in `app/dispatch.cljs`. A name that is in no table, a handler result with an unknown key, and a vector with the wrong number of arguments each fail: they throw in a development build and are logged in a release build.
 
 ## State Management
 
-- All state in `app/db.cljs` — `!app-db` atom, `!output-conn` and `!history-conn` Datascript connections
+- All state in `app/db.cljs` — the `!app-db` atom, plain values only, so it prints
 - State changes only through `dispatch!` — never direct `swap!` or `reset!` on `!app-db`
+- Live objects (the extension context, the disposables, the timers) are in `app/live_objects.cljs`, beside the state. Only effects and entry points touch them
+- When-contexts are computed from the state by `app/when_contexts.cljs`
 - Pass data explicitly to helper functions — helpers must not access atoms directly
-- Inspect `!app-db` safely: always `(dissoc @db/!app-db :vscode/extension-context)` — circular references
+- Print the state with a `*print-length*`: the output log and the history are long
 
-## Datascript Connections
+## Output Log and Eval History
 
-- `!output-conn` — session-scoped, schemaless, cap 1000 entities, all output categories
-- `!history-conn` — persistent, `:output/line` unique identity, cap 10000, `evaluatedCode` only
-- Entity attributes: `:output/line`, `:output/category`, `:output/text`, `:output/who`, `:output/timestamp`, `:output/ns`, `:output/repl-session-key`
+- `:calva/output-log` — sorted map from line to entity, cap 1000, all output categories
+- `:calva/history` — sorted map from line to entity, cap 10000, `evaluatedCode` only, saved to `eval-history.transit.json`
+- Pure functions in `integrations/calva/output.cljs`; an output log query builds a Datascript db from the log when it runs
+- Entity attributes: `:output/line`, `:output/category`, `:output/text`, `:output/who`, `:output/timestamp`, `:output/ns`, `:output/repl-session-key`, `:output/shadow-build`, `:output/shadow-runtime-id`
 
 ## File Organization
 
-- `app/axs.cljs` + `app/fxs.cljs` — application lifecycle (activation, commands, cleanup)
-- `mcp/axs.cljs` + `mcp/fxs.cljs` — MCP server lifecycle
-- `mcp/server.cljs` — TCP socket server implementation
-- `mcp/requests.cljs` — MCP protocol handling (tools/list, tools/call, resources)
-- `mcp/skills.cljs` — skill discovery, filtering, instruction composition
-- `db/axs.cljs` — generic state mutation actions
-- `integrations/calva/` — Calva API integration
-- `integrations/vscode/` — VS Code Language Model tools
-- `ex/` — dispatcher, action routing, effect routing (~50 LOC total framework)
+- `event_handler.cljs` — the loop
+- `app/dispatch.cljs` — the merged tables, `dispatch!`, the dispatch log
+- `app/axs.cljs` + `app/fxs.cljs` — application lifecycle (activation, commands, cleanup, `:uf/fx.dispatch` and the deferred dispatch effects)
+- `mcp/axs.cljs` + `mcp/fxs.cljs` — the MCP server's lifecycle, through vscode-mcp's config
+- `mcp/requests.cljs` — MCP protocol handling (`tools/call` here, the rest through `vscode-mcp.requests`)
+- `tools.cljs` + `tools/` — the tool table, the tool call, content parts, confirmations, the evaluation tool's decisions
+- `integrations/calva/` — Calva API integration, the output log, structural editing (`edit_plan.cljs` decides, `editor.cljs` and `editor_persist.cljs` gather and apply)
+- `integrations/vscode/` — settings, when-contexts and messages
 
 ## Tool Implementation Pattern
 
-Tool manifests live once in `package.json` (`languageModelTools`). Both the MCP server and VS Code Language Model API read them at runtime.
+Tool manifests live once in `package.json` (`languageModelTools`). Both entry points dispatch `[:tool/ax.call {:call/tool … :call/arguments …}]`, which checks the call against the manifest and the settings.
 
 1. Manifest: `package.json` → `languageModelTools` entry
-2. MCP handler: `requests.cljs` → `handle-tool-call` multimethod
-3. VS Code tool: `tools.cljs` → Language Model API registration
-4. Test: `bb run-mcp-inspector` → invoke tool
+2. Row in `tools/tools` (`tools.cljs`): `:tool/function`, `:tool/reads`, `:tool/log-line`, `:tool/invocation-message`, `:tool/confirmation`
+3. Confirmation: a function in `tools/confirmation.cljs`
+4. Unit tests; a test checks the tool table against the manifest
 
 ## Skill Authoring
 
 1. Create `assets/skills/{name}/SKILL.md` with YAML frontmatter (`name`, `description`)
 2. Register in `package.json` → `contributes.chatSkills`
-3. MCP server picks it up automatically via `skills.cljs`
+3. MCP server picks it up automatically via `vscode-mcp.manifest`
 
 ## Error Handling
 

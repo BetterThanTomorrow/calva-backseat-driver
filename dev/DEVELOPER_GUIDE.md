@@ -85,9 +85,11 @@ bb run-mcp-inspector
 ```clojure
 ;; Test MCP server directly through REPL
 (comment
-  (require '[calva-backseat-driver.mcp.server :as server])
-  (server/start-server! {:port 1664})
-  ;; Test tool calls, inspect logs, etc.
+  (require '[calva-backseat-driver.app.dispatch :as dispatch])
+  (dispatch/dispatch! [[:mcp/ax.start-server]])
+  ;; A tool call, as both entry points dispatch it
+  (dispatch/dispatch! [[:tool/ax.call {:call/tool "clojure_list_sessions"
+                                       :call/arguments {}}]])
   )
 ```
 
@@ -108,8 +110,9 @@ bb run-mcp-inspector
 
 **Quick Checklist**:
 - [ ] Define tool manifest in `package.json`
-- [ ] Implement MCP handler in `mcp/requests.cljs`
-- [ ] Add VS Code tool in `integrations/vscode/tools.cljs`
+- [ ] Add a row to the tool table, `tools/tools` in `tools.cljs`
+- [ ] Add a confirmation function in `tools/confirmation.cljs`
+- [ ] Add unit tests (one checks the tool table against the manifest)
 - [ ] Test with MCP Inspector
 - [ ] Validate schema compliance
 
@@ -145,22 +148,24 @@ bb run-e2e-tests-ws     # Full E2E test suite
 
 ### Debugging Tips
 ```clojure
-;; Check app state
+;; Check app state (the output log and the history are long)
 (comment
-  @calva-backseat-driver.app.db/app-db
+  (binding [*print-length* 5]
+    (pr-str @calva-backseat-driver.app.db/!app-db))
+  ;; The last 200 dispatches (development build)
+  @calva-backseat-driver.app.dispatch/!dispatch-log
   )
 
 ;; Monitor MCP server logs
 (comment
-  (require '[calva-backseat-driver.mcp.logging :as log])
-  (log/debug "Custom debug message")
+  (calva-backseat-driver.app.dispatch/dispatch! [[:app/ax.log :debug "Custom debug message"]])
   )
 ```
 
 ## Architecture References
 
 - **Project Summary**: [`PROJECT_SUMMARY.md`](../PROJECT_SUMMARY.md) - Complete project overview, architecture, and patterns
-- **Action/Effect System**: `dev/EX_ARCHITECTURE.md` - Detailed action/effect implementation
+- **Action/Effect System**: `dev/EX_ARCHITECTURE.md` - What is particular to Backseat Driver's loop
 - **MCP Protocol**: `dev/MCP_OVERVIEW.md` - Model Context Protocol specifics
 
 ## AI Development Notes

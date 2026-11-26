@@ -13,9 +13,7 @@ This is ClojureScript on Node.js. Use the `cljs` session, not `clj`.
 
 ## State Inspection Safety
 
-- `@db/!app-db` — always `dissoc :vscode/extension-context` before inspecting (circular references)
-- VS Code API objects — use `select-keys` or `dissoc`, never print raw
-- Datascript connections — `@db/!output-conn` (session output), `@db/!history-conn` (persistent history)
+The state, `@db/!app-db`, is plain data and prints. The output log (`:calva/output-log`) and the eval history (`:calva/history`) are long, so print with a `*print-length*`, as in `app/db.cljs`'s comment form: `(binding [*print-length* 5] (pr-str @db/!app-db))`.
 
 ## Bundled AI Context (chatSkills / chatInstructions)
 
@@ -33,6 +31,6 @@ bb package-pre-release  # Package pre-release VSIX
 ## Reference Documents
 
 - `AGENTS.md` — comprehensive agent onboarding (architecture, patterns, adding features)
-- `dev/EX_ARCHITECTURE.md` — action/effect system details
+- `dev/EX_ARCHITECTURE.md` — the loop: what is particular to Backseat Driver's
 - `dev/MCP_OVERVIEW.md` — MCP protocol specifics
 - `dev/agent-docs/soul-of-backseat-driver.md` — guiding philosophy and invariants
