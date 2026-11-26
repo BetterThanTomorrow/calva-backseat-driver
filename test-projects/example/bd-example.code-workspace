@@ -6,6 +6,12 @@
 	],
 	"settings": {
 		"calva.autoOpenInspector": false,
+		// The JVMs run without a GUI, so a test that makes an image with java.awt
+		// doesn't give the JVM a Dock icon and a menu bar on macOS. A workspace file's
+		// setting is the one a jack-in reads: in a workspace, a folder's isn't.
+		"calva.jackInEnv": {
+			"JDK_JAVA_OPTIONS": "-Djava.awt.headless=true"
+		},
 		// "calva-backseat-driver.autoStartMCPServer": true,
 		// "calva-backseat-driver.mcpSocketServerPort": 0
 	},
