@@ -1,13 +1,11 @@
 (ns calva-backseat-driver.mcp.axs
   (:require
-   [calva-backseat-driver.integrations.vscode.settings :as settings]
-   [vscode-mcp.core :as vscode-mcp]))
+   [calva-backseat-driver.integrations.vscode.settings :as settings]))
 
 (defn- lifecycle-options
   "What the lifecycle effects need from the state."
   [state]
   {:mcp/wrapper-config-path (:mcp/wrapper-config-path state)
-   :mcp/lifecycle-state (:mcp/lifecycle-state state)
    :mcp/settings (select-keys state [:vscode/config.autoStartMCPServer
                                      :vscode/config.autoRegisterCursorMcp
                                      :vscode/config.autoRegisterEcaMcp
@@ -18,6 +16,12 @@
 (defn- log-options [state]
   (select-keys state [:app/min-log-level :app/log-file-uri]))
 
+(defn- server-changed
+  "Takes `server-state`, what changed about the MCP server: whether it runs, starts or
+   stops, where it listens, and the name it is registered with in Cursor."
+  [state _uf-data server-state]
+  {:uf/db (merge state server-state)})
+
 (defn- start-server
   "Starts the MCP server. With `:silent?` it starts only when the settings ask for it,
    and shows no message. The dispatch resolves to the server info."
@@ -26,21 +30,12 @@
                                                       :lifecycle/silent? silent?)]]
    :uf/dxs [[:mcp/ax.lifecycle-updated :uf/prev-result]]})
 
-(defn- sync-cursor-mcp-when-contexts
-  [state _uf-data]
-  (let [lifecycle (:mcp/lifecycle-state state)
-        server-running? (boolean (vscode-mcp/server-info lifecycle))]
-    {:uf/dxs [[:app/ax.set-when-context :calva-backseat-driver/cursor-mcp-available?
-               (:mcp/cursor-mcp-available? state)]
-              [:app/ax.set-when-context :calva-backseat-driver/mcp-server-registered-with-cursor?
-               (and server-running?
-                    (vscode-mcp/cursor-registered? lifecycle))]]}))
-
 (defn- lifecycle-updated
-  [state _uf-data lifecycle-state]
-  {:uf/db (assoc state :mcp/lifecycle-state lifecycle-state)
-   :uf/fxs [[:uf/await :app/fx.return (clj->js (vscode-mcp/server-info lifecycle-state))]]
-   :uf/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]]})
+  "Takes the `server-state` that a start or a registration resolved to. The dispatch
+   resolves to the server info, nil when no server runs."
+  [state _uf-data server-state]
+  {:uf/db (merge state server-state)
+   :uf/fxs [[:uf/await :mcp/fx.server-info]]})
 
 (defn- stop-server
   "Stops the MCP server. The dispatch resolves to true."
@@ -49,10 +44,10 @@
    :uf/dxs [[:mcp/ax.lifecycle-stopped :uf/prev-result]]})
 
 (defn- lifecycle-stopped
-  [state _uf-data lifecycle-state]
-  {:uf/db (assoc state :mcp/lifecycle-state lifecycle-state)
-   :uf/fxs [[:uf/await :app/fx.return true]]
-   :uf/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]]})
+  "Takes the `server-state` that a stop resolved to. The dispatch resolves to true."
+  [state _uf-data server-state]
+  {:uf/db (merge state server-state)
+   :uf/fxs [[:uf/await :app/fx.return true]]})
 
 (defn- register-with-cursor
   [state _uf-data]
@@ -65,30 +60,31 @@
     "Could not register Backseat Driver MCP server with Cursor."))
 
 (defn- cursor-registration-finished
-  "Takes what registering with Cursor on request resolved to: `:ok` with the new
-   lifecycle `:state`, a `:reason` it didn't register, or the `:error` it threw."
-  [_state _uf-data {:keys [ok reason error] lifecycle-state :state :as result}]
+  "Takes what registering with Cursor on request resolved to: `:ok`, a `:reason` it
+   didn't register, or the `:error` it threw, and the `:server/state` after it. A
+   registration starts the server when it isn't running, so the state takes the
+   server's state also when the registration failed."
+  [state _uf-data {:keys [ok reason error] server-state :server/state :as result}]
   (cond
     ok
-    {:uf/dxs [[:mcp/ax.lifecycle-updated lifecycle-state]]}
+    {:uf/dxs [[:mcp/ax.lifecycle-updated server-state]]}
 
     error
     {:uf/dxs [[:app/ax.log :error "[Cursor MCP] register-with-cursor error:" error]
               [:mcp/ax.cursor-mcp-registration-failed error]]}
 
     :else
-    {:uf/fxs [[:vscode/fx.show-information-message (registration-failure-message reason)]]
-     :uf/dxs [[:mcp/ax.cursor-mcp-registration-failed result]]}))
+    {:uf/db (merge state server-state)
+     :uf/fxs [[:vscode/fx.show-information-message (registration-failure-message reason)]]
+     :uf/dxs [[:mcp/ax.cursor-mcp-registration-failed (dissoc result :server/state)]]}))
 
 (defn- cursor-mcp-registered
   [state _uf-data result]
-  {:uf/fxs [[:app/fx.log (log-options state) :info ["Cursor MCP server registered:" result]]]
-   :uf/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]]})
+  {:uf/fxs [[:app/fx.log (log-options state) :info ["Cursor MCP server registered:" result]]]})
 
 (defn- cursor-mcp-registration-failed
   [state _uf-data failure]
-  {:uf/fxs [[:app/fx.log (log-options state) :warn ["Cursor MCP auto-registration failed:" failure]]]
-   :uf/dxs [[:mcp/ax.sync-cursor-mcp-when-contexts]]})
+  {:uf/fxs [[:app/fx.log (log-options state) :warn ["Cursor MCP auto-registration failed:" failure]]]})
 
 (defn- open-server-log
   "Opens the log file in an editor. The dispatch resolves when it is shown."
@@ -114,9 +110,9 @@
   {:uf/fxs [[:mcp/fx.update-registry (lifecycle-options state)]]})
 
 (def actions
-  {:mcp/ax.start-server #'start-server
+  {:mcp/ax.server-changed #'server-changed
+   :mcp/ax.start-server #'start-server
    :mcp/ax.lifecycle-updated #'lifecycle-updated
-   :mcp/ax.sync-cursor-mcp-when-contexts #'sync-cursor-mcp-when-contexts
    :mcp/ax.stop-server #'stop-server
    :mcp/ax.lifecycle-stopped #'lifecycle-stopped
    :mcp/ax.register-with-cursor #'register-with-cursor

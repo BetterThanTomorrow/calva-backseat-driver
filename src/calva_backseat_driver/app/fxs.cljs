@@ -24,6 +24,24 @@
   (dispatch! actions)
   nil)
 
+(defn- cancel-deferred-dispatch
+  "Drops the dispatch that waits under `timer-key`, when there is one."
+  [_dispatch! timer-key]
+  (some-> (live-objects/remove! [:timer timer-key])
+          js/clearTimeout))
+
+(defn- defer-dispatch
+  "Dispatches `actions` after `ms` milliseconds. A dispatch that still waits under the
+   same `timer-key` is dropped for this one."
+  [dispatch! actions ms timer-key]
+  (cancel-deferred-dispatch dispatch! timer-key)
+  (live-objects/put! [:timer timer-key]
+                     (js/setTimeout (fn []
+                                      (live-objects/remove! [:timer timer-key])
+                                      (dispatch! actions))
+                                    ms))
+  nil)
+
 (defn- register-command
   "Registers the command `command-id`. Running it dispatches `actions`, and the command
    resolves to the result of that dispatch."
@@ -50,4 +68,6 @@
    :app/fx.register-command #'register-command
    :app/fx.register-language-model-tools #'register-language-model-tools
    :app/fx.clear-disposables #'clear-disposables
-   :uf/fx.dispatch #'dispatch})
+   :uf/fx.dispatch #'dispatch
+   :uf/fx.defer-dispatch #'defer-dispatch
+   :uf/fx.cancel-deferred-dispatch #'cancel-deferred-dispatch})

@@ -14,7 +14,8 @@
   {:app/min-log-level :error
    :vscode/config.enableMcpReplEvaluation false
    :vscode/config.provideBdSkill true
-   :vscode/config.provideEditSkill true})
+   :vscode/config.provideEditSkill true
+   :calva/output-log (sorted-map 3 {:output/line 3 :output/category "evaluatedCode" :output/text "(+ 1 2)"})})
 
 (use-fixtures :each
   {:before (fn []
@@ -41,15 +42,25 @@
               (dispatch/dispatch! [[:tool/ax.call {:call/tool "clojure_evaluate_code"
                                                    :call/arguments {:code "1"}}]])
               (dispatch/dispatch! [[:tool/ax.call {:call/tool "no_such_tool"
-                                                   :call/arguments {}}]])])
-        (.then (fn [[balanced disabled unknown]]
+                                                   :call/arguments {}}]])
+              (dispatch/dispatch! [[:tool/ax.call {:call/tool "clojure_repl_output_log"
+                                                   :call/arguments {:query "[:find [?text ...] :in $ ?category :where [?e :output/category ?category] [?e :output/text ?text]]"
+                                                                    :inputs ["evaluatedCode"]}}]])
+              (dispatch/dispatch! [[:tool/ax.call {:call/tool "clojure_repl_output_log"
+                                                   :call/arguments {:query "[:find ?e :where [(nope ?x)]]"}}]])])
+        (.then (fn [[balanced disabled unknown found thrown]]
                  (is (= "(def foo [a b])"
                         (-> balanced :result/content first :text js/JSON.parse (js->clj :keywordize-keys true) :balanced-text))
                      "A call resolves to the tool's result as content parts")
                  (is (= {:result/refused :disabled} disabled)
                      "A tool whose setting is off is refused")
                  (is (= {:result/refused :unknown} unknown)
-                     "A tool that the manifest doesn't have is refused")))
+                     "A tool that the manifest doesn't have is refused")
+                 (is (= [{:type "text" :text "[\"(+ 1 2)\"]"}]
+                        (:result/content found))
+                     "An output log query runs on the log in the state")
+                 (is (= {:result/thrown "Query for unknown vars: [?e]"} thrown)
+                     "A query that fails is a tool that threw, with the message")))
         (.catch (fn [e]
                   (is (nil? e) "The calls resolve")))
         (.finally done))))

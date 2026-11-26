@@ -1,34 +1,21 @@
 (ns calva-backseat-driver.app.db
-  (:require [cognitect.transit :as transit]
-            [datascript.core :as d]))
+  "The app state: one atom that holds values. The loop in `app.dispatch` is the only
+   writer. The extension context, the disposables and the timers are live objects, in
+   `app.live-objects`.")
 
-(def init-db {:extension/when-contexts {:calva-mcp-extension/activated? false}
-              :calva/output-line-counter 0})
+(def init-db
+  "The state before activation. The output log and the eval history are sorted maps
+   from an entity's line to the entity."
+  {:calva/output-line-counter 0
+   :calva/output-log (sorted-map)
+   :calva/history (sorted-map)})
 
 (defonce !app-db (atom init-db))
 
-(defonce !output-conn (d/create-conn))
-
-(defonce !history-conn (d/create-conn {:output/line {:db/unique :db.unique/identity}}))
-
-(defn serialize-history [conn]
-  (let [entities (d/q '[:find [(pull ?e [:output/line :output/category :output/text :output/who :output/timestamp :output/ns :output/repl-session-key :output/shadow-build :output/shadow-runtime-id]) ...]
-                        :where [?e :output/line]]
-                      @conn)
-        data {:format-version 1 :entities (vec entities)}
-        w (transit/writer :json)]
-    (transit/write w data)))
-
-(defn deserialize-history [transit-str]
-  (try
-    (let [r (transit/reader :json)
-          data (transit/read r transit-str)]
-      (when (= 1 (:format-version data))
-        (:entities data)))
-    (catch :default _e
-      nil)))
-
 (comment
-  (d/q '[:find (count ?e) . :where [?e :output/line]] @!output-conn)
-  (d/q '[:find (count ?e) . :where [?e :output/line]] @!history-conn)
+  (keys @!app-db)
+  (count (:calva/output-log @!app-db))
+  (count (:calva/history @!app-db))
+  (binding [*print-length* 5]
+    (pr-str @!app-db))
   :rcf)

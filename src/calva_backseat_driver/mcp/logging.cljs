@@ -2,6 +2,7 @@
   (:require
    ["fs" :as fs]
    ["path" :as path]
+   ["vscode" :as vscode]
    [clojure.string :as string]))
 
 (defonce ^:private !ensured-directories (atom #{}))
@@ -23,16 +24,17 @@
                         (resolve-fn)))))))
 
 (defn log!
-  "Appends a line with `level` and `messages` to the log file."
-  [{:app/keys [^js log-file-uri]} level & messages]
+  "Appends a line with `level` and `messages` to the log file at the URI string
+   `log-file-uri`."
+  [{:app/keys [log-file-uri]} level & messages]
   (let [timestamp (.toISOString (js/Date.))
         log-entry (str timestamp " [" (name level) "] "
                        (string/join " " (map pr-str messages))
-                       "\n")
-        file-path (.-fsPath log-file-uri)]
+                       "\n")]
     (-> (js/Promise.resolve nil)
         (.then (fn [_]
-                 (ensure-directory! (path/dirname file-path))
-                 (append-file+ file-path log-entry)))
+                 (let [file-path (.-fsPath (vscode/Uri.parse log-file-uri))]
+                   (ensure-directory! (path/dirname file-path))
+                   (append-file+ file-path log-entry))))
         (.catch (fn [err]
                   (js/console.error "Failed to write to MCP server log:" err))))))

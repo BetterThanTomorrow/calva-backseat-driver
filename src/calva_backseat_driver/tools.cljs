@@ -5,11 +5,12 @@
    ["vscode" :as vscode]
    [calva-backseat-driver.bracket-balance :as balance]
    [calva-backseat-driver.integrations.calva.features :as calva]
+   [calva-backseat-driver.integrations.calva.output :as output]
    [calva-backseat-driver.tools.confirmation :as confirmation]
    [calva-backseat-driver.tools.content :as content]
    [clojure.string :as string]))
 
-;; The tools. Each takes `dispatch!` and a tool call, `{:call/arguments … :call/settings …}`,
+;; The tools. Each takes `dispatch!` and a tool call, `{:call/arguments … :call/state …}`,
 ;; and returns a promise of `{:result/data …}`, with `:result/error? true` when the tool failed.
 
 (defn- result-of+
@@ -21,7 +22,7 @@
 
 (defn- evaluate-code+
   "Evaluates the call's code through Calva."
-  [dispatch! {:call/keys [arguments settings]}]
+  [dispatch! {:call/keys [arguments state]}]
   (let [{:keys [code replSessionKey who description targetRuntimeId]
          ns :namespace} arguments]
     (if-let [who-error (calva/validate-who who)]
@@ -31,8 +32,8 @@
                                                  :calva/repl-session-key replSessionKey
                                                  :calva/who who
                                                  :calva/description description
-                                                 :calva/max-length (:vscode/config.evaluation.maxLength settings)
-                                                 :calva/max-depth (:vscode/config.evaluation.maxDepth settings)}
+                                                 :calva/max-length (:vscode/config.evaluation.maxLength state)
+                                                 :calva/max-depth (:vscode/config.evaluation.maxDepth state)}
                                           ns (assoc :calva/ns ns)
                                           targetRuntimeId (assoc :calva/target-runtime-id targetRuntimeId)))))))
 
@@ -60,10 +61,10 @@
 
 (defn- output-log+
   "Runs the call's Datalog query on the output log."
-  [dispatch! {:call/keys [arguments]}]
-  (result-of+ (calva/query-output {:uf/dispatch! dispatch!
-                                   :calva/query-edn-str (:query arguments)
-                                   :calva/inputs (:inputs arguments)})))
+  [dispatch! {:call/keys [arguments state]}]
+  (let [{:keys [query inputs]} arguments]
+    (dispatch! [[:app/ax.log :debug "[Server] Querying output log with:" query]])
+    (result-of+ (output/query (:calva/output-log state) query inputs))))
 
 (defn- balance-brackets+
   "Balances the brackets of the call's text from its indentation."
@@ -101,15 +102,15 @@
 
 (defn- edit-files+
   "Applies the call's edits to the files they name."
-  [_dispatch! {:call/keys [arguments settings]}]
+  [_dispatch! {:call/keys [arguments state]}]
   (result-of+ (calva/edit-files+ {:calva/edits (:edits arguments)
-                                  :calva/search-padding (:vscode/config.editor.fuzzyLineTargetingPadding settings)
-                                  :calva/context-padding (:vscode/config.editor.lineContextResponsePadding settings)})))
+                                  :calva/search-padding (:vscode/config.editor.fuzzyLineTargetingPadding state)
+                                  :calva/context-padding (:vscode/config.editor.lineContextResponsePadding state)})))
 
 ;; The tool table
 
 (def tools
-  "One row per tool: the var that runs it, the settings it reads, the default for its
+  "One row per tool: the var that runs it, what it reads from the app state, the default for its
    `maxImages` argument when images in its result become image parts, and what a person
    is shown before it runs."
   {"clojure_evaluate_code"
@@ -137,6 +138,7 @@
 
    "clojure_repl_output_log"
    {:tool/function #'output-log+
+    :tool/reads [:calva/output-log]
     :tool/default-max-images 0
     :tool/invocation-message "Querying REPL output log"
     :tool/confirmation #'confirmation/output-log}
@@ -173,7 +175,7 @@
     (content/parts data)))
 
 (defn call-tool+
-  "Runs the tool of `tool-call`, `{:call/tool … :call/arguments … :call/settings …}`.
+  "Runs the tool of `tool-call`, `{:call/tool … :call/arguments … :call/state …}`.
    Returns a promise of `{:result/content parts}`, with `:result/error? true` when the
    tool failed. The promise rejects when the tool throws."
   [dispatch! {:call/keys [tool arguments] :as tool-call}]

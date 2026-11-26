@@ -23,6 +23,11 @@
       (p/create (fn [resolve reject]
                   (.then response+ resolve reject))))))
 
+(defn- server-changed
+  "The action that takes `server-state`, a change vscode-mcp reported about the server."
+  [server-state]
+  [:mcp/ax.server-changed server-state])
+
 (defn build-lifecycle-config
   "Returns the `vscode-mcp.core` config for the extension `context`, with the wrapper
    installed in `wrapper-config-path` and the settings from `settings`."
@@ -46,12 +51,13 @@
     :registry/enabled? (not (false? (:vscode/config.enableMcpRegistry settings)))
     :registry/custom-data+ registry-custom-data+
     :lifecycle/on-starting-changed (fn [starting?]
-                                     (dispatch! [[:app/ax.set-when-context :calva-backseat-driver/starting? starting?]]))
+                                     (dispatch! [(server-changed {:server/starting? (boolean starting?)})]))
     :lifecycle/on-stopping-changed (fn [stopping?]
-                                     (dispatch! [[:app/ax.set-when-context :calva-backseat-driver/stopping? stopping?]]))
-    :lifecycle/on-running-changed (fn [running? _server-info]
-                                    (dispatch! [[:app/ax.set-when-context :calva-backseat-driver/started? running?]
-                                                [:mcp/ax.sync-cursor-mcp-when-contexts]]))
+                                     (dispatch! [(server-changed {:server/stopping? (boolean stopping?)})]))
+    :lifecycle/on-running-changed (fn [running? server-info]
+                                    (dispatch! [(server-changed {:server/running? (boolean running?)
+                                                                 :server/assigned-port (:server/assigned-port server-info)
+                                                                 :server/host (:server/host server-info)})]))
     :lifecycle/on-cursor-registered (fn [result]
                                       (dispatch! [[:mcp/ax.cursor-mcp-registered result]]))
     :lifecycle/on-cursor-registration-failed (fn [failure]

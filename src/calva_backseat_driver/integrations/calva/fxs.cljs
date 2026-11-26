@@ -2,51 +2,15 @@
   (:require
    ["fs" :as fs]
    ["path" :as path]
-   [datascript.core :as d]
-   [calva-backseat-driver.app.db :as db]
+   ["vscode" :as vscode]
    [calva-backseat-driver.app.live-objects :as live-objects]
-   [calva-backseat-driver.integrations.calva.api :as calva]))
+   [calva-backseat-driver.integrations.calva.api :as calva]
+   [calva-backseat-driver.integrations.calva.output :as output]))
 
-(defn- cap-conn! [conn max-size]
-  (let [total (d/q '[:find (count ?e) . :where [?e :output/line]] @conn)]
-    (when (and total (> total max-size))
-      (let [excess (- total max-size)
-            oldest-lines (take excess (sort (d/q '[:find [?l ...] :where [?e :output/line ?l]] @conn)))
-            retractions (mapv (fn [l]
-                                [:db.fn/retractEntity
-                                 (d/q '[:find ?e . :in $ ?l :where [?e :output/line ?l]] @conn l)])
-                              oldest-lines)]
-        (d/transact! conn retractions)))))
-
-(defonce !persist-timer (atom nil))
-
-(defn- persist-history! [^js storage-uri]
-  (when storage-uri
-    (try
-      (let [fs-path (.-fsPath storage-uri)
-            dir-path (path/dirname fs-path)]
-        (when-not (.existsSync fs dir-path)
-          (.mkdirSync fs dir-path #js {:recursive true}))
-        (.writeFileSync fs fs-path (db/serialize-history db/!history-conn) "utf8"))
-      (catch :default e
-        (js/console.error "[History] Failed to persist:" (.-message e))))))
-
-(defn- schedule-persist! [storage-uri]
-  (when-let [timer @!persist-timer]
-    (js/clearTimeout timer))
-  (reset! !persist-timer
-          (js/setTimeout (fn []
-                           (reset! !persist-timer nil)
-                           (persist-history! storage-uri))
-                         500)))
-
-(defn- restore-history! [^js storage-uri]
-  (let [transit-str (.readFileSync fs (.-fsPath storage-uri) "utf8")
-        entities (db/deserialize-history transit-str)]
-    (when (seq entities)
-      (d/transact! db/!history-conn entities)
-      (d/transact! db/!output-conn entities)
-      (d/q '[:find (max ?l) . :where [?e :output/line ?l]] @db/!history-conn))))
+(defn- file-path
+  "The file system path of the URI string `uri`."
+  [uri]
+  (.-fsPath (vscode/Uri.parse uri)))
 
 (defn- calva-activated
   "Returns a promise that resolves when Calva is active."
@@ -69,41 +33,40 @@
                            (dispatch! [[:calva/ax.sessions-changed (js->clj event :keywordize-keys true)]])))]
     (live-objects/add-disposables! [disposable])))
 
-(defn- transact-output
-  "Adds `entity` to the output log, and to the history when it is evaluated code. The
-   history is saved to `storage-uri` shortly after."
-  [_dispatch! entity storage-uri]
-  (d/transact! db/!output-conn [entity])
-  (cap-conn! db/!output-conn 1000)
-  (when (= "evaluatedCode" (:output/category entity))
-    (d/transact! db/!history-conn [entity])
-    (cap-conn! db/!history-conn 10000)
-    (schedule-persist! storage-uri)))
+(defn- read-history-file
+  "Returns the entities in `history-file`. A file that can't be read is removed, and
+   gives nil."
+  [history-file]
+  (try
+    (output/deserialized (fs/readFileSync history-file "utf8"))
+    (catch :default e
+      (js/console.warn "[History] Failed to load, starting fresh:" (.-message e))
+      (try (fs/unlinkSync history-file) (catch :default _))
+      nil)))
 
-(defn- load-history-from-disk
-  "Loads the history at `storage-uri`, and dispatches `[:calva/ax.history-loaded max-line]`."
-  [dispatch! ^js storage-uri]
-  (let [loaded-line (when (and storage-uri (.existsSync fs (.-fsPath storage-uri)))
-                      (try
-                        (restore-history! storage-uri)
-                        (catch :default e
-                          (js/console.warn "[History] Failed to load, starting fresh:" (.-message e))
-                          (try (.unlinkSync fs (.-fsPath storage-uri)) (catch :default _))
-                          nil)))]
-    (dispatch! [[:calva/ax.history-loaded (or loaded-line 0)]])))
-
-(defn- flush-history
-  "Saves the history to `storage-uri` at once."
+(defn- read-history
+  "Returns the entities of the eval history saved at `storage-uri`, or nil when there is
+   none."
   [_dispatch! storage-uri]
-  (when-let [timer @!persist-timer]
-    (js/clearTimeout timer)
-    (reset! !persist-timer nil))
-  (persist-history! storage-uri))
+  (let [history-file (some-> storage-uri file-path)]
+    (when (and history-file
+               (fs/existsSync history-file))
+      (read-history-file history-file))))
+
+(defn- save-history
+  "Writes the eval `history` to the file at `storage-uri`."
+  [_dispatch! storage-uri history]
+  (when storage-uri
+    (try
+      (let [history-file (file-path storage-uri)]
+        (fs/mkdirSync (path/dirname history-file) #js {:recursive true})
+        (fs/writeFileSync history-file (output/serialized history) "utf8"))
+      (catch :default e
+        (js/console.error "[History] Failed to persist:" (.-message e))))))
 
 (def effects
   {:calva/fx.calva-activated #'calva-activated
    :calva/fx.subscribe-to-output #'subscribe-to-output
    :calva/fx.subscribe-to-sessions-changed #'subscribe-to-sessions-changed
-   :calva/fx.transact-output #'transact-output
-   :calva/fx.load-history-from-disk #'load-history-from-disk
-   :calva/fx.flush-history #'flush-history})
+   :calva/fx.read-history #'read-history
+   :calva/fx.save-history #'save-history})

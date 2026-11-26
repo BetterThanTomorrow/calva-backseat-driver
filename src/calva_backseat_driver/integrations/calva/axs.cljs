@@ -1,8 +1,11 @@
 (ns calva-backseat-driver.integrations.calva.axs
-  (:require [cljs.reader :as reader]
-            [datascript.core :as d]
-            [calva-backseat-driver.app.db :as db]
-            [calva-backseat-driver.integrations.calva.values :as calva-values]))
+  (:require
+   [calva-backseat-driver.integrations.calva.output :as output]))
+
+(def ^:private history-save-delay-ms
+  "How long after the eval history changed it is saved. A change inside that time
+   starts the wait again."
+  500)
 
 (defn- when-activated
   "Dispatches `actions` once Calva is active."
@@ -23,43 +26,38 @@
   [_state _uf-data _event]
   {:uf/dxs [[:mcp/ax.update-registry]]})
 
-(defn- output-entity
-  "Returns the output log entity for a `message` from Calva, numbered `line` and stamped `now`."
-  [message line now]
-  (let [shadow-build (calva-values/map-field-value message :shadowBuild)
-        shadow-runtime-id (calva-values/map-field-value message :shadowRuntimeId)]
-    (cond-> {:output/line line
-             :output/category (:category message)
-             :output/text (:text message)
-             :output/timestamp now}
-      (:who message) (assoc :output/who (:who message))
-      (:ns message) (assoc :output/ns (:ns message))
-      (:replSessionKey message) (assoc :output/repl-session-key (:replSessionKey message))
-      shadow-build (assoc :output/shadow-build shadow-build)
-      shadow-runtime-id (assoc :output/shadow-runtime-id shadow-runtime-id))))
-
 (defn- add-output
-  "Adds a `message` from Calva to the output log."
+  "Adds a `message` from Calva to the output log, and to the eval history when it is
+   evaluated code. A history that changed is saved shortly after."
   [state {:system/keys [now]} message]
-  (let [line (inc (:calva/output-line-counter state 0))]
-    {:uf/db (assoc state :calva/output-line-counter line)
-     :uf/fxs [[:calva/fx.transact-output (output-entity message line now) (:calva/history-storage-uri state)]]}))
+  (let [line (inc (:calva/output-line-counter state 0))
+        entity (output/entity message line now)
+        code? (output/evaluated-code? entity)]
+    {:uf/db (cond-> (-> state
+                        (assoc :calva/output-line-counter line)
+                        (update :calva/output-log output/add entity output/log-cap))
+              code? (update :calva/history output/add entity output/history-cap))
+     :uf/fxs (when code?
+               [[:uf/fx.defer-dispatch [[:calva/ax.save-history]] history-save-delay-ms :calva/history-save]])}))
 
-(defn- query-output
-  "Runs the Datalog query `query-edn-str` with `inputs` on the output log. The dispatch resolves to the result."
-  [_state _uf-data query-edn-str inputs]
-  (let [query (reader/read-string query-edn-str)
-        result (apply d/q query @db/!output-conn inputs)]
-    {:uf/fxs [[:uf/await :app/fx.return result]]}))
+(defn- save-history
+  "Saves the eval history to its file."
+  [state _uf-data]
+  {:uf/fxs [[:calva/fx.save-history (:calva/history-storage-uri state) (:calva/history state)]]})
 
 (defn- init-history
+  "Reads the saved eval history."
   [state _uf-data]
-  {:uf/fxs [[:calva/fx.load-history-from-disk (:calva/history-storage-uri state)]]})
+  {:uf/fxs [[:uf/await :calva/fx.read-history (:calva/history-storage-uri state)]]
+   :uf/dxs [[:calva/ax.history-read :uf/prev-result]]})
 
-(defn- history-loaded
-  "Continues the line numbering from `max-line`, the highest line of the loaded history."
-  [state _uf-data max-line]
-  {:uf/db (assoc state :calva/output-line-counter max-line)})
+(defn- history-read
+  "Takes the `entities` of the saved eval history, nil when there is none. The history
+   gets all of them, the output log the newest, and line numbering goes on from the
+   highest line. A state that has taken output already keeps what it has."
+  [state _uf-data entities]
+  (when (zero? (:calva/output-line-counter state 0))
+    {:uf/db (merge state (output/restored entities))}))
 
 (def actions
   {:calva/ax.when-activated #'when-activated
@@ -67,6 +65,6 @@
    :calva/ax.subscribe-to-sessions-changed #'subscribe-to-sessions-changed
    :calva/ax.sessions-changed #'sessions-changed
    :calva/ax.add-output #'add-output
-   :calva/ax.query-output #'query-output
+   :calva/ax.save-history #'save-history
    :calva/ax.init-history #'init-history
-   :calva/ax.history-loaded #'history-loaded})
+   :calva/ax.history-read #'history-read})

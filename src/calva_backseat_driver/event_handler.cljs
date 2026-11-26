@@ -58,9 +58,9 @@
             arglists)))
 
 (defn- check-arguments!
-  "In a development build, fails when `handler`, the var for the `kind` named
-   `the-name`, doesn't take the loop's `own` arguments followed by `args`."
-  [kind the-name handler own args]
+  "In a development build, fails when `handler`, the var for the `kind` that the vector
+   `[the-name & args]` names, doesn't take the loop's `own` arguments followed by `args`."
+  [kind handler own [the-name & args]]
   (let [arglists (:arglists (meta handler))]
     (when (and js/goog.DEBUG
                (not (takes? arglists (+ own (count args)))))
@@ -74,20 +74,19 @@
   (let [fxs (known effect-table "effect" effect-name fxs)]
     (doseq [fx fxs]
       (check-arguments! "effect"
-                        (effect-name fx)
                         (get effect-table (effect-name fx))
                         1
                         (if (await-fx? fx)
-                          (drop 2 fx)
-                          (rest fx))))
+                          (rest fx)
+                          fx)))
     fxs))
 
 (def ^:private result-keys #{:uf/db :uf/fxs :uf/dxs})
 
 (defn- handle-action
-  [action-table state uf-data [action-name & args]]
+  [action-table state uf-data [action-name & args :as action]]
   (if-let [handler (get action-table action-name)]
-    (let [_ (check-arguments! "action" action-name handler 2 args)
+    (let [_ (check-arguments! "action" handler 2 action)
           result (apply handler state uf-data args)]
       (when-let [unknown-keys (seq (remove result-keys (keys result)))]
         (fail! (str "The handler of " action-name " returned unknown keys: " (pr-str unknown-keys))

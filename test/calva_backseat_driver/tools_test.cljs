@@ -79,5 +79,5 @@
   (let [settings (set (map (fn [property]
                              (keyword "vscode" (str "config." (subs (name property) (count "calva-backseat-driver.")))))
                            (keys (get-in manifest [:contributes :configuration :properties]))))]
-    (is (every? settings (mapcat :tool/reads (vals tools/tools)))
-        "Every setting a tool reads is a setting in package.json")))
+    (is (every? (conj settings :calva/output-log) (mapcat :tool/reads (vals tools/tools)))
+        "What a tool reads from the state is a setting in package.json, or the output log")))

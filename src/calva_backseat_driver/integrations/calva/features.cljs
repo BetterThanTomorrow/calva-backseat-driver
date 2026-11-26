@@ -166,11 +166,6 @@
   (dispatch! [[:app/ax.log :debug "[Server] Getting symbol info for:" clojure-symbol]])
   ((get-in calva/calva-api [:info :getSymbolInfo]) clojure-symbol repl-session-key ns))
 
-(defn query-output [{:uf/keys [dispatch!]
-                     :calva/keys [query-edn-str inputs]}]
-  (dispatch! [[:app/ax.log :debug "[Server] Querying output log with:" query-edn-str]
-              [:calva/ax.query-output query-edn-str inputs]]))
-
 (defn load-file+
   "Loads/evaluates a Clojure file through Calva's connected REPL.
    Returns a promise resolving to the string result of the last evaluated form."

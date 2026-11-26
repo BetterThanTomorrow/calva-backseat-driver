@@ -4,6 +4,7 @@
    [calva-backseat-driver.app.axs :as app-axs]
    [calva-backseat-driver.app.db :as db]
    [calva-backseat-driver.app.fxs :as app-fxs]
+   [calva-backseat-driver.app.when-contexts :as when-contexts]
    [calva-backseat-driver.event-handler :as event-handler]
    [calva-backseat-driver.integrations.calva.axs :as calva-axs]
    [calva-backseat-driver.integrations.calva.fxs :as calva-fxs]
@@ -53,5 +54,6 @@
                              :uf/action-table (actions)
                              :uf/effect-table (effects)
                              :uf/dispatch! dispatch!
+                             :uf/state-effects when-contexts/effects
                              :uf/log! (when js/goog.DEBUG log-dispatch!)}
                             action-vectors))

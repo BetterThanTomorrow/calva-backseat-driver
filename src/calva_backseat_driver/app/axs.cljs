@@ -28,15 +28,14 @@
 
 (defn- init
   "Registers the commands and the tools, and starts what the extension runs."
-  [_state _uf-data]
-  {:uf/fxs (-> (mapv (fn [[command-id actions]]
+  [state _uf-data]
+  {:uf/db (assoc state :app/activated? true)
+   :uf/fxs (-> (mapv (fn [[command-id actions]]
                        [:app/fx.register-command command-id actions])
                      commands)
                (conj [:app/fx.register-language-model-tools]
                      [:vscode/fx.subscribe-to-settings]))
    :uf/dxs [[:calva/ax.init-history]
-            [:app/ax.set-when-context :calva-mcp-extension/activated? true]
-            [:mcp/ax.sync-cursor-mcp-when-contexts]
             [:app/ax.start-background-work]]})
 
 (defn- start-background-work
@@ -56,13 +55,8 @@
   "Takes what the reload hook found installed, and initializes when a reload came before the first init."
   [state _uf-data facts]
   {:uf/db (merge state facts)
-   :uf/dxs (when-not (get-in state [:extension/when-contexts :calva-mcp-extension/activated?])
+   :uf/dxs (when-not (:app/activated? state)
              [[:app/ax.init]])})
-
-(defn- set-when-context
-  [state _uf-data k v]
-  {:uf/db (assoc-in state [:extension/when-contexts k] v)
-   :uf/fxs [[:vscode/fx.set-context k v]]})
 
 (defn- log
   "Writes `messages` to the log file at `level`."
@@ -73,17 +67,19 @@
              messages]]})
 
 (defn- cleanup
-  [_state _uf-data]
-  {:uf/fxs [[:app/fx.clear-disposables]]
-   :uf/dxs [[:app/ax.set-when-context :calva-mcp-extension/activated? false]]})
+  "Disposes what the extension registered."
+  [state _uf-data]
+  {:uf/db (assoc state :app/activated? false)
+   :uf/fxs [[:app/fx.clear-disposables]]})
 
 (defn- deactivate
-  "Saves the history at once, and stops the MCP server without a message."
+  "Saves the eval history at once, and stops the MCP server without a message."
   [state _uf-data]
-  {:uf/fxs [[:calva/fx.flush-history (:calva/history-storage-uri state)]
+  {:uf/db (assoc state :app/activated? false)
+   :uf/fxs [[:uf/fx.cancel-deferred-dispatch :calva/history-save]
+            [:calva/fx.save-history (:calva/history-storage-uri state) (:calva/history state)]
             [:app/fx.clear-disposables]]
-   :uf/dxs [[:app/ax.set-when-context :calva-mcp-extension/activated? false]
-            [:mcp/ax.stop-server {:lifecycle/silent? true}]]})
+   :uf/dxs [[:mcp/ax.stop-server {:lifecycle/silent? true}]]})
 
 (def actions
   {:app/ax.activate #'activate
@@ -91,7 +87,6 @@
    :app/ax.start-background-work #'start-background-work
    :app/ax.settings-changed #'settings-changed
    :app/ax.hot-reloaded #'hot-reloaded
-   :app/ax.set-when-context #'set-when-context
    :app/ax.log #'log
    :app/ax.cleanup #'cleanup
    :app/ax.deactivate #'deactivate})

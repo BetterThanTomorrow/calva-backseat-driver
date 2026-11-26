@@ -11,7 +11,8 @@
    :vscode/config.enableMcpReplEvaluation true
    :vscode/config.provideBdSkill true
    :vscode/config.provideEditSkill false
-   :calva/output-line-counter 7})
+   :calva/output-line-counter 7
+   :calva/output-log (sorted-map 7 {:output/line 7 :output/text "(+ 1 2)"})})
 
 (def ^:private when-clause-settings
   {"config.calva-backseat-driver.provideBdSkill" true
@@ -32,21 +33,24 @@
   (is (= [:uf/await :tool/fx.run
           {:call/tool "clojure_evaluate_code"
            :call/arguments {:code "(+ 1 2)"}
-           :call/settings {:vscode/config.evaluation.maxLength 25
-                           :vscode/config.evaluation.maxDepth 7}
+           :call/state {:vscode/config.evaluation.maxLength 25
+                        :vscode/config.evaluation.maxDepth 7}
            :call/when-clause-settings when-clause-settings}]
          (run-effect "clojure_evaluate_code" {:code "(+ 1 2)"}))
       "An evaluation runs with the print limits from the settings")
   (is (= {:vscode/config.editor.fuzzyLineTargetingPadding 2
           :vscode/config.editor.lineContextResponsePadding 10}
-         (:call/settings (nth (run-effect "clojure_edit_files" {:edits []}) 2)))
+         (:call/state (nth (run-effect "clojure_edit_files" {:edits []}) 2)))
       "An edit runs with the paddings from the settings")
+  (is (= {:calva/output-log {7 {:output/line 7 :output/text "(+ 1 2)"}}}
+         (:call/state (nth (run-effect "clojure_repl_output_log" {:query "[:find ?e :where [?e :output/line]]"}) 2)))
+      "An output log query runs with the output log")
   (is (= {}
-         (:call/settings (nth (run-effect "clojure_list_sessions" {}) 2)))
-      "A tool that reads no settings gets none")
+         (:call/state (nth (run-effect "clojure_list_sessions" {}) 2)))
+      "A tool that reads nothing from the state gets nothing")
   (is (= {:call/tool "no_such_tool"
           :call/arguments {}
-          :call/settings {}
+          :call/state {}
           :call/when-clause-settings when-clause-settings}
          (nth (run-effect "no_such_tool" {}) 2))
       "A tool that isn't in the table is still run, for the effect to refuse"))

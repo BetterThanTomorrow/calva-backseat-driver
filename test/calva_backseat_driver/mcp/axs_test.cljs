@@ -10,7 +10,6 @@
 
 (def ^:private state
   {:mcp/wrapper-config-path "/tmp/w"
-   :mcp/lifecycle-state :the-lifecycle-state
    :vscode/config.mcpHost "127.0.0.1"
    :vscode/config.mcpSocketServerPort 1664
    :vscode/config.provideBdSkill true
@@ -19,7 +18,6 @@
 
 (def ^:private lifecycle-options
   {:mcp/wrapper-config-path "/tmp/w"
-   :mcp/lifecycle-state :the-lifecycle-state
    :mcp/settings {:vscode/config.mcpHost "127.0.0.1"
                   :vscode/config.mcpSocketServerPort 1664}})
 
@@ -27,22 +25,38 @@
   {:app/min-log-level :debug
    :app/log-file-uri :the-log-file})
 
-(deftest sync-cursor-mcp-when-context-keys-test
-  (testing "when-context keys match package.json enablement strings"
-    (is (= ":calva-backseat-driver/mcp-server-registered-with-cursor?"
-           (str :calva-backseat-driver/mcp-server-registered-with-cursor?)))
-    (is (= ":calva-backseat-driver/cursor-mcp-available?"
-           (str :calva-backseat-driver/cursor-mcp-available?)))))
+(def ^:private running
+  "The server's state as a start resolves to it."
+  {:server/running? true
+   :server/assigned-port 49311
+   :server/host "127.0.0.1"
+   :lifecycle/registered-name nil})
+
+(def ^:private stopped
+  "The server's state as a stop resolves to it."
+  {:server/running? false
+   :server/assigned-port nil
+   :server/host nil
+   :lifecycle/registered-name nil})
+
+(deftest server-changed
+  (is (= (assoc state :server/starting? true)
+         (:uf/db (handle state [:mcp/ax.server-changed {:server/starting? true}])))
+      "The state takes what changed about the server")
+  (is (= (merge state running {:server/starting? true})
+         (:uf/db (handle (assoc state :server/starting? true :server/running? false)
+                         [:mcp/ax.server-changed running])))
+      "and keeps the rest"))
 
 (deftest start-server
   (testing "started by a person"
     (let [result (handle state [:mcp/ax.start-server])]
       (is (= [[:uf/await :mcp/fx.lifecycle-start (assoc lifecycle-options :lifecycle/silent? nil)]]
              (:uf/fxs result))
-          "The start gets the lifecycle state, the wrapper's directory and the MCP settings")
+          "The start gets the wrapper's directory and the MCP settings")
       (is (= [[:mcp/ax.lifecycle-updated :uf/prev-result]]
              (:uf/dxs result))
-          "and the state takes the lifecycle state the start resolves to")))
+          "and the state takes the server's state that the start resolves to")))
   (testing "started by the extension"
     (is (= [[:uf/await :mcp/fx.lifecycle-start (assoc lifecycle-options :lifecycle/silent? true)]]
            (:uf/fxs (handle state [:mcp/ax.start-server {:silent? true}])))
@@ -55,14 +69,21 @@
     (is (= [[:mcp/ax.lifecycle-stopped :uf/prev-result]]
            (:uf/dxs result)))))
 
+(deftest lifecycle-updated
+  (let [result (handle state [:mcp/ax.lifecycle-updated running])]
+    (is (= (merge state running) (:uf/db result))
+        "The state takes the server's state")
+    (is (= [[:uf/await :mcp/fx.server-info]]
+           (:uf/fxs result))
+        "The start command resolves to the server info")))
+
 (deftest lifecycle-stopped
-  (let [result (handle state [:mcp/ax.lifecycle-stopped :the-stopped-state])]
-    (is (= :the-stopped-state (:mcp/lifecycle-state (:uf/db result))))
+  (let [result (handle (merge state running) [:mcp/ax.lifecycle-stopped stopped])]
+    (is (= (merge state stopped) (:uf/db result))
+        "The state takes the server's state")
     (is (= [[:uf/await :app/fx.return true]]
            (:uf/fxs result))
-        "The stop command resolves to true")
-    (is (= [[:mcp/ax.sync-cursor-mcp-when-contexts]]
-           (:uf/dxs result)))))
+        "The stop command resolves to true")))
 
 (deftest update-registry
   (is (= [[:mcp/fx.update-registry lifecycle-options]]
@@ -72,22 +93,18 @@
   (testing "a registration writes a log line"
     (let [result (handle state [:mcp/ax.cursor-mcp-registered {:ok true}])]
       (is (= [[:app/fx.log log-options :info ["Cursor MCP server registered:" {:ok true}]]]
-             (:uf/fxs result)))
-      (is (= [[:mcp/ax.sync-cursor-mcp-when-contexts]]
-             (:uf/dxs result)))))
+             (:uf/fxs result)))))
   (testing "a failed registration writes a log line"
     (let [result (handle state [:mcp/ax.cursor-mcp-registration-failed {:ok false}])]
       (is (= [[:app/fx.log log-options :warn ["Cursor MCP auto-registration failed:" {:ok false}]]]
-             (:uf/fxs result)))
-      (is (= [[:mcp/ax.sync-cursor-mcp-when-contexts]]
-             (:uf/dxs result))))))
+             (:uf/fxs result))))))
 
 (deftest cursor-registration-finished
   (testing "a registration"
-    (let [result (handle state [:mcp/ax.cursor-registration-finished {:ok true :state :the-new-state}])]
-      (is (= [[:mcp/ax.lifecycle-updated :the-new-state]]
+    (let [result (handle state [:mcp/ax.cursor-registration-finished {:ok true :server/state running}])]
+      (is (= [[:mcp/ax.lifecycle-updated running]]
              (:uf/dxs result))
-          "The state takes the new lifecycle state")
+          "The state takes the server's state")
       (is (empty? (:uf/fxs result)))))
   (testing "outside Cursor"
     (let [failure {:ok false :reason :cursor-api-unavailable}
@@ -99,12 +116,15 @@
              (:uf/dxs result)))))
   (testing "a registration that didn't take"
     (let [failure {:ok false :reason :registration-failed}
-          result (handle state [:mcp/ax.cursor-registration-finished failure])]
+          result (handle state [:mcp/ax.cursor-registration-finished (assoc failure :server/state running)])]
       (is (= [[:vscode/fx.show-information-message "Could not register Backseat Driver MCP server with Cursor."]]
              (:uf/fxs result))
           "The person is told that it could not register")
+      (is (= (merge state running) (:uf/db result))
+          "The state takes the state of the server the registration started")
       (is (= [[:mcp/ax.cursor-mcp-registration-failed failure]]
-             (:uf/dxs result)))))
+             (:uf/dxs result))
+          "and the failure is logged")))
   (testing "a registration that threw"
     (let [result (handle state [:mcp/ax.cursor-registration-finished {:ok false :error "boom"}])]
       (is (= [[:app/ax.log :error "[Cursor MCP] register-with-cursor error:" "boom"]

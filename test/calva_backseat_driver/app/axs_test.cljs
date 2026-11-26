@@ -30,7 +30,7 @@
         "and then the extension initializes")))
 
 (deftest init
-  (let [{:uf/keys [fxs dxs]} (handle {} [:app/ax.init])
+  (let [{:uf/keys [db fxs dxs]} (handle {} [:app/ax.init])
         manifest (js->clj (js/JSON.parse (fs/readFileSync (path/resolve "package.json") "utf8"))
                           :keywordize-keys true)]
     (is (= (set (map :command (get-in manifest [:contributes :commands])))
@@ -43,12 +43,12 @@
         "Registers the tools with the Language Model API")
     (is (some #{[:vscode/fx.subscribe-to-settings]} fxs)
         "Subscribes to changes of the settings")
+    (is (= {:app/activated? true} db)
+        "The extension is activated, which its when-context follows")
     (is (= [[:calva/ax.init-history]
-            [:app/ax.set-when-context :calva-mcp-extension/activated? true]
-            [:mcp/ax.sync-cursor-mcp-when-contexts]
             [:app/ax.start-background-work]]
            dxs)
-        "Loads the history, sets the when-contexts and starts the background work")))
+        "Loads the history and starts the background work")))
 
 (deftest start-background-work
   (testing "Calva"
@@ -86,7 +86,7 @@
 
 (deftest hot-reloaded
   (testing "a reload after the extension initialized"
-    (let [state {:extension/when-contexts {:calva-mcp-extension/activated? true}}
+    (let [state {:app/activated? true}
           result (handle state [:app/ax.hot-reloaded {:mcp/eca-available? true}])]
       (is (= (assoc state :mcp/eca-available? true)
              (:uf/db result))
@@ -97,13 +97,6 @@
     (is (= [[:app/ax.init]]
            (:uf/dxs (handle {} [:app/ax.hot-reloaded {:mcp/eca-available? true}])))
         "initializes")))
-
-(deftest set-when-context
-  (let [result (handle {} [:app/ax.set-when-context :calva-backseat-driver/started? true])]
-    (is (= {:extension/when-contexts {:calva-backseat-driver/started? true}}
-           (:uf/db result)))
-    (is (= [[:vscode/fx.set-context :calva-backseat-driver/started? true]]
-           (:uf/fxs result)))))
 
 (deftest log
   (is (= [[:app/fx.log
@@ -117,13 +110,24 @@
                           [:app/ax.log :warn "a message" {:with "data"}])))
       "The log effect gets the level, the messages and where the log is"))
 
+(deftest cleanup
+  (let [result (handle {:app/activated? true} [:app/ax.cleanup])]
+    (is (= {:app/activated? false} (:uf/db result)))
+    (is (= [[:app/fx.clear-disposables]] (:uf/fxs result)))))
+
 (deftest deactivate
-  (let [result (handle {:calva/history-storage-uri :the-history-file} [:app/ax.deactivate])]
-    (is (= [[:calva/fx.flush-history :the-history-file]
+  (let [history (sorted-map 7 {:output/line 7 :output/category "evaluatedCode" :output/text "(+ 1 2)"})
+        result (handle {:app/activated? true
+                        :calva/history-storage-uri "file:///storage/eval-history.transit.json"
+                        :calva/history history}
+                       [:app/ax.deactivate])]
+    (is (= [[:uf/fx.cancel-deferred-dispatch :calva/history-save]
+            [:calva/fx.save-history "file:///storage/eval-history.transit.json" history]
             [:app/fx.clear-disposables]]
            (:uf/fxs result))
-        "Saves the history at once, and disposes what the extension registered")
-    (is (= [[:app/ax.set-when-context :calva-mcp-extension/activated? false]
-            [:mcp/ax.stop-server {:lifecycle/silent? true}]]
+        "Saves the history at once, in place of the save that waited, and disposes what the extension registered")
+    (is (false? (:app/activated? (:uf/db result)))
+        "The extension is no longer activated")
+    (is (= [[:mcp/ax.stop-server {:lifecycle/silent? true}]]
            (:uf/dxs result))
         "Then stops the MCP server without a message")))
