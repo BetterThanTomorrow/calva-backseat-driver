@@ -55,7 +55,18 @@
                                 10
                                 1795517607133)]
       (is (not (contains? entity :output/shadow-build)))
-      (is (not (contains? entity :output/shadow-runtime-id))))))
+      (is (not (contains? entity :output/shadow-runtime-id)))))
+  (testing "a message without a text"
+    (let [entity (output/entity {:category "otherOutput" :text nil} 11 1795517607133)]
+      (is (= {:output/line 11
+              :output/category "otherOutput"
+              :output/timestamp 1795517607133}
+             entity)
+          "The entity has no attribute for it")
+      (is (= 1 (output/query (output/add output/empty-log entity 10)
+                             "[:find (count ?e) . :where [?e :output/line]]"
+                             nil))
+          "and a log with it can be queried"))))
 
 (deftest add
   (is (= {1 (code 1)}

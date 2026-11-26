@@ -18,19 +18,22 @@
 (def empty-log (sorted-map))
 
 (defn entity
-  "Returns the entity for a `message` from Calva, numbered `line` and stamped `now`."
+  "Returns the entity for a `message` from Calva, numbered `line` and stamped `now`.
+   It has an attribute for each field of the message that has a value, since a query
+   can't run on an entity with a nil attribute."
   [message line now]
-  (let [shadow-build (calva-values/map-field-value message :shadowBuild)
-        shadow-runtime-id (calva-values/map-field-value message :shadowRuntimeId)]
-    (cond-> {:output/line line
-             :output/category (:category message)
-             :output/text (:text message)
-             :output/timestamp now}
-      (:who message) (assoc :output/who (:who message))
-      (:ns message) (assoc :output/ns (:ns message))
-      (:replSessionKey message) (assoc :output/repl-session-key (:replSessionKey message))
-      shadow-build (assoc :output/shadow-build shadow-build)
-      shadow-runtime-id (assoc :output/shadow-runtime-id shadow-runtime-id))))
+  (into {:output/line line
+         :output/timestamp now}
+        (keep (fn [[attribute field]]
+                (when-some [value (calva-values/map-field-value message field)]
+                  [attribute value])))
+        {:output/category :category
+         :output/text :text
+         :output/who :who
+         :output/ns :ns
+         :output/repl-session-key :replSessionKey
+         :output/shadow-build :shadowBuild
+         :output/shadow-runtime-id :shadowRuntimeId}))
 
 (defn evaluated-code?
   "True for an entity the eval history keeps."
