@@ -242,25 +242,25 @@
   (let [validation-result (parinfer/validate-brackets code)]
     (if-not (:valid? validation-result)
       (assoc validation-result :saved false)
-      (let [uri (vscode/Uri.file file-path)]
-        (try
-          (let [^js vscode-document (await (vscode/workspace.openTextDocument uri))
-                was-dirty? (.-isDirty vscode-document)
-                text-before (.getText vscode-document)
-                {:editor/keys [text] [[end-line end-character]] :editor/range} (edit-plan/append-plan {:document/text text-before} code)
-                edit (vscode/TextEdit.insert (vscode/Position. end-line end-character) text)
-                workspace-edit (vscode/WorkspaceEdit.)
-                _ (.set workspace-edit uri #js [edit])
-                edit-result (await (vscode/workspace.applyEdit workspace-edit))
-                persist (await (editor-persist/persist-edit-result+
-                                vscode-document was-dirty? edit-result
-                                {:text-before text-before}))]
-            (cond-> persist
-              (:success persist) (assoc :appended-at-end true)))
-          (catch :default error
-            {:success false
-             :saved false
-             :error (.-message error)}))))))
+      (try
+        (let [uri (vscode/Uri.file file-path)
+              ^js vscode-document (await (vscode/workspace.openTextDocument uri))
+              was-dirty? (.-isDirty vscode-document)
+              text-before (.getText vscode-document)
+              {:editor/keys [text] [[end-line end-character]] :editor/range} (edit-plan/append-plan {:document/text text-before} code)
+              edit (vscode/TextEdit.insert (vscode/Position. end-line end-character) text)
+              workspace-edit (vscode/WorkspaceEdit.)
+              _ (.set workspace-edit uri #js [edit])
+              edit-result (await (vscode/workspace.applyEdit workspace-edit))
+              persist (await (editor-persist/persist-edit-result+
+                              vscode-document was-dirty? edit-result
+                              {:text-before text-before}))]
+          (cond-> persist
+            (:success persist) (assoc :appended-at-end true)))
+        (catch :default error
+          {:success false
+           :saved false
+           :error (.-message error)})))))
 
 (defn ^:async disk-matches-document?
   "True when on-disk file content equals the open document buffer for file-path.
