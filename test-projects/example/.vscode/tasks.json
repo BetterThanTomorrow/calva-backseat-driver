@@ -1,0 +1,73 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "testProjectStart",
+      "type": "command",
+      "command": "joyride.runCode",
+      "args": "(require '[test-project] :reload) (test-project/start!) \"ok\""
+    },
+    {
+      "id": "testProjectStop",
+      "type": "command",
+      "command": "joyride.runCode",
+      "args": "(require '[test-project] :reload) (test-project/stop!) \"ok\""
+    }
+  ],
+  "tasks": [
+    {
+      "label": "test project: start",
+      "detail": "Jack in to the five REPLs, open two browser tabs and two tuis on the shadow-cljs app",
+      "type": "shell",
+      "command": "echo ${input:testProjectStart}",
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "close": true,
+        "panel": "shared",
+        "showReuseMessage": false
+      }
+    },
+    {
+      "label": "test project: stop",
+      "detail": "Stop the tuis, close the app's browser tabs, and stop every jack-in",
+      "type": "shell",
+      "command": "echo ${input:testProjectStop}",
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "silent",
+        "close": true,
+        "panel": "shared",
+        "showReuseMessage": false
+      }
+    },
+    {
+      "label": "tui 1",
+      "type": "shell",
+      "command": "node out/mini-tui.js",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated",
+        "group": "tui",
+        "reveal": "always",
+        "focus": false
+      }
+    },
+    {
+      "label": "tui 2",
+      "type": "shell",
+      "command": "node out/mini-tui.js",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated",
+        "group": "tui",
+        "reveal": "always",
+        "focus": false
+      }
+    }
+  ]
+}

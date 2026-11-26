@@ -17,7 +17,17 @@ Strategies and patterns for testing the Backseat Driver MCP server toolset. Each
 
 ## Before You Start
 
-Call `clojure_list_sessions` immediately. Both a `clj` (JVM Clojure) and a `bb` (Babashka) session are expected. If either is missing, use `#askQuestions` to tell the user which REPL(s) are absent and ask them to start the REPL(s) before continuing. Do not proceed with REPL-dependent tests without these sessions unless the user responds that it is okay to continue without them.
+Call `clojure_list_sessions` immediately. The test project starts its REPLs when the window opens (`.joyride/src/test_project.cljs`), and five sessions are expected:
+
+| Session | REPL | Files |
+|---------|------|-------|
+| `clj` | JVM Clojure in `sub-project/` | `sub-project/*.clj`, `sub-project/deps.edn` |
+| `mini-clj` | JVM Clojure in the mini project | `src/**/*.clj` |
+| `bb` | Babashka in the mini project | `**/*.bb` |
+| `shadow-clj` | shadow-cljs JVM side | `deps.edn`, `shadow-cljs.edn` |
+| `shadow-cljs` | shadow-cljs, builds `:app` and `:tui` | `**/app.cljs`, `**/tui.cljs` |
+
+`:app` is expected to have two browser runtimes, and `:tui` two node runtimes, each tui in its own split terminal. If something is missing, run the VS Code task **test project: start**, which starts only what is missing, and list the sessions again. If it is still missing, use `#askQuestions` to tell the user what is absent before continuing. Do not proceed with REPL-dependent tests without these sessions unless the user responds that it is okay to continue without them.
 
 ## Test Scope
 
@@ -25,7 +35,7 @@ Match the user's request to the relevant section(s). When asked to "run a full t
 
 **Section index** — each section lists its own prerequisites:
 - **REPL Session Listing** — no prerequisites
-- **Shadow-cljs Runtime Targeting** — requires shadow-cljs REPL connected with at least one live runtime (manual gate; see section)
+- **Shadow-cljs Runtime Targeting** — requires the shadow-cljs session with its runtimes (see Before You Start)
 - **REPL Evaluation** — requires session listing first
 - **Load File** — requires session listing first
 - **Structural Editing** — requires session listing first
@@ -44,7 +54,7 @@ The `bd-tester` agent is a purpose-built subagent for Backseat Driver testing. I
   - Group A (independent): Bracket Balancer, Symbol Info / ClojureDocs
   - Group B (needs evals first): REPL Evaluation, Load File, then Output Log Queries
   - Group C (needs evals first): Structural Editing
-  - **Shadow-cljs Runtime Targeting**: manual gate only — requires human setup (browser tab + optional node runtime). Do not delegate to `bd-tester` unless the human has confirmed shadow-cljs is connected and runtimes are visible in Calva.
+  - Group D (independent): Shadow-cljs Runtime Targeting, once `clojure_list_sessions` shows the `:app` and `:tui` runtimes
 
 When delegating, pass the specific section name, any prerequisite results (e.g., available session keys), and the success criteria from this skill. The `bd-tester` agent handles skill loading and reporting internally.
 
@@ -68,8 +78,7 @@ Prerequisites: none. Run this first when testing any REPL-dependent section.
 - `currentRoutedTarget`: `true` for the session serving the user's active file
 
 **Validation**:
-- JVM Clojure REPL connected → expect at least one session with key `"clj"`
-- Babashka REPL connected → expect a session with key `"bb"`
+- Expect the five sessions from Before You Start: `"clj"`, `"mini-clj"`, `"bb"`, `"shadow-clj"`, `"shadow-cljs"`
 - Exactly one session has `currentRoutedTarget: true`
 
 **Shadow session fields** (only when a session has `supportsRuntimes: true` — typically the shadow-cljs session, e.g. `"shadow-cljs"` in this project):
@@ -88,11 +97,9 @@ Non-shadow sessions (`clj`, `bb`, etc.) must **not** include `builds` — flat s
 
 Prerequisites:
 - **Calva >= 2.0.592** (`repl.listSessionsAndRuntimes` API)
-- Shadow-cljs connected via Calva (in this project: **Shadow CLJS (browser + tui)** connect sequence)
-- At least one browser runtime attached (open http://localhost:8780 after jack-in)
-- For multi-runtime tests: also attach the `:tui` node runtime (Calva shadow runtime picker) or open a second browser tab on the same build
+- The `shadow-cljs` session, with two browser runtimes on `:app` (tabs on http://localhost:8780) and two node runtimes on `:tui` (the tasks **tui 1** and **tui 2**)
 
-If `supportsRuntimes` is absent or `builds` is empty, ask the human to finish jack-in / open the browser before continuing. This section is a **manual gate** — automated E2E does not cover live shadow runtimes.
+If `supportsRuntimes` is absent or a build has fewer runtimes, run the task **test project: start** and list the sessions again. Automated E2E does not cover live shadow runtimes.
 
 ### 1. Compact session listing (default)
 

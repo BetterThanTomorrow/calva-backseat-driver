@@ -28,33 +28,26 @@ out/                   - Compiled node-script output
 shadow-cljs.edn        - Shadow CLJS build config (`:app` browser, `:tui` node)
 test/mini/             - Test namespace (future use)
 .github/               - Instructions, prompts, and skills
+.joyride/              - Starts and stops the REPLs, browser tabs and tuis
 ```
 
-## Shadow CLJS
+## Starting the REPLs, browsers and tuis
 
-Minimal browser app using Replicant. Jack in with the **Shadow CLJS (browser + tui)** Calva connect sequence — it watches both `:app` and `:tui` builds. The browser app is served at http://localhost:8780
+When the window opens, `.joyride/scripts/workspace_activate.cljs` runs `test-project/start!` from `.joyride/src/test_project.cljs`. It jacks in to five REPLs, opens two browser tabs on the shadow-cljs app, and starts two tuis in split terminals. It looks at what is already running first, so it only starts what is missing. The VS Code tasks **test project: start** and **test project: stop** start and stop all of it. The connect sequences are in `test_project.cljs`, not in the settings.
 
 ### REPL sessions
 
-Connect sequences name sessions and route evaluations by file pattern ([Calva docs](https://calva.io/connect-sequences/)):
+| Session | REPL | Files |
+|---------|------|-------|
+| `clj` | JVM Clojure in `sub-project/` | `sub-project/*.clj`, `sub-project/deps.edn` |
+| `mini-clj` | JVM Clojure in the mini project | `src/**/*.clj` |
+| `bb` | Babashka in the mini project | `**/*.bb` |
+| `shadow-clj` | shadow-cljs JVM side | `deps.edn`, `shadow-cljs.edn` |
+| `shadow-cljs` | shadow-cljs, builds `:app` and `:tui` | `**/app.cljs`, `**/tui.cljs` |
 
-| Session | Connect sequence | Files |
-|---------|------------------|-------|
-| `mini-clj` | Mini Clojure Project | `**/*.clj` |
-| `shadow-clj` | Shadow CLJS (browser + tui) | `deps.edn`, `shadow-cljs.edn` |
-| `shadow-cljs` | Shadow CLJS (browser + tui) | `**/app.cljs`, `**/tui.cljs` |
+The browser app (`:app`, Replicant) is served at http://localhost:8780. The node prompt app (`:tui`) is a small readline menu, run by the tasks **tui 1** and **tui 2**. Enter `1` to increment a counter, `2` to quit. For `tui.cljs` evaluations, select the `:tui` runtime in Calva's shadow runtime picker (the cljs session connects to `:app`).
 
-For `tui.cljs` evaluations, select the `:tui` node runtime in Calva's shadow runtime picker (default connect attaches to `:app` / browser).
-
-Node prompt app (`:tui`) — a small readline menu in the terminal. Enter `1` to increment a counter, `2` to quit.
-
-```bash
-npx shadow-cljs -A :dev watch app tui
-# or run the compiled script in a terminal:
-node out/mini-tui.js
-```
-
-If jack-in fails with `already started`, a stale shadow-cljs server is still running. Stop it first:
+If a jack-in fails with `already started`, a stale shadow-cljs server is still running. Stop it first:
 
 ```bash
 npx shadow-cljs stop
