@@ -57,11 +57,14 @@
 
 (defn- lifecycle-updated
   "Takes the `server-state` that a start or a registration resolved to. The dispatch
-   resolves to it, or to nil when no server runs."
-  [state _uf-data server-state]
+   resolves to it, or to nil when no server runs. A server that runs gets Calva's
+   sessions for its registry entry once more, since they may have changed while it started."
+  [state _uf-data {:server/keys [running?] :as server-state}]
   {:uf/db (merge state server-state)
-   :uf/fxs [[:uf/await :app/fx.return (when (:server/running? server-state)
-                                        server-state)]]})
+   :uf/fxs [[:uf/await :app/fx.return (when running?
+                                        server-state)]]
+   :uf/dxs (when running?
+             [[:mcp/ax.update-registry]])})
 
 (defn- stop-server
   "Stops the MCP server. The dispatch resolves to true."

@@ -112,11 +112,16 @@
           "The state takes the server's state")
       (is (= [[:uf/await :app/fx.return running]]
              (:uf/fxs result))
-          "The start command resolves to the server's state, with its port and host")))
+          "The start command resolves to the server's state, with its port and host")
+      (is (= [[:mcp/ax.update-registry]]
+             (:uf/dxs result))
+          "The registry entry gets the sessions as they are after the start")))
   (testing "no server after a start"
-    (is (= [[:uf/await :app/fx.return nil]]
-           (:uf/fxs (handle state [:mcp/ax.lifecycle-updated stopped])))
-        "The start command resolves to nil")))
+    (let [result (handle state [:mcp/ax.lifecycle-updated stopped])]
+      (is (= [[:uf/await :app/fx.return nil]]
+             (:uf/fxs result))
+          "The start command resolves to nil")
+      (is (empty? (:uf/dxs result))))))
 
 (deftest stop-server
   (let [result (handle state [:mcp/ax.stop-server {:lifecycle/silent? true}])]
