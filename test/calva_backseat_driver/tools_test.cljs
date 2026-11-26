@@ -1,7 +1,7 @@
 (ns calva-backseat-driver.tools-test
   (:require ["fs" :as fs]
             ["path" :as path]
-            [cljs.test :refer [deftest is testing async]]
+            [cljs.test :refer [deftest is testing]]
             [calva-backseat-driver.tools :as tools]))
 
 (deftest prepared-invocation
@@ -144,39 +144,38 @@
          (tools/load-file-result {:load/error nil}))
       "A load that failed without a message answers as it did: an error that is nil"))
 
-(deftest calling-a-tool
-  (async done
-    (let [!asked (atom [])
-          perform-effect! (fn [[effect-name :as fx]]
-                            (swap! !asked conj fx)
-                            (js/Promise.resolve (get {:calva/fx.load-file {:load/error "no such file"}
-                                                      :calva/fx.symbol-info js/undefined
-                                                      :calva/fx.edit-files {:summary "0/0 edits applied across 0 files"}}
-                                                     effect-name)))]
-      (-> (js/Promise.all
-           #js [(tools/call-tool+ perform-effect! {:call/tool "clojure_load_file"
-                                                   :call/arguments {:filePath "/nope.clj" :replSessionKey "clj" :who "coder"}})
-                (tools/call-tool+ perform-effect! {:call/tool "clojure_symbol_info"
-                                                   :call/arguments {:clojureSymbol "map" :replSessionKey "clj" :namespace "user"}})
-                (tools/call-tool+ perform-effect! {:call/tool "clojure_edit_files"
-                                                   :call/arguments {:edits []}
-                                                   :call/state {:vscode/config.editor.fuzzyLineTargetingPadding 2
-                                                                :vscode/config.editor.lineContextResponsePadding 10}})])
-          (.then (fn [[failed-load no-info edited]]
-                   (is (= {:result/content [{:type "text" :text "{\"error\":\"no such file\"}"}]
-                           :result/error? true
-                           :result/log [[:debug "[Server] Load file failed:" "no such file"]]}
-                          failed-load)
-                       "A failed load is content with the error, marked as failed, with its log line")
-                   (is (= {:result/content [{:type "text"}]} no-info)
-                       "A tool that Calva answers undefined gives a text part without text")
-                   (is (= [[:calva/fx.load-file "/nope.clj" "clj" "coder"]
-                           [:calva/fx.symbol-info "map" "clj" "user"]
-                           [:calva/fx.edit-files [] {:editor/search-padding 2 :editor/context-padding 10}]]
-                          @!asked)
-                       "Each tool asks Calva with the call's arguments, and editing with the paddings from the settings")
-                   (is (= "{\"summary\":\"0/0 edits applied across 0 files\"}"
-                          (-> edited :result/content first :text)))))
-          (.catch (fn [e]
-                    (is (nil? e) "The calls resolve")))
-          (.finally done)))))
+(deftest ^:async calling-a-tool
+  (let [!asked (atom [])
+        perform-effect! (fn [[effect-name :as fx]]
+                          (swap! !asked conj fx)
+                          (js/Promise.resolve (get {:calva/fx.load-file {:load/error "no such file"}
+                                                    :calva/fx.symbol-info js/undefined
+                                                    :calva/fx.edit-files {:summary "0/0 edits applied across 0 files"}}
+                                                   effect-name)))]
+    (try
+      (let [[failed-load no-info edited]
+            (await (js/Promise.all
+                    #js [(tools/call-tool+ perform-effect! {:call/tool "clojure_load_file"
+                                                            :call/arguments {:filePath "/nope.clj" :replSessionKey "clj" :who "coder"}})
+                         (tools/call-tool+ perform-effect! {:call/tool "clojure_symbol_info"
+                                                            :call/arguments {:clojureSymbol "map" :replSessionKey "clj" :namespace "user"}})
+                         (tools/call-tool+ perform-effect! {:call/tool "clojure_edit_files"
+                                                            :call/arguments {:edits []}
+                                                            :call/state {:vscode/config.editor.fuzzyLineTargetingPadding 2
+                                                                         :vscode/config.editor.lineContextResponsePadding 10}})]))]
+        (is (= {:result/content [{:type "text" :text "{\"error\":\"no such file\"}"}]
+                :result/error? true
+                :result/log [[:debug "[Server] Load file failed:" "no such file"]]}
+               failed-load)
+            "A failed load is content with the error, marked as failed, with its log line")
+        (is (= {:result/content [{:type "text"}]} no-info)
+            "A tool that Calva answers undefined gives a text part without text")
+        (is (= [[:calva/fx.load-file "/nope.clj" "clj" "coder"]
+                [:calva/fx.symbol-info "map" "clj" "user"]
+                [:calva/fx.edit-files [] {:editor/search-padding 2 :editor/context-padding 10}]]
+               @!asked)
+            "Each tool asks Calva with the call's arguments, and editing with the paddings from the settings")
+        (is (= "{\"summary\":\"0/0 edits applied across 0 files\"}"
+               (-> edited :result/content first :text))))
+      (catch :default e
+        (is (nil? e) "The calls resolve")))))

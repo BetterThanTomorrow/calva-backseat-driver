@@ -1,5 +1,5 @@
 (ns calva-backseat-driver.tools.evaluation-test
-  (:require [cljs.test :refer [deftest testing is async]]
+  (:require [cljs.test :refer [deftest testing is]]
             [calva-backseat-driver.tools.evaluation :as evaluation]))
 
 (def ^:private arguments
@@ -127,38 +127,37 @@
     (swap! !asked conj fx)
     (js/Promise.resolve (get answers effect-name))))
 
-(deftest evaluate-code
-  (async done
-    (let [!asked (atom [])
-          perform-effect! (performer {:calva/fx.list-sessions sessions
-                                      :calva/fx.evaluate evaluation}
-                                     !asked)
-          tool-call (fn [arguments]
-                      {:call/tool "clojure_evaluate_code"
-                       :call/arguments arguments
-                       :call/state {:vscode/config.evaluation.maxLength 25}})]
-      (-> (js/Promise.all
-           #js [(evaluation/evaluate-code+ perform-effect! (tool-call (assoc arguments :who "")))
-                (evaluation/evaluate-code+ perform-effect! (tool-call (assoc arguments :replSessionKey "nope")))
-                (evaluation/evaluate-code+ perform-effect! (tool-call arguments))])
-          (.then (fn [[blank-who unknown-session evaluated]]
-                   (is (= {:error "The `who` parameter is required. Provide a slug identifying your agent (e.g. \"copilot\")."}
-                          (:result/data blank-who)))
-                   (is (= "Session 'nope' not found."
-                          (get-in unknown-session [:result/data :error])))
-                   (is (= {:result "3" :ns "user" :stdout nil :stderr nil :session-key "clj" :notes [] :who "coder"}
-                          (:result/data evaluated)))
-                   (is (= [[:calva/fx.list-sessions]
-                           [:calva/fx.list-sessions]
-                           [:calva/fx.evaluate "(+ 1 2)" {:sessionKey "clj"
-                                                          :ns "user"
-                                                          :who "coder"
-                                                          :nReplOptions {:pprintOptions {:enabled true
-                                                                                         :printEngine "pprint"
-                                                                                         :maxLength 25
-                                                                                         :maxDepth nil}}}]]
-                          @!asked)
-                       "A call with a bad who asks Calva nothing, one with an unknown session asks for the sessions, and one that can run evaluates")))
-          (.catch (fn [e]
-                    (is (nil? e) "The calls resolve")))
-          (.finally done)))))
+(deftest ^:async evaluate-code
+  (let [!asked (atom [])
+        perform-effect! (performer {:calva/fx.list-sessions sessions
+                                    :calva/fx.evaluate evaluation}
+                                   !asked)
+        tool-call (fn [arguments]
+                    {:call/tool "clojure_evaluate_code"
+                     :call/arguments arguments
+                     :call/state {:vscode/config.evaluation.maxLength 25}})]
+    (try
+      (let [[blank-who unknown-session evaluated]
+            (await (js/Promise.all
+                    #js [(evaluation/evaluate-code+ perform-effect! (tool-call (assoc arguments :who "")))
+                         (evaluation/evaluate-code+ perform-effect! (tool-call (assoc arguments :replSessionKey "nope")))
+                         (evaluation/evaluate-code+ perform-effect! (tool-call arguments))]))]
+        (is (= {:error "The `who` parameter is required. Provide a slug identifying your agent (e.g. \"copilot\")."}
+               (:result/data blank-who)))
+        (is (= "Session 'nope' not found."
+               (get-in unknown-session [:result/data :error])))
+        (is (= {:result "3" :ns "user" :stdout nil :stderr nil :session-key "clj" :notes [] :who "coder"}
+               (:result/data evaluated)))
+        (is (= [[:calva/fx.list-sessions]
+                [:calva/fx.list-sessions]
+                [:calva/fx.evaluate "(+ 1 2)" {:sessionKey "clj"
+                                               :ns "user"
+                                               :who "coder"
+                                               :nReplOptions {:pprintOptions {:enabled true
+                                                                              :printEngine "pprint"
+                                                                              :maxLength 25
+                                                                              :maxDepth nil}}}]]
+               @!asked)
+            "A call with a bad who asks Calva nothing, one with an unknown session asks for the sessions, and one that can run evaluates"))
+      (catch :default e
+        (is (nil? e) "The calls resolve")))))

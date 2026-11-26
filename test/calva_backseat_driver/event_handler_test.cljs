@@ -1,5 +1,5 @@
 (ns calva-backseat-driver.event-handler-test
-  (:require [cljs.test :refer [deftest is async]]
+  (:require [cljs.test :refer [deftest is]]
             [calva-backseat-driver.event-handler :as event-handler]))
 
 (defn- test-system
@@ -70,6 +70,13 @@
       (.then (fn [v] [:resolved v]))
       (.catch (fn [e] [:rejected (ex-message e)]))))
 
+(defn- dispatch-outcome+
+  "`outcome+` of dispatching `actions` with `dispatch!`. A plain function, so that the
+   dispatch's promise reaches `outcome+`: in an async test, the compiler awaits the call
+   to a local function when it binds the argument first."
+  [dispatch! actions]
+  (outcome+ (dispatch! actions)))
+
 (deftest merge-tables
   (is (= {:a 1 :b 2} (event-handler/merge-tables [{:a 1} {:b 2}]))
       "The rows of every table")
@@ -95,101 +102,82 @@
                         (event-handler/handle-actions test-actions {} {} [[:test/ax.wrong-keys]]))
       "A handler that returns a key the loop doesn't know throws"))
 
-(deftest dispatch-state-effects-and-deferred-actions
-  (async done
-    (let [{:keys [dispatch! !state !performed]} (test-system test-actions {})]
-      (-> (dispatch! [[:test/ax.order] [:test/ax.now]])
-          (.then (fn [_]
-                   (is (= :handled (:order @!state))
-                       "The state is committed")
-                   (is (number? (:now @!state))
-                       "Handlers get the time in uf-data")
-                   (is (= [[:test/fx.note :effect] [:test/fx.note :deferred]] @!performed)
-                       "Effects run before the deferred actions")))
-          (.finally done)))))
+(deftest ^:async dispatch-state-effects-and-deferred-actions
+  (let [{:keys [dispatch! !state !performed]} (test-system test-actions {})]
+    (await (dispatch! [[:test/ax.order] [:test/ax.now]]))
+    (is (= :handled (:order @!state))
+        "The state is committed")
+    (is (number? (:now @!state))
+        "Handlers get the time in uf-data")
+    (is (= [[:test/fx.note :effect] [:test/fx.note :deferred]] @!performed)
+        "Effects run before the deferred actions")))
 
-(deftest awaited-results-are-threaded
-  (async done
-    (let [{:keys [dispatch! !state !performed]} (test-system test-actions {})]
-      (-> (dispatch! [[:test/ax.recipe 21]])
-          (.then (fn [result]
-                   (is (= 42 result)
-                       "The dispatch resolves to the chain's last awaited result")
-                   (is (= [[:test/fx.double 21]
-                           [:test/fx.note 42]
-                           [:test/fx.note {:nested :uf/prev-result}]]
-                          @!performed)
-                       "The awaited result replaces :uf/prev-result as an element, and nothing deeper")
-                   (is (= 42 (:result @!state))
-                       "and in the deferred actions")))
-          (.finally done)))))
+(deftest ^:async awaited-results-are-threaded
+  (let [{:keys [dispatch! !state !performed]} (test-system test-actions {})
+        result (await (dispatch! [[:test/ax.recipe 21]]))]
+    (is (= 42 result)
+        "The dispatch resolves to the chain's last awaited result")
+    (is (= [[:test/fx.double 21]
+            [:test/fx.note 42]
+            [:test/fx.note {:nested :uf/prev-result}]]
+           @!performed)
+        "The awaited result replaces :uf/prev-result as an element, and nothing deeper")
+    (is (= 42 (:result @!state))
+        "and in the deferred actions")))
 
-(deftest a-dispatch-never-throws
-  (async done
-    (let [{:keys [dispatch! !state]} (test-system test-actions {})]
-      (-> (js/Promise.all
-           #js [(outcome+ (dispatch! [[:test/ax.throw "the action threw"]]))
-                (outcome+ (dispatch! [[:test/ax.reject "the effect rejected"]]))
-                (outcome+ (dispatch! [[:test/ax.nope]]))
-                (outcome+ (dispatch! [[:test/ax.unknown-effect]]))
-                (outcome+ (dispatch! [[:test/ax.effect-among-actions]]))
-                (outcome+ (dispatch! [[:test/ax.assoc :a 1] [:test/ax.throw "the second action threw"]]))])
-          (.then (fn [outcomes]
-                   (is (= [[:rejected "the action threw"]
-                           [:rejected "the effect rejected"]
-                           [:rejected "Unknown action: :test/ax.nope"]
-                           [:rejected "Unknown effect: :test/fx.nope"]
-                           [:rejected "Unknown action: :test/fx.note"]
-                           [:rejected "the second action threw"]]
-                          (vec outcomes))
-                       "Each failure rejects its own dispatch")
-                   (is (= {} @!state)
-                       "A batch with an action that throws changes no state")))
-          (.finally done)))))
+(deftest ^:async a-dispatch-never-throws
+  (let [{:keys [dispatch! !state]} (test-system test-actions {})
+        outcomes (await (js/Promise.all
+                         #js [(dispatch-outcome+ dispatch! [[:test/ax.throw "the action threw"]])
+                              (dispatch-outcome+ dispatch! [[:test/ax.reject "the effect rejected"]])
+                              (dispatch-outcome+ dispatch! [[:test/ax.nope]])
+                              (dispatch-outcome+ dispatch! [[:test/ax.unknown-effect]])
+                              (dispatch-outcome+ dispatch! [[:test/ax.effect-among-actions]])
+                              (dispatch-outcome+ dispatch! [[:test/ax.assoc :a 1] [:test/ax.throw "the second action threw"]])]))]
+    (is (= [[:rejected "the action threw"]
+            [:rejected "the effect rejected"]
+            [:rejected "Unknown action: :test/ax.nope"]
+            [:rejected "Unknown effect: :test/fx.nope"]
+            [:rejected "Unknown action: :test/fx.note"]
+            [:rejected "the second action threw"]]
+           (vec outcomes))
+        "Each failure rejects its own dispatch")
+    (is (= {} @!state)
+        "A batch with an action that throws changes no state")))
 
-(deftest two-chains-in-one-tick
-  (async done
-    (let [{:keys [dispatch!]} (test-system test-actions {})]
-      (-> (js/Promise.all
-           #js [(outcome+ (dispatch! [[:test/ax.slow 5 :first]]))
-                (outcome+ (dispatch! [[:test/ax.reject "the second chain failed"]]))
-                (outcome+ (dispatch! [[:test/ax.throw "the third chain threw"]]))
-                (outcome+ (dispatch! [[:test/ax.recipe 4]]))])
-          (.then (fn [outcomes]
-                   (is (= [[:resolved :first]
-                           [:rejected "the second chain failed"]
-                           [:rejected "the third chain threw"]
-                           [:resolved 8]]
-                          (vec outcomes))
-                       "Each chain gets its own result, also when another one fails in the same tick")))
-          (.finally done)))))
+(deftest ^:async two-chains-in-one-tick
+  (let [{:keys [dispatch!]} (test-system test-actions {})
+        outcomes (await (js/Promise.all
+                         #js [(dispatch-outcome+ dispatch! [[:test/ax.slow 5 :first]])
+                              (dispatch-outcome+ dispatch! [[:test/ax.reject "the second chain failed"]])
+                              (dispatch-outcome+ dispatch! [[:test/ax.throw "the third chain threw"]])
+                              (dispatch-outcome+ dispatch! [[:test/ax.recipe 4]])]))]
+    (is (= [[:resolved :first]
+            [:rejected "the second chain failed"]
+            [:rejected "the third chain threw"]
+            [:resolved 8]]
+           (vec outcomes))
+        "Each chain gets its own result, also when another one fails in the same tick")))
 
-(deftest two-awaiting-actions-in-one-batch
-  (async done
-    (let [{:keys [dispatch!]} (test-system test-actions {})]
-      (-> (outcome+ (dispatch! [[:test/ax.recipe 1] [:test/ax.recipe 2]]))
-          (.then (fn [[kind message]]
-                   (is (= :rejected kind))
-                   (is (re-find #"Two actions of one batch await effects" message)
-                       "The loop refuses a batch whose awaited results would mix")))
-          (.finally done)))))
+(deftest ^:async two-awaiting-actions-in-one-batch
+  (let [{:keys [dispatch!]} (test-system test-actions {})
+        [kind message] (await (dispatch-outcome+ dispatch! [[:test/ax.recipe 1] [:test/ax.recipe 2]]))]
+    (is (= :rejected kind))
+    (is (re-find #"Two actions of one batch await effects" message)
+        "The loop refuses a batch whose awaited results would mix")))
 
-(deftest state-effects
-  (async done
-    (let [{:keys [dispatch! !performed !system]} (test-system test-actions {:a 0})]
-      (swap! !system assoc :uf/state-effects
-             (fn [old-state new-state]
-               (when (not= (:a old-state) (:a new-state))
-                 [[:test/fx.note [:a-changed (:a new-state)]]])))
-      (-> (dispatch! [[:test/ax.assoc :a 1] [:test/ax.note :own-effect]])
-          (.then (fn [_]
-                   (dispatch! [[:test/ax.assoc :b 1]])))
-          (.then (fn [_]
-                   (is (= [[:test/fx.note [:a-changed 1]]
-                           [:test/fx.note :own-effect]]
-                          @!performed)
-                       "The effects of a state change run before the dispatch's own, and only on a change")))
-          (.finally done)))))
+(deftest ^:async state-effects
+  (let [{:keys [dispatch! !performed !system]} (test-system test-actions {:a 0})]
+    (swap! !system assoc :uf/state-effects
+           (fn [old-state new-state]
+             (when (not= (:a old-state) (:a new-state))
+               [[:test/fx.note [:a-changed (:a new-state)]]])))
+    (await (dispatch! [[:test/ax.assoc :a 1] [:test/ax.note :own-effect]]))
+    (await (dispatch! [[:test/ax.assoc :b 1]]))
+    (is (= [[:test/fx.note [:a-changed 1]]
+            [:test/fx.note :own-effect]]
+           @!performed)
+        "The effects of a state change run before the dispatch's own, and only on a change")))
 
 (defn- takes-two
   [state _uf-data a b]
@@ -203,81 +191,73 @@
   [_dispatch! v]
   v)
 
-(deftest argument-counts-are-checked-in-development
-  (async done
-    (let [actions (assoc test-actions
-                         :test/ax.takes-two #'takes-two
-                         :test/ax.takes-options #'takes-options
-                         :test/ax.two-to-an-effect (fn [_state _uf-data]
-                                                     {:uf/fxs [[:test/fx.takes-one-value 1 2]]})
-                         :test/ax.two-to-an-awaited-effect (fn [_state _uf-data]
-                                                             {:uf/fxs [[:uf/await :test/fx.takes-one-value 1 2]]}))
-          {:keys [dispatch! !state !system]} (test-system actions {})]
-      (swap! !system assoc-in [:uf/effect-table :test/fx.takes-one-value] #'takes-one-value)
-      (-> (js/Promise.all
-           #js [(outcome+ (dispatch! [[:test/ax.takes-two 1]]))
-                (outcome+ (dispatch! [[:test/ax.takes-two 1 2 3]]))
-                (outcome+ (dispatch! [[:test/ax.takes-two 1 2]]))
-                (outcome+ (dispatch! [[:test/ax.takes-options]]))
-                (outcome+ (dispatch! [[:test/ax.takes-options {:silent? true}]]))
-                (outcome+ (dispatch! [[:test/ax.two-to-an-effect]]))
-                (outcome+ (dispatch! [[:test/ax.two-to-an-awaited-effect]]))])
-          (.then (fn [outcomes]
-                   (is (= [[:rejected "The action :test/ax.takes-two doesn't take 1 arguments: ([state _uf-data a b])"]
-                           [:rejected "The action :test/ax.takes-two doesn't take 3 arguments: ([state _uf-data a b])"]
-                           [:resolved nil]
-                           [:resolved nil]
-                           [:resolved nil]
-                           [:rejected "The effect :test/fx.takes-one-value doesn't take 2 arguments: ([_dispatch! v])"]
-                           [:rejected "The effect :test/fx.takes-one-value doesn't take 2 arguments: ([_dispatch! v])"]]
-                          (vec outcomes))
-                       "An action or an effect vector with the wrong number of arguments fails")
-                   (is (= {:sum 3 :options {:silent? true}} @!state)
-                       "and the ones with the right number are handled")))
-          (.finally done)))))
+(deftest ^:async argument-counts-are-checked-in-development
+  (let [actions (assoc test-actions
+                       :test/ax.takes-two #'takes-two
+                       :test/ax.takes-options #'takes-options
+                       :test/ax.two-to-an-effect (fn [_state _uf-data]
+                                                   {:uf/fxs [[:test/fx.takes-one-value 1 2]]})
+                       :test/ax.two-to-an-awaited-effect (fn [_state _uf-data]
+                                                           {:uf/fxs [[:uf/await :test/fx.takes-one-value 1 2]]}))
+        {:keys [dispatch! !state !system]} (test-system actions {})]
+    (swap! !system assoc-in [:uf/effect-table :test/fx.takes-one-value] #'takes-one-value)
+    (let [outcomes (await (js/Promise.all
+                           #js [(dispatch-outcome+ dispatch! [[:test/ax.takes-two 1]])
+                                (dispatch-outcome+ dispatch! [[:test/ax.takes-two 1 2 3]])
+                                (dispatch-outcome+ dispatch! [[:test/ax.takes-two 1 2]])
+                                (dispatch-outcome+ dispatch! [[:test/ax.takes-options]])
+                                (dispatch-outcome+ dispatch! [[:test/ax.takes-options {:silent? true}]])
+                                (dispatch-outcome+ dispatch! [[:test/ax.two-to-an-effect]])
+                                (dispatch-outcome+ dispatch! [[:test/ax.two-to-an-awaited-effect]])]))]
+      (is (= [[:rejected "The action :test/ax.takes-two doesn't take 1 arguments: ([state _uf-data a b])"]
+              [:rejected "The action :test/ax.takes-two doesn't take 3 arguments: ([state _uf-data a b])"]
+              [:resolved nil]
+              [:resolved nil]
+              [:resolved nil]
+              [:rejected "The effect :test/fx.takes-one-value doesn't take 2 arguments: ([_dispatch! v])"]
+              [:rejected "The effect :test/fx.takes-one-value doesn't take 2 arguments: ([_dispatch! v])"]]
+             (vec outcomes))
+          "An action or an effect vector with the wrong number of arguments fails")
+      (is (= {:sum 3 :options {:silent? true}} @!state)
+          "and the ones with the right number are handled"))))
 
-(deftest an-effect-that-dispatches
-  (async done
-    (let [actions (assoc test-actions
-                         :test/ax.outer (fn [state _uf-data]
-                                          {:uf/db (assoc state :outer 1)
-                                           :uf/fxs [[:test/fx.dispatch [[:test/ax.assoc :nested 1]]]]
-                                           :uf/dxs [[:test/ax.assoc :deferred 1]]}))
-          {:keys [dispatch! !state]} (test-system actions {})]
-      (-> (dispatch! [[:test/ax.outer]])
-          (.then (fn [_]
-                   (is (= {:outer 1 :nested 1 :deferred 1} @!state)
-                       "What an effect's own dispatch changed is there after the outer chain's deferred actions")))
-          (.finally done)))))
+(deftest ^:async an-effect-that-dispatches
+  (let [actions (assoc test-actions
+                       :test/ax.outer (fn [state _uf-data]
+                                        {:uf/db (assoc state :outer 1)
+                                         :uf/fxs [[:test/fx.dispatch [[:test/ax.assoc :nested 1]]]]
+                                         :uf/dxs [[:test/ax.assoc :deferred 1]]}))
+        {:keys [dispatch! !state]} (test-system actions {})]
+    (await (dispatch! [[:test/ax.outer]]))
+    (is (= {:outer 1 :nested 1 :deferred 1} @!state)
+        "What an effect's own dispatch changed is there after the outer chain's deferred actions")))
 
-(deftest a-release-build-logs-and-goes-on
-  (async done
-    (let [{:keys [dispatch! !state !performed]} (test-system test-actions {})
-          console-error js/console.error
-          !logged (atom [])]
-      (set! js/goog.DEBUG false)
-      (set! js/console.error (fn [& args]
-                               (swap! !logged conj (first args))))
-      (-> (outcome+ (dispatch! [[:test/ax.nope]
-                                [:test/ax.assoc :a 1]
-                                [:test/ax.unknown-effect]
-                                [:test/ax.effect-among-actions]
-                                [:test/ax.note :ran]]))
-          (.then (fn [outcome]
-                   (set! js/goog.DEBUG true)
-                   (set! js/console.error console-error)
-                   (is (= [:resolved nil] outcome)
-                       "The dispatch resolves")
-                   (is (= {:a 1} @!state)
-                       "The actions the table has are handled")
-                   (is (= [[:test/fx.note :ran]] @!performed)
-                       "and the effects the table has are performed")
-                   (is (= ["Unknown action: :test/ax.nope"
-                           "Unknown effect: :test/fx.nope"
-                           "Unknown action: :test/fx.note"]
-                          @!logged)
-                       "Each unknown name is logged")))
-          (.finally (fn []
-                      (set! js/goog.DEBUG true)
-                      (set! js/console.error console-error)
-                      (done)))))))
+(deftest ^:async a-release-build-logs-and-goes-on
+  (let [{:keys [dispatch! !state !performed]} (test-system test-actions {})
+        console-error js/console.error
+        !logged (atom [])]
+    (set! js/goog.DEBUG false)
+    (set! js/console.error (fn [& args]
+                             (swap! !logged conj (first args))))
+    (try
+      (let [outcome (await (dispatch-outcome+ dispatch! [[:test/ax.nope]
+                                                     [:test/ax.assoc :a 1]
+                                                     [:test/ax.unknown-effect]
+                                                     [:test/ax.effect-among-actions]
+                                                     [:test/ax.note :ran]]))]
+        (set! js/goog.DEBUG true)
+        (set! js/console.error console-error)
+        (is (= [:resolved nil] outcome)
+            "The dispatch resolves")
+        (is (= {:a 1} @!state)
+            "The actions the table has are handled")
+        (is (= [[:test/fx.note :ran]] @!performed)
+            "and the effects the table has are performed")
+        (is (= ["Unknown action: :test/ax.nope"
+                "Unknown effect: :test/fx.nope"
+                "Unknown action: :test/fx.note"]
+               @!logged)
+            "Each unknown name is logged"))
+      (finally
+        (set! js/goog.DEBUG true)
+        (set! js/console.error console-error)))))

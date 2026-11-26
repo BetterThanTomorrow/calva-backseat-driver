@@ -1,6 +1,5 @@
 (ns calva-backseat-driver.integrations.calva.editor-test
-  (:require [cljs.test :refer [deftest testing is async]]
-            [promesa.core :as p]
+  (:require [cljs.test :refer [deftest testing is]]
             [calva-backseat-driver.integrations.calva.editor-persist :as editor-persist]))
 
 (defn- stub-document
@@ -22,42 +21,38 @@
                    save-result)))))
     doc))
 
-(deftest persist-after-edit-timeout-does-not-save
+(deftest ^:async persist-after-edit-timeout-does-not-save
   (testing "timed-out visibility wait on a real change returns :saved false without calling save"
-    (async done
-           (let [save-calls (atom 0)
-                 doc (stub-document {:dirty? false
-                                     :save-result true
-                                     :on-save #(swap! save-calls inc)})]
-             (-> (p/let [result (editor-persist/persist-after-edit+
-                                 doc false true {:edit-visible? false})]
-                   (is (true? (:success result)))
-                   (is (false? (:saved result)))
-                   (is (string? (:note result)))
-                   (is (zero? @save-calls)
-                       "save must not run when visibility wait timed out")
-                   (done))
-                 (p/catch (fn [e]
-                            (is false (str e))
-                            (done))))))))
+    (let [save-calls (atom 0)
+          doc (stub-document {:dirty? false
+                              :save-result true
+                              :on-save #(swap! save-calls inc)})]
+      (try
+        (let [result (await (editor-persist/persist-after-edit+
+                             doc false true {:edit-visible? false}))]
+          (is (true? (:success result)))
+          (is (false? (:saved result)))
+          (is (string? (:note result)))
+          (is (zero? @save-calls)
+              "save must not run when visibility wait timed out"))
+        (catch :default e
+          (is false (str e)))))))
 
-(deftest persist-after-edit-identical-replace-skips-visibility-gate
+(deftest ^:async persist-after-edit-identical-replace-skips-visibility-gate
   (testing "identical replace saves even when edit-visible? is false"
-    (async done
-           (let [save-calls (atom 0)
-                 doc (stub-document {:dirty? true
-                                     :save-result true
-                                     :on-save #(swap! save-calls inc)})]
-             (-> (p/let [result (editor-persist/persist-after-edit+
-                                 doc false true {:identical-replace? true
-                                                 :edit-visible? false})]
-                   (is (true? (:success result)))
-                   (is (true? (:saved result)))
-                   (is (= 1 @save-calls))
-                   (done))
-                 (p/catch (fn [e]
-                            (is false (str e))
-                            (done))))))))
+    (let [save-calls (atom 0)
+          doc (stub-document {:dirty? true
+                              :save-result true
+                              :on-save #(swap! save-calls inc)})]
+      (try
+        (let [result (await (editor-persist/persist-after-edit+
+                             doc false true {:identical-replace? true
+                                             :edit-visible? false}))]
+          (is (true? (:success result)))
+          (is (true? (:saved result)))
+          (is (= 1 @save-calls)))
+        (catch :default e
+          (is false (str e)))))))
 
 (defn- lazy-thenable
   "A thenable that isn't a native promise, as VS Code returns from a document's `save`.
@@ -86,43 +81,37 @@
                                          :reject reject})))))
     doc))
 
-(deftest persist-after-edit-awaits-the-save
+(deftest ^:async persist-after-edit-awaits-the-save
   (testing "a save that VS Code resolves later, through a thenable that isn't a native promise"
-    (async done
-           (let [!events (atom [])
-                 doc (document-saving-later !events (fn [{:keys [resolve]}] (resolve true)))]
-             (-> (p/let [result (editor-persist/persist-after-edit+ doc false true {:edit-visible? true})]
-                   (is (= [:save-settled] @!events)
-                       "The save has resolved when the edit is reported")
-                   (is (= {:success true :saved true} (select-keys result [:success :saved]))
-                       "and the edit is reported as saved")
-                   (is (false? (.-isDirty doc)))
-                   (done))
-                 (p/catch (fn [e]
-                            (is false (str e))
-                            (done))))))))
+    (let [!events (atom [])
+          doc (document-saving-later !events (fn [{:keys [resolve]}] (resolve true)))]
+      (try
+        (let [result (await (editor-persist/persist-after-edit+ doc false true {:edit-visible? true}))]
+          (is (= [:save-settled] @!events)
+              "The save has resolved when the edit is reported")
+          (is (= {:success true :saved true} (select-keys result [:success :saved]))
+              "and the edit is reported as saved")
+          (is (false? (.-isDirty doc))))
+        (catch :default e
+          (is false (str e)))))))
 
-(deftest persist-after-edit-save-that-fails
+(deftest ^:async persist-after-edit-save-that-fails
   (testing "a save that VS Code resolves to false"
-    (async done
-           (let [doc (document-saving-later (atom []) (fn [{:keys [resolve]}] (resolve false)))]
-             (-> (p/let [result (editor-persist/persist-after-edit+ doc false true {:edit-visible? true})]
-                   (is (= {:success true :saved false} (select-keys result [:success :saved]))
-                       "The edit is reported as in the buffer only")
-                   (done))
-                 (p/catch (fn [e]
-                            (is false (str e))
-                            (done))))))))
+    (let [doc (document-saving-later (atom []) (fn [{:keys [resolve]}] (resolve false)))]
+      (try
+        (let [result (await (editor-persist/persist-after-edit+ doc false true {:edit-visible? true}))]
+          (is (= {:success true :saved false} (select-keys result [:success :saved]))
+              "The edit is reported as in the buffer only"))
+        (catch :default e
+          (is false (str e)))))))
 
-(deftest persist-after-edit-save-that-rejects
+(deftest ^:async persist-after-edit-save-that-rejects
   (testing "a save that rejects"
-    (async done
-           (let [doc (document-saving-later (atom []) (fn [{:keys [reject]}] (reject (js/Error. "disk full"))))]
-             (-> (p/let [result (editor-persist/persist-after-edit+ doc false true {:edit-visible? true})]
-                   (is (= {:success true :saved false :error "disk full"}
-                          (select-keys result [:success :saved :error]))
-                       "The edit is reported as in the buffer only, with the error's message")
-                   (done))
-                 (p/catch (fn [e]
-                            (is false (str e))
-                            (done))))))))
+    (let [doc (document-saving-later (atom []) (fn [{:keys [reject]}] (reject (js/Error. "disk full"))))]
+      (try
+        (let [result (await (editor-persist/persist-after-edit+ doc false true {:edit-visible? true}))]
+          (is (= {:success true :saved false :error "disk full"}
+                 (select-keys result [:success :saved :error]))
+              "The edit is reported as in the buffer only, with the error's message"))
+        (catch :default e
+          (is false (str e)))))))

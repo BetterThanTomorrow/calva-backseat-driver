@@ -1,7 +1,7 @@
 (ns calva-backseat-driver.app.dispatch-test
   (:require ["fs" :as fs]
             ["path" :as path]
-            [cljs.test :refer [deftest is async use-fixtures]]
+            [cljs.test :refer [deftest is use-fixtures]]
             [calva-backseat-driver.app.db :as db]
             [calva-backseat-driver.app.dispatch :as dispatch]
             [vscode-mcp.manifest :as manifest]))
@@ -30,33 +30,32 @@
               (map namespace (keys (dispatch/actions))))
       "Every action is named for its domain"))
 
-(deftest a-tool-call-through-the-loop
-  (async done
-    (-> (js/Promise.all
-         #js [(dispatch/dispatch! [[:tool/ax.call {:call/tool "clojure_balance_brackets"
-                                                   :call/arguments {:text "(def foo [a b"}}]])
-              (dispatch/dispatch! [[:tool/ax.call {:call/tool "clojure_evaluate_code"
-                                                   :call/arguments {:code "1"}}]])
-              (dispatch/dispatch! [[:tool/ax.call {:call/tool "no_such_tool"
-                                                   :call/arguments {}}]])
-              (dispatch/dispatch! [[:tool/ax.call {:call/tool "clojure_repl_output_log"
-                                                   :call/arguments {:query "[:find [?text ...] :in $ ?category :where [?e :output/category ?category] [?e :output/text ?text]]"
-                                                                    :inputs ["evaluatedCode"]}}]])
-              (dispatch/dispatch! [[:tool/ax.call {:call/tool "clojure_repl_output_log"
-                                                   :call/arguments {:query "[:find ?e :where [(nope ?x)]]"}}]])])
-        (.then (fn [[balanced disabled unknown found thrown]]
-                 (is (= "(def foo [a b])"
-                        (-> balanced :result/content first :text js/JSON.parse (js->clj :keywordize-keys true) :balanced-text))
-                     "A call resolves to the tool's result as content parts")
-                 (is (= {:result/refused :disabled} disabled)
-                     "A tool whose setting is off is refused")
-                 (is (= {:result/refused :unknown} unknown)
-                     "A tool that the manifest doesn't have is refused")
-                 (is (= [{:type "text" :text "[\"(+ 1 2)\"]"}]
-                        (:result/content found))
-                     "An output log query runs on the log in the state")
-                 (is (= {:result/thrown "Query for unknown vars: [?e]"} thrown)
-                     "A query that fails is a tool that threw, with the message")))
-        (.catch (fn [e]
-                  (is (nil? e) "The calls resolve")))
-        (.finally done))))
+(deftest ^:async a-tool-call-through-the-loop
+  (try
+    (let [[balanced disabled unknown found thrown]
+          (await (js/Promise.all
+                  #js [(dispatch/dispatch! [[:tool/ax.call {:call/tool "clojure_balance_brackets"
+                                                            :call/arguments {:text "(def foo [a b"}}]])
+                       (dispatch/dispatch! [[:tool/ax.call {:call/tool "clojure_evaluate_code"
+                                                            :call/arguments {:code "1"}}]])
+                       (dispatch/dispatch! [[:tool/ax.call {:call/tool "no_such_tool"
+                                                            :call/arguments {}}]])
+                       (dispatch/dispatch! [[:tool/ax.call {:call/tool "clojure_repl_output_log"
+                                                            :call/arguments {:query "[:find [?text ...] :in $ ?category :where [?e :output/category ?category] [?e :output/text ?text]]"
+                                                                             :inputs ["evaluatedCode"]}}]])
+                       (dispatch/dispatch! [[:tool/ax.call {:call/tool "clojure_repl_output_log"
+                                                            :call/arguments {:query "[:find ?e :where [(nope ?x)]]"}}]])]))]
+      (is (= "(def foo [a b])"
+             (-> balanced :result/content first :text js/JSON.parse (js->clj :keywordize-keys true) :balanced-text))
+          "A call resolves to the tool's result as content parts")
+      (is (= {:result/refused :disabled} disabled)
+          "A tool whose setting is off is refused")
+      (is (= {:result/refused :unknown} unknown)
+          "A tool that the manifest doesn't have is refused")
+      (is (= [{:type "text" :text "[\"(+ 1 2)\"]"}]
+             (:result/content found))
+          "An output log query runs on the log in the state")
+      (is (= {:result/thrown "Query for unknown vars: [?e]"} thrown)
+          "A query that fails is a tool that threw, with the message"))
+    (catch :default e
+      (is (nil? e) "The calls resolve"))))
