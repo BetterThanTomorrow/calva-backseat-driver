@@ -6,6 +6,6 @@
         thheller/shadow-cljs {:mvn/version "3.5.14"}
         io.github.pez/baldr {:mvn/version "1.0.9"}
         io.github.betterthantomorrow/vscode-mcp {:git/url "https://github.com/BetterThanTomorrow/vscode-mcp.git"
-                                                 :git/sha "df2d1e48f5838b4008bfd27bf6ba0c81b970cd84"}}
+                                                 :git/sha "6b2a3a5484abaa83014db0635bcc4e51cef52df3"}}
  :aliases {:local-dev {:override-deps {io.github.betterthantomorrow/vscode-mcp {:local/root "../vscode-mcp"}}}
            :e2e-test-joyride {:extra-deps {joyride/workspace {:local/root "e2e-test-ws/.joyride"}}}}}
