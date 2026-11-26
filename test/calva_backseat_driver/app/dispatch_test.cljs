@@ -4,14 +4,12 @@
             [cljs.test :refer [deftest is async use-fixtures]]
             [calva-backseat-driver.app.db :as db]
             [calva-backseat-driver.app.dispatch :as dispatch]
-            [calva-backseat-driver.app.live-objects :as live-objects]))
-
-(def ^:private extension-context
-  "An extension context with the manifest, which is what gating a tool reads from it."
-  #js {:extension #js {:packageJSON (js/JSON.parse (fs/readFileSync (path/resolve "package.json") "utf8"))}})
+            [vscode-mcp.manifest :as manifest]))
 
 (def ^:private state
-  {:app/min-log-level :error
+  {:extension/manifest (manifest/manifest-data
+                        #js {:extension #js {:packageJSON (js/JSON.parse (fs/readFileSync (path/resolve "package.json") "utf8"))}})
+   :app/min-log-level :error
    :vscode/config.enableMcpReplEvaluation false
    :vscode/config.provideBdSkill true
    :vscode/config.provideEditSkill true
@@ -19,10 +17,8 @@
 
 (use-fixtures :each
   {:before (fn []
-             (live-objects/put! :vscode/extension-context extension-context)
              (reset! db/!app-db state))
    :after (fn []
-            (live-objects/remove! :vscode/extension-context)
             (reset! db/!app-db db/init-db))})
 
 (deftest tables

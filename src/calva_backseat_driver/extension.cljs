@@ -9,7 +9,8 @@
    [calva-backseat-driver.integrations.calva.version :as version]
    [calva-backseat-driver.integrations.vscode.settings :as settings]
    [vscode-mcp.cursor :as vscode-mcp-cursor]
-   [vscode-mcp.eca :as vscode-mcp-eca]))
+   [vscode-mcp.eca :as vscode-mcp-eca]
+   [vscode-mcp.manifest :as manifest]))
 
 (defn- mcp-availability
   "What the MCP server's start by itself depends on: the editors and extensions it can
@@ -20,12 +21,13 @@
    :mcp/workspace-root-present? (vscode-mcp-eca/workspace-root-present?)})
 
 (defn- initial-state
-  "The state the extension starts with: the settings, what is available, and where its
-   files are, as URI strings."
+  "The state the extension starts with: the settings, what is available, the manifest
+   as data, and where its files are, as URI strings."
   [^js context]
   (merge (settings/settings context)
          (mcp-availability)
-         {:app/log-file-uri (str (vscode/Uri.joinPath (.-logUri context) "mcp-server.log"))
+         {:extension/manifest (manifest/manifest-data context)
+          :app/log-file-uri (str (vscode/Uri.joinPath (.-logUri context) "mcp-server.log"))
           :app/min-log-level :debug
           :mcp/wrapper-config-path (path/join (os/homedir) ".config" "calva" "backseat-driver")
           :calva/history-storage-uri (some-> (.-storageUri context)

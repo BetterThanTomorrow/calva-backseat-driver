@@ -52,9 +52,7 @@
 (defn- handle-request
   "Answers the MCP `request`. Returns the response, or a promise of it."
   [dispatch! options request]
-  (requests/handle-request-fn (assoc options
-                                     :uf/dispatch! dispatch!
-                                     :vscode/extension-context (live-objects/extension-context))
+  (requests/handle-request-fn (assoc options :uf/dispatch! dispatch!)
                               request))
 
 (defn- update-registry

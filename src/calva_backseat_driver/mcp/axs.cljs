@@ -104,7 +104,8 @@
   "Answers the MCP `request`. The dispatch resolves to the response."
   [state _uf-data request]
   {:uf/fxs [[:uf/await :mcp/fx.handle-request
-             {:mcp/repl-enabled? (:vscode/config.enableMcpReplEvaluation state)
+             {:mcp/manifest (:extension/manifest state)
+              :mcp/repl-enabled? (:vscode/config.enableMcpReplEvaluation state)
               :mcp/when-clause-settings (settings/when-clause-settings state)}
              request]]})
 

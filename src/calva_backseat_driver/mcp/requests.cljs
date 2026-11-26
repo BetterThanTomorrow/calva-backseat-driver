@@ -62,7 +62,7 @@
     nil))
 
 (defn- bd-resource-templates [options]
-  (let [all-tools (manifest/get-tools (:vscode/extension-context options) {:settings (:mcp/when-clause-settings options)})
+  (let [all-tools (manifest/get-tools (:mcp/manifest options) {:settings (:mcp/when-clause-settings options)})
         tool-desc (fn [t-name] (:description (first (filter #(= (:name %) t-name) all-tools))))]
     [{:uriTemplate "/symbol-info/{symbol}@{session-key}@{namespace}"
       :name "symbol-info"
@@ -96,9 +96,7 @@
 (defn handle-request-fn [{:uf/keys [dispatch!] :as options}
                          {:keys [method] :as request}]
   (dispatch! [[:app/ax.log :debug "[Server] handle-request " (pr-str request)]])
-  (let [opts (request-opts options)
-        ctx (:vscode/extension-context options)]
-    (case method
-      "tools/call" (handle-tools-call dispatch! request)
-      (mcp-requests/handle-manifest-request ctx request opts))))
+  (case method
+    "tools/call" (handle-tools-call dispatch! request)
+    (mcp-requests/handle-manifest-request (:mcp/manifest options) request (request-opts options))))
 

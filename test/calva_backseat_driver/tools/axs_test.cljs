@@ -1,10 +1,19 @@
 (ns calva-backseat-driver.tools.axs-test
-  (:require [cljs.test :refer [deftest is]]
+  (:require ["fs" :as fs]
+            ["path" :as path]
+            [cljs.test :refer [deftest is]]
             [calva-backseat-driver.event-handler :as event-handler]
             [calva-backseat-driver.tools.axs :as tools-axs]))
 
+(def ^:private manifest
+  "The manifest as data, with the tools that package.json has."
+  {:manifest/tools (js->clj (.. (js/JSON.parse (fs/readFileSync (path/resolve "package.json") "utf8"))
+                                -contributes
+                                -languageModelTools))})
+
 (def ^:private state
-  {:vscode/config.evaluation.maxLength 25
+  {:extension/manifest manifest
+   :vscode/config.evaluation.maxLength 25
    :vscode/config.evaluation.maxDepth 7
    :vscode/config.editor.fuzzyLineTargetingPadding 2
    :vscode/config.editor.lineContextResponsePadding 10
@@ -16,18 +25,15 @@
    :calva/output-line-counter 7
    :calva/output-log (sorted-map 7 {:output/line 7 :output/text "(+ 1 2)"})})
 
-(def ^:private when-clause-settings
-  {"config.calva-backseat-driver.provideBdSkill" true
-   "config.calva-backseat-driver.provideEditSkill" false
-   "config.calva-backseat-driver.enableMcpReplEvaluation" true
-   ":calva-mcp-extension/activated?" true})
-
 (defn- effects
-  "The effects that the handlers give for a call of `tool` with `arguments`."
-  [tool arguments]
-  (:uf/fxs (event-handler/handle-actions tools-axs/actions state {:system/now 0}
-                                         [[:tool/ax.call {:call/tool tool
-                                                          :call/arguments arguments}]])))
+  "The effects that the handlers give for a call of `tool` with `arguments`, in
+   `state`, or in the state above when none is given."
+  ([tool arguments]
+   (effects state tool arguments))
+  ([state tool arguments]
+   (:uf/fxs (event-handler/handle-actions tools-axs/actions state {:system/now 0}
+                                          [[:tool/ax.call {:call/tool tool
+                                                           :call/arguments arguments}]]))))
 
 (defn- run-effect
   "The effect that runs a call of `tool` with `arguments`."
@@ -52,8 +58,7 @@
           {:call/tool "clojure_evaluate_code"
            :call/arguments {:code "(+ 1 2)"}
            :call/state {:vscode/config.evaluation.maxLength 25
-                        :vscode/config.evaluation.maxDepth 7}
-           :call/when-clause-settings when-clause-settings}]
+                        :vscode/config.evaluation.maxDepth 7}}]
          (run-effect "clojure_evaluate_code" {:code "(+ 1 2)"}))
       "An evaluation runs with the print limits from the settings")
   (is (= {:vscode/config.editor.fuzzyLineTargetingPadding 2
@@ -66,9 +71,10 @@
   (is (= {}
          (:call/state (nth (run-effect "clojure_list_sessions" {}) 2)))
       "A tool that reads nothing from the state gets nothing")
-  (is (= {:call/tool "no_such_tool"
-          :call/arguments {}
-          :call/state {}
-          :call/when-clause-settings when-clause-settings}
-         (nth (run-effect "no_such_tool" {}) 2))
-      "A tool that isn't in the table is still run, for the effect to refuse"))
+  (is (= [[:uf/await :app/fx.return {:result/refused :unknown}]]
+         (effects "no_such_tool" {}))
+      "A tool that the manifest doesn't have isn't run, and the call is refused")
+  (is (= [[:uf/await :app/fx.return {:result/refused :disabled}]]
+         (effects (assoc state :vscode/config.enableMcpReplEvaluation false)
+                  "clojure_evaluate_code" {:code "(+ 1 2)"}))
+      "A tool whose setting is off isn't run, and writes no log line"))

@@ -180,12 +180,15 @@
 (deftest handle-request
   (let [request {:jsonrpc "2.0" :id 1 :method "tools/list"}]
     (is (= [[:uf/await :mcp/fx.handle-request
-             {:mcp/repl-enabled? false
+             {:mcp/manifest {:manifest/name "calva-backseat-driver"}
+              :mcp/repl-enabled? false
               :mcp/when-clause-settings {"config.calva-backseat-driver.provideBdSkill" true
                                          "config.calva-backseat-driver.provideEditSkill" nil
                                          "config.calva-backseat-driver.enableMcpReplEvaluation" false
                                          ":calva-mcp-extension/activated?" true}}
              request]]
-           (:uf/fxs (handle (assoc state :vscode/config.enableMcpReplEvaluation false)
+           (:uf/fxs (handle (assoc state
+                                   :vscode/config.enableMcpReplEvaluation false
+                                   :extension/manifest {:manifest/name "calva-backseat-driver"})
                             [:mcp/ax.handle-request request])))
-        "The request is answered with the settings that gate tools and skills")))
+        "The request is answered from the manifest, with the settings that gate tools and skills")))
