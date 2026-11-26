@@ -50,5 +50,5 @@
                                         (dispatch! context [[:mcp/ax.cursor-mcp-registered result]]))
       :lifecycle/on-cursor-registration-failed (fn [failure]
                                                  (dispatch! context [[:mcp/ax.cursor-mcp-registration-failed failure]]))
-      :lifecycle/on-error (fn [err]
-                            (dispatch! context [[:mcp/ax.server-error err]]))})))
+      :mcp/on-error (fn [err]
+                      (dispatch! context [[:mcp/ax.server-error err]]))})))
