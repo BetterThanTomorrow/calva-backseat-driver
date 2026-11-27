@@ -11,11 +11,15 @@ Changes to Calva Backseat Driver
 - Tools called through the Language Model API now refuse a tool whose setting is off, matching the MCP server's behaviour
 - Fix: [An edit to the file in the active editor can leave the buffer unsaved](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues/72). An edit comes back when VS Code has saved the file, format on save included
 - Fix: Text after an image, and a second image in the same result, are taken as part of the first image
-- Fix: The start message's copy buttons copy nothing
-- Fix: Skill descriptions are listed with their YAML quotes
-- Fix: A start that fails after the server began to listen leaves the socket open
+- Fix: The start message's copy buttons don't work
+- Fix: Skill descriptions are listed with YAML quotes retained
+- Fix: A failed start when the server is already listening leaves the socket open
 - Removed when-contexts `calva-backseat-driver/starting?` and `calva-backseat-driver/stopping?` (they were never used for anything)
-- For contributors: the e2e suite runs in another editor, such as Cursor, with `bb run-e2e-tests-ws --local --vscode-executable <path>`
+- Each time the MCP server starts, it installs Backseat Driver's skills in `~/.config/vscode-mcp/skills/calva-backseat-driver/`, for the user (or agent) to symlink
+- The `backseat-driver` and `editing-clojure-files` skills are always provided. (Settings removed)
+- Fix: Starting or stopping the MCP server while it is still starting can leave the server half started
+- Fix: The output log query examples in the `backseat-driver` skill use regex literals, which doesn't work
+- For contributors: the e2e suite can run in another editor, such as Cursor, with `bb run-e2e-tests-ws --local --vscode-executable <path>`
 
 ## [v0.0.47] - 2026-11-25
 
