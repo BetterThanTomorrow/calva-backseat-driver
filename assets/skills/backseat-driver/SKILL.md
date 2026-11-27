@@ -13,19 +13,22 @@ Scan your available skills for Clojure-related ones. If you see a skill named Cl
 
 ### In lack of Clojure skills
 
-If you don't see such a skill available, tell the user to install the `clojure` plugin from the Awesome Backseat Driver marketplace. Give these instructions:
+If you don't see such a skill available, tell the user to install the `clojure` and `clojure-editor` plugins from the Awesome Backseat Driver marketplace, https://github.com/BetterThanTomorrow/awesome-backseat-driver. `clojure` brings the Clojure skill. `clojure-editor` brings the subagents that the `editing-clojure-files` skill delegates edits to. Give the instructions for the user's harness:
 
-```markdown
-1. From the VS Code command palette run: **Chat: Install Plugin from Source**
-1. Paste: https://github.com/BetterThanTomorrow/awesome-backseat-driver
-1. Select **clojure**
-````
+- **VS Code (Copilot):** From the command palette, run **Chat: Install Plugin from Source**, paste the repo URL, and select **clojure**. Do the same for **clojure-editor**.
+- **Cursor:** In **Cursor Settings → Plugins**, paste the repo URL in the search field, and install **clojure** and **clojure-editor**.
+- **Claude Code:** Run these in Claude Code:
+  ```
+  /plugin install clojure --marketplace BetterThanTomorrow/awesome-backseat-driver
+  /plugin install clojure-editor --marketplace BetterThanTomorrow/awesome-backseat-driver
+  ```
+- **Another harness:** The skills and agents in the repo are Markdown files. Offer to copy the ones the user wants into the harness's skills and agents folders.
 
 ## Core Principles
 
 1. **ClojureDocs before guessing** — Before using any core function you the very least unsure about how to use effectively, call `clojuredocs_info`. You will get docstrings, argument lists, community examples, and gotchas. What's not to love?
 
-2. **Structural editing for structural code** — Clojure is a structural language. Use the structural editing tools, not generic text replacement. See `dev/tool-instructions/editing-clojure-files.md` for detailed workflows.
+2. **Structural editing for structural code** — Clojure is a structural language. Use the structural editing tools, not generic text replacement. The `editing-clojure-files` skill has the detailed workflows.
 
 ## The Workflow
 
@@ -36,8 +39,8 @@ Every task — implementing, debugging, planning, reviewing — follows this loo
 3. EXPLORE   → clojure_evaluate_code (test ideas in the REPL)
 4. BUILD UP  → clojure_evaluate_code (compose verified pieces)
 5. APPLY     → structural editing tools (edit files with verified code — check returned linter diagnostics)
-6. VERIFY    → clojure_load_file / clojure_evaluate_code (load file or namespace, call functions) + get_errors (Problems report)
-7. MONITOR   → clojure_repl_output_log (side effects, errors) + get_errors (new warnings/errors)
+6. VERIFY    → clojure_load_file / clojure_evaluate_code (load file or namespace, call functions) + the editor's diagnostics (Problems report, `get_errors` in Copilot)
+7. MONITOR   → clojure_repl_output_log (side effects, errors) + the editor's diagnostics (new warnings/errors)
 
 Not every task needs all steps. A planner might stop at step 4. A reviewer might focus on steps 1-3. But the sequence is always orient → research → explore.
 
@@ -207,7 +210,7 @@ Use Backseat Driver's structural editing tools for all Clojure file modification
 
 ### Joyride projects
 
-In a Joyride context, if the `joyride_evaluate_code` tool is available, "Use the REPL" means `joyride_evaluate_code`. In lieu of the `joyride_evaluate_code` tool, use the `clojure_evaluate_tool`. Joyride's REPL runs in the VS Code Extension Host and is promise-aware in ways that Backseat Driver's REPL is not — using Backseat Driver's eval for Joyride code leads to async problems. Other tools of Backseat Driver (ClojureDocs, symbol info, structural editing, output log) remain useful.
+In a Joyride context, if the `joyride_evaluate_code` tool is available, "Use the REPL" means `joyride_evaluate_code`. In lieu of the `joyride_evaluate_code` tool, use `clojure_evaluate_code`. Joyride's REPL runs in the VS Code Extension Host and is promise-aware in ways that Backseat Driver's REPL is not — using Backseat Driver's eval for Joyride code leads to async problems. Other tools of Backseat Driver (ClojureDocs, symbol info, structural editing, output log) remain useful.
 
 
 ## Connecting an agent over MCP

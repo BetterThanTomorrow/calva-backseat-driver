@@ -9,7 +9,7 @@ Clojure code is a tree of forms, not lines of text. The unit of editing is the t
 
 ## Delegation
 
-Unless you have been specifically tasked with editing files yourself, always delegate file editing to a subagent. This protects the context window and isolates errors. Prefer the `Clojure-editor` subagent when available.
+Unless you have been specifically tasked with editing files yourself, always delegate file editing to a subagent. This protects the context window and isolates errors. Prefer the `clojure-editor` subagent when available. It comes with the `clojure-editor` plugin from Awesome Backseat Driver, https://github.com/BetterThanTomorrow/awesome-backseat-driver.
 
 **When delegating**: Provide exact file paths, REPL-verified code with proper indentation, target line info, decision context, and explicit edit order instructions.
 
