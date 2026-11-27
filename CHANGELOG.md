@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+- Update info aboyt Awesome Backseat Driver in bundled skills
+
 ## [v0.0.48] - 2026-11-27
 
 - Fix: A failed MCP server start shows no error message
