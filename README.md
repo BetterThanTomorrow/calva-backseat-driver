@@ -1,6 +1,6 @@
 # Enabling Native AI Interactive Programming in VS Code
 
-Clojure Tools for VS Code Agent harnesses. (Such as Copilot and Cursor.)
+Clojure tools for the AI agents you use with VS Code: Copilot, Cursor, Claude Code, ECA, and any other agent that speaks MCP.
 
 [![VS Code Extension](https://img.shields.io/visual-studio-marketplace/v/betterthantomorrow.calva-backseat-driver)](https://marketplace.visualstudio.com/items?itemName=betterthantomorrow.calva-backseat-driver)
 [![Issues](https://img.shields.io/github/issues/BetterThanTomorrow/calva-backseat-driver)](https://github.com/BetterThanTomorrow/calva-backseat-driver/issues)
@@ -8,9 +8,10 @@ Clojure Tools for VS Code Agent harnesses. (Such as Copilot and Cursor.)
 
 Backseat Driver gives VS Code AI harnesses access to [Calva](https://calva.io)'s Clojure tools these ways:
 
-1. **Copilot**: Zero config. (Using **VS Code LM Tools.**).
-2. **Cursor**, Zero config. (Using Cursor add-MCP-server API).
-3. **Other AI harnesses**: MCP (Requiring [some configuration](MCP-CONFIGURATION.md) per project).
+1. **Copilot**: Zero config. (Using **VS Code LM Tools.**)
+2. **Cursor**: Zero config. (Using Cursor's add-MCP-server API.)
+3. **ECA**: Zero config, when the ECA extension is installed. (Backseat Driver writes the project's `.eca/config.json`.)
+4. **Claude Code and other agent harnesses**: MCP. An agent running in a VS Code window needs one line of user-level config, and it then reaches whichever window it runs in. See [Configure Backseat Driver as an MCP server](MCP-CONFIGURATION.md).
 
 ## Features
 
@@ -40,7 +41,7 @@ For truly effective agent Clojure work to happen, it needs to know how you prefe
 To avoid starting with a blank slate, where bad training data and hallucinations about Clojure ruin the day, consider installing the **clojure**, and other plugins from the [Awesome Backseat Driver](https://github.com/BetterThanTomorrow/awesome-backseat-driver) repository.
 
 > [!NOTE]
-> **Awesome Backseat Driver** has plugins for Copilot and Cursor (so far). But if you are using some other haress, you can still copy the skills, custom agents, etc from there. (Or ask your agent to do it for you.)
+> **Awesome Backseat Driver** has plugins for Copilot, Cursor, and Claude Code. If you are using some other harness, you can still copy the skills, custom agents, etc from there. (Or ask your agent to do it for you.)
 
 ## Configuring Backseat Driver
 
@@ -53,10 +54,11 @@ To prevent large REPL evaluation results from overwhelming the agent's context w
 
 ### Skills
 
-Backseat Driver provides two skills to AI agents:
+Backseat Driver comes with two skills: `backseat-driver`, for using its tools, and `editing-clojure-files`, for structural editing.
 
-- `calva-backseat-driver.provideBdSkill` (default `true`) — provide the Backseat Driver skill to agents
-- `calva-backseat-driver.provideEditSkill` (default `true`) — provide the Clojure structural editing skill to agents
+- Copilot gets them as VS Code chat skills.
+- Over MCP, they are resources (`resources/list`, `skill://index.json`).
+- Backseat Driver also installs them in `~/.config/vscode-mcp/skills/calva-backseat-driver/`. A harness that doesn't pick up an MCP server's skills, such as Claude Code, can link them from there into its skills folder. (The agent offers to do this for you when it connects.)
 
 ### Editor configuration
 
@@ -76,13 +78,13 @@ See: [Configure Backseat Driver as an MCP server](MCP-CONFIGURATION.md)
 - [VS Code](https://code.visualstudio.com/) (or your favorite fork)
 - [Calva](https://marketplace.visualstudio.com/items?itemName=betterthantomorrow.calva)
 - [Calva Backseat Driver](https://marketplace.visualstudio.com/items?itemName=betterthantomorrow.calva-backseat-driver)
-- GitHub Copilot (or some MCP compliant assistant)
+- An AI agent: Copilot, Cursor, Claude Code, ECA, or any other MCP client
 
 ### Using
 
-0. Teach the AI Clojure and REPL discipline, e.g. See: [Agent Instructions](#agentt-instructions-leveraging-backseat-driver)
+0. Teach the AI Clojure and REPL discipline, e.g. See: [Agent Instructions](#agent-instructions-leveraging-backseat-driver)
 1. Connect Calva to your Clojure/ClojureScript project
-1. Ask Copilot to help you with things. It will know what you mean when you say: "Please use the REPL to investigate ...".
+1. Ask your agent to help you with things. It will know what you mean when you say: "Please use the REPL to investigate ...".
   * It will know how to find the right REPL session and how to use it.
   * Configure Calva to use the terminal for REPL output and monitor the output terminal to see what it tries at the REPL
 
