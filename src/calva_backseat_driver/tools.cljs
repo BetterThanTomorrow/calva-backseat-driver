@@ -102,6 +102,8 @@
 
 ;; The tool table
 
+;; The table is data, one row per tool, which CodeScene measures as a long function
+;; @CodeScene(disable:"Large Method")
 (def tools
   "One row per tool: the var that runs it, what it reads from the app state, the log
    line a call writes (a keyword in it stands for that argument of the call), the
