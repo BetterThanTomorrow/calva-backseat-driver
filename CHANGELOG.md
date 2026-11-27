@@ -4,6 +4,8 @@ Changes to Calva Backseat Driver
 
 ## [Unreleased]
 
+## [v0.0.48] - 2026-11-27
+
 - Fix: A failed MCP server start shows no error message
 - Fix: A failed Cursor registration from the command shows no message
 - Fix: Cursor registrations are not written to the MCP server log
